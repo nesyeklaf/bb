@@ -3,9 +3,10 @@ import * as React from "react";
 import { useLatestRef } from "@/hooks/useLatestRef";
 import {
   browserNavigationEdgeGuardPx,
+  composedElementPath,
   findTouchById,
   hasTextSelectionWithin,
-  isHorizontallyScrollableElement,
+  startsInHorizontalScroller,
 } from "./gesture-dom";
 
 const DRAG_INTENT_PX = 12;
@@ -27,7 +28,7 @@ type DragSession = {
   lastTime: number;
   velocityX: number;
   dragging: boolean;
-  target: Element | null;
+  path: readonly Element[];
   boundary: Element;
 };
 
@@ -77,14 +78,16 @@ function trackedPoint(event: Event, session: DragSession): Point | null {
   return { x: event.clientX, y: event.clientY };
 }
 
-function startsInHorizontalScroller(session: DragSession): boolean {
-  let element = session.target;
-  while (element !== null) {
-    if (isHorizontallyScrollableElement(element)) return true;
-    if (element === session.boundary) return false;
-    element = element.parentElement;
-  }
-  return false;
+function startsInDetachedOrScrollingTarget(session: DragSession): boolean {
+  const [target] = session.path;
+  return (
+    target !== undefined &&
+    (!target.isConnected ||
+      startsInHorizontalScroller(
+        session.path,
+        (element) => element === session.boundary,
+      ))
+  );
 }
 
 function suppressNextClick() {
@@ -167,9 +170,7 @@ export function useHorizontalDismissDrag(options: Options) {
         }
         if (
           !optionsRef.current.shouldBeginDrag() ||
-          (session.target !== null &&
-            (!session.target.isConnected ||
-              startsInHorizontalScroller(session)))
+          startsInDetachedOrScrollingTarget(session)
         ) {
           clearSession();
           return;
@@ -250,7 +251,7 @@ export function useHorizontalDismissDrag(options: Options) {
       id: number,
       x: number,
       y: number,
-      target: EventTarget | null,
+      path: readonly Element[],
       boundary: Element,
     ) => {
       if (hasTextSelectionWithin(boundary)) return;
@@ -276,7 +277,7 @@ export function useHorizontalDismissDrag(options: Options) {
         lastTime: Date.now(),
         velocityX: 0,
         dragging: false,
-        target: target instanceof Element ? target : null,
+        path,
         boundary,
       };
       sessionRef.current = session;
@@ -303,7 +304,7 @@ export function useHorizontalDismissDrag(options: Options) {
         event.pointerId,
         event.clientX,
         event.clientY,
-        event.target,
+        composedElementPath(event),
         boundary,
       );
     },
@@ -332,7 +333,7 @@ export function useHorizontalDismissDrag(options: Options) {
         touch.identifier,
         touch.clientX,
         touch.clientY,
-        event.target,
+        composedElementPath(event),
         boundary,
       );
     },
