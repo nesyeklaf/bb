@@ -26,6 +26,23 @@ export function isHorizontallyScrollableElement(element: Element): boolean {
   );
 }
 
+export function composedElementPath(event: Event): Element[] {
+  return event
+    .composedPath()
+    .filter((node): node is Element => node instanceof Element);
+}
+
+export function startsInHorizontalScroller(
+  path: readonly Element[],
+  isBoundary: (element: Element) => boolean,
+): boolean {
+  for (const element of path) {
+    if (isHorizontallyScrollableElement(element)) return true;
+    if (isBoundary(element)) return false;
+  }
+  return false;
+}
+
 export function hasTextSelectionWithin(root: Element): boolean {
   const selection = root.ownerDocument.getSelection();
   if (selection === null || selection.isCollapsed) return false;

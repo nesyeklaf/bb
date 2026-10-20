@@ -31,7 +31,11 @@ function fireTouch(
   type: "touchstart" | "touchmove" | "touchend",
   touch: Touch,
 ) {
-  const event = new Event(type, { bubbles: true, cancelable: true });
+  const event = new Event(type, {
+    bubbles: true,
+    cancelable: true,
+    composed: true,
+  });
   Object.defineProperties(event, {
     touches: {
       value: type === "touchend" ? createTouchList() : createTouchList(touch),
@@ -285,6 +289,29 @@ describe("CompactSecondaryPanelShelf", () => {
     fireTouch(window, "touchmove", createTouch(240, 164));
     fireTouch(window, "touchend", createTouch(240, 164));
     expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  it("leaves a swipe over a shadow-root scroller to the scroller", () => {
+    const { onClose } = renderShelf(true);
+    const shelf = screen.getByTestId("secondary-panel-shelf");
+    Object.defineProperty(shelf, "clientWidth", { value: 300 });
+    const shadowRoot = screen
+      .getByTestId("panel-body")
+      .attachShadow({ mode: "open" });
+    const scroller = document.createElement("code");
+    scroller.style.overflowX = "scroll";
+    Object.defineProperty(scroller, "scrollWidth", { get: () => 500 });
+    Object.defineProperty(scroller, "clientWidth", { get: () => 100 });
+    const line = document.createElement("span");
+    line.textContent = "const wideLine = true;";
+    scroller.append(line);
+    shadowRoot.append(scroller);
+
+    fireTouch(line, "touchstart", createTouch(60, 160));
+    fireTouch(window, "touchmove", createTouch(240, 164));
+    fireTouch(window, "touchend", createTouch(240, 164));
+
+    expect(onClose).not.toHaveBeenCalled();
   });
 
   it("ignores a closing swipe from the left browser edge", () => {
