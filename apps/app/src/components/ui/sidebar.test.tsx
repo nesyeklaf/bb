@@ -92,7 +92,11 @@ function fireTouch(
   type: "touchstart" | "touchmove",
   touch: Touch,
 ) {
-  const event = new Event(type, { bubbles: true, cancelable: true });
+  const event = new Event(type, {
+    bubbles: true,
+    cancelable: true,
+    composed: true,
+  });
   Object.defineProperties(event, {
     touches: { value: createTouchList(touch) },
     changedTouches: { value: createTouchList(touch) },
@@ -156,6 +160,31 @@ function renderScrollerSwipeHarness() {
     prose: screen.getByText("Wide code block"),
     getScrollWidthReads: () => scrollWidthReads,
   };
+}
+
+function renderShadowScrollerSwipeHarness() {
+  render(
+    <CompactViewportOverrideProvider isCompactViewport>
+      <SidebarProvider>
+        <Sidebar>Sidebar content</Sidebar>
+        <SidebarInset>
+          <div data-testid="shadow-host" />
+        </SidebarInset>
+      </SidebarProvider>
+    </CompactViewportOverrideProvider>,
+  );
+  const shadowRoot = screen
+    .getByTestId("shadow-host")
+    .attachShadow({ mode: "open" });
+  const scroller = document.createElement("code");
+  scroller.style.overflowX = "scroll";
+  Object.defineProperty(scroller, "scrollWidth", { get: () => 500 });
+  Object.defineProperty(scroller, "clientWidth", { get: () => 100 });
+  const line = document.createElement("span");
+  line.textContent = "const wideLine = true;";
+  scroller.append(line);
+  shadowRoot.append(scroller);
+  return { line };
 }
 
 function renderSelectableSwipeHarness() {
@@ -1447,6 +1476,16 @@ describe("mobile sidebar text-selection arbitration", () => {
     firePointer(window, "pointermove", 280, 164);
 
     expect(getScrollWidthReads()).toBe(1);
+    expect(getMobilePanel()?.dataset.state).toBe("closed");
+  });
+
+  it("leaves a swipe over a shadow-root scroller to the scroller", () => {
+    const { line } = renderShadowScrollerSwipeHarness();
+
+    fireTouch(line, "touchstart", createTouch(120, 160));
+    fireTouch(window, "touchmove", createTouch(260, 164));
+    fireTouch(window, "touchmove", createTouch(280, 164));
+
     expect(getMobilePanel()?.dataset.state).toBe("closed");
   });
 

@@ -15,9 +15,10 @@ import {
 } from "./secondary-panel-shelf-visibility.js";
 import {
   browserNavigationEdgeGuardPx,
+  composedElementPath,
   findTouchById,
   hasTextSelectionWithin,
-  isHorizontallyScrollableElement,
+  startsInHorizontalScroller,
 } from "./gesture-dom.js";
 import { useHorizontalDismissDrag } from "./use-horizontal-dismiss-drag.js";
 import { MACOS_WINDOW_DRAG_CLASS } from "@/lib/bb-desktop";
@@ -74,7 +75,7 @@ type SidebarInsetSwipeSession = {
   velocityX: number;
   isDragging: boolean;
   selectionRoot: Element | null;
-  startTarget: Element | null;
+  startPath: readonly Element[];
   canPreventDefault: boolean;
 };
 
@@ -184,7 +185,7 @@ function createSidebarInsetSwipeSession({
   startY,
   startTimeMs,
   selectionRoot,
-  startTarget,
+  startPath,
   canPreventDefault,
 }: {
   kind: "pointer" | "touch";
@@ -193,7 +194,7 @@ function createSidebarInsetSwipeSession({
   startY: number;
   startTimeMs: number;
   selectionRoot: Element | null;
-  startTarget: Element | null;
+  startPath: readonly Element[];
   canPreventDefault: boolean;
 }): SidebarInsetSwipeSession {
   return {
@@ -208,7 +209,7 @@ function createSidebarInsetSwipeSession({
     velocityX: 0,
     isDragging: false,
     selectionRoot,
-    startTarget,
+    startPath,
     canPreventDefault,
   };
 }
@@ -234,21 +235,18 @@ function shouldOpenSidebarMobileSwipe(
   );
 }
 
-function isInsideHorizontalScrollRegion(target: Element): boolean {
-  let element: Element | null = target;
-  while (element !== null) {
-    if (isHorizontallyScrollableElement(element)) {
-      return true;
-    }
-    if (
-      element.matches('[data-sidebar="inset"], [data-sidebar-mobile-backdrop]')
-    ) {
-      return false;
-    }
-    element = element.parentElement;
-  }
+function isInsideHorizontalScrollRegion(path: readonly Element[]): boolean {
+  return startsInHorizontalScroller(path, (element) =>
+    element.matches('[data-sidebar="inset"], [data-sidebar-mobile-backdrop]'),
+  );
+}
 
-  return false;
+function startsInDetachedOrScrollingTarget(path: readonly Element[]): boolean {
+  const [target] = path;
+  return (
+    target !== undefined &&
+    (!target.isConnected || isInsideHorizontalScrollRegion(path))
+  );
 }
 
 function getSidebarSwipeSelectionRoot(
@@ -1307,9 +1305,7 @@ const SidebarInset = React.forwardRef<
 
         if (
           isCompactSecondaryPanelSwipeOpening() ||
-          (session.startTarget !== null &&
-            (!session.startTarget.isConnected ||
-              isInsideHorizontalScrollRegion(session.startTarget)))
+          startsInDetachedOrScrollingTarget(session.startPath)
         ) {
           clearSidebarMobileDragStyles();
           clearSwipeSession();
@@ -1480,7 +1476,7 @@ const SidebarInset = React.forwardRef<
         startY: touch.clientY,
         startTimeMs: event.timeStamp,
         selectionRoot: getSidebarSwipeSelectionRoot(event.target),
-        startTarget: event.target instanceof Element ? event.target : null,
+        startPath: composedElementPath(event),
         canPreventDefault,
       });
 
@@ -1536,7 +1532,7 @@ const SidebarInset = React.forwardRef<
         startY: event.clientY,
         startTimeMs: event.timeStamp,
         selectionRoot: getSidebarSwipeSelectionRoot(event.target),
-        startTarget: event.target instanceof Element ? event.target : null,
+        startPath: composedElementPath(event),
         canPreventDefault: true,
       });
 
@@ -1630,10 +1626,7 @@ const SidebarInset = React.forwardRef<
         return;
       }
 
-      if (
-        event.target instanceof Element &&
-        isInsideHorizontalScrollRegion(event.target)
-      ) {
+      if (isInsideHorizontalScrollRegion(composedElementPath(event))) {
         return;
       }
 
