@@ -58,7 +58,7 @@ ssh AI 'bash ~/bb-fork-remote.sh rollback'             # package and config only
 ssh AI 'bash ~/bb-fork-remote.sh rollback --with-db'   # also bb.db
 ```
 
-A newer bb migrates `bb.db` on its first start, and an older bb does not know those migrations. So a rollback without `--with-db` fails when the deploy brought new migrations. Check with `git diff --stat <old>..<new> -- apps/server/drizzle`. `--with-db` restores the database as it was before the deploy and loses every thread, message and setting written since.
+A newer bb migrates `bb.db` on its first start, and an older bb does not know those migrations. So a rollback without `--with-db` fails when the deploy brought new migrations. Check with `git diff --stat <old>..<new> -- packages/db/drizzle`. `--with-db` restores the database as it was before the deploy and loses every thread, message and setting written since.
 
 ## Network
 
