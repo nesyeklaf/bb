@@ -538,6 +538,7 @@ payloads. Use it to reproduce performance problems that only appear at scale.
 - Scale flags: `--projects`, `--threads`, `--events`, `--seed`. `--reset`
   deletes the database file first. Without `--reset` the fixture appends.
 - Example: `pnpm seed:perf -- --reset --events 400000`.
+- `scripts/perf` drives scripted browser captures (frame budget, long tasks, input latency, perceived wait) against a seeded production build; setup, scenarios and validity checks are in [scripts/perf/DOCUMENTATION.md](../scripts/perf/DOCUMENTATION.md).
 
 ## Opt-in Benchmarks
 
