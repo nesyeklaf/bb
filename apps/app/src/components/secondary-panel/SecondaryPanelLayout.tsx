@@ -59,7 +59,6 @@ interface SecondaryPanelLayoutProps {
   open: boolean;
   onToggle: () => void;
   onClose: () => void;
-  onSwipeOpen?: () => void;
   panelGroupKey?: Key;
   resetKey: Key;
   contentKey: string;
@@ -81,7 +80,6 @@ export function SecondaryPanelLayout({
   open,
   onToggle,
   onClose,
-  onSwipeOpen,
   panelGroupKey,
   resetKey,
   contentKey,
@@ -386,7 +384,6 @@ export function SecondaryPanelLayout({
         <CompactSecondaryPanelShelf
           open={open}
           onClose={onClose}
-          onOpen={onSwipeOpen}
           srLabel={drawerLabel}
           onContentAnimationEnd={handleDrawerContentAnimationEnd}
         >

@@ -8,7 +8,6 @@ import { MobilePanelTabPager } from "./MobilePanelTabPager";
 import { APP_OVERLAY_LAYER } from "@/components/ui/app-overlay-layers";
 import {
   getCompactSecondaryPanelPresentation,
-  isCompactSecondaryPanelSwipeOpening,
 } from "@/components/ui/secondary-panel-shelf-visibility";
 
 function createTouch(clientX: number, clientY: number): Touch {
@@ -92,7 +91,7 @@ describe("CompactSecondaryPanelShelf", () => {
     );
   });
 
-  it("opens from a leftward swipe on the main content and snaps back from a short one", () => {
+  it("stays closed after a leftward swipe on the main content", () => {
     vi.useFakeTimers();
     try {
       const onOpen = vi.fn();
@@ -104,12 +103,13 @@ describe("CompactSecondaryPanelShelf", () => {
         <>
           <main data-sidebar="inset">
             <div data-testid="main-body" />
-            <textarea data-testid="composer" />
           </main>
           <CompactSecondaryPanelShelf
             open={false}
             onClose={vi.fn()}
-            onOpen={onOpen}
+            // The shelf no longer accepts an open handler; pass one anyway so
+            // the test would catch a swipe-to-open path that still calls it.
+            {...({ onOpen } as object)}
             srLabel="Right panel"
           >
             <div data-testid="panel-body" />
@@ -124,48 +124,15 @@ describe("CompactSecondaryPanelShelf", () => {
       const body = screen.getByTestId("main-body");
 
       fireTouch(body, "touchstart", createTouch(300, 160));
-      fireTouch(window, "touchmove", createTouch(260, 162));
-      expect(Number.parseFloat(inset.style.translate)).toBeCloseTo(-40);
-      expect(shelf.style.visibility).toBe("visible");
-      fireTouch(window, "touchend", createTouch(260, 162));
-      vi.advanceTimersByTime(250);
-      expect(onOpen).not.toHaveBeenCalled();
+      fireTouch(window, "touchmove", createTouch(60, 162));
       expect(inset.style.translate).toBe("");
       expect(shelf.style.visibility).toBe("");
-
-      fireTouch(body, "touchstart", createTouch(100, 160));
-      fireTouch(window, "touchmove", createTouch(300, 162));
-      fireTouch(window, "touchend", createTouch(300, 162));
+      fireTouch(window, "touchend", createTouch(60, 162));
       vi.advanceTimersByTime(250);
-      expect(onOpen).not.toHaveBeenCalled();
 
-      inset.setAttribute("data-sidebar-shelf", "open");
-      fireTouch(body, "touchstart", createTouch(300, 160));
-      fireTouch(window, "touchmove", createTouch(100, 162));
+      expect(onOpen).not.toHaveBeenCalled();
+      expect(shelf.dataset.state).toBe("closed");
       expect(inset.style.translate).toBe("");
-      fireTouch(window, "touchend", createTouch(100, 162));
-      vi.advanceTimersByTime(250);
-      expect(onOpen).not.toHaveBeenCalled();
-      inset.removeAttribute("data-sidebar-shelf");
-
-      const composer = screen.getByTestId("composer");
-      fireTouch(composer, "touchstart", createTouch(300, 160));
-      fireTouch(window, "touchmove", createTouch(100, 162));
-      fireTouch(window, "touchend", createTouch(100, 162));
-      vi.advanceTimersByTime(250);
-      expect(onOpen).not.toHaveBeenCalled();
-
-      fireTouch(body, "touchstart", createTouch(300, 160));
-      fireTouch(window, "touchmove", createTouch(100, 162));
-      expect(Number.parseFloat(inset.style.translate)).toBeCloseTo(-200);
-      expect(isCompactSecondaryPanelSwipeOpening()).toBe(true);
-      fireTouch(window, "touchend", createTouch(100, 162));
-      expect(onOpen).not.toHaveBeenCalled();
-      vi.advanceTimersByTime(250);
-      expect(onOpen).toHaveBeenCalledOnce();
-      expect(isCompactSecondaryPanelSwipeOpening()).toBe(false);
-      expect(inset.style.translate).toBe("");
-      expect(shelf.style.visibility).toBe("");
     } finally {
       vi.runOnlyPendingTimers();
       vi.useRealTimers();

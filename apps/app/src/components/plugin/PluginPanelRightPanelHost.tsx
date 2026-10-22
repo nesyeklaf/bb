@@ -1160,7 +1160,6 @@ export function PluginPanelRightPanelHost({
       <SecondaryPanelLayout
         open={isOpen}
         onToggle={togglePanel}
-        onSwipeOpen={togglePanel}
         onClose={panelController.close}
         panelGroupKey={`plugin-panel-host:${panelHostId}`}
         resetKey={panelStateId}
