@@ -1,0 +1,30 @@
+#!/usr/bin/env bash
+# Deploy a bb-app tarball to a bb server over ssh and verify it.
+# Usage: scripts/fork/deploy.sh <ssh-host> <bb-app-x.y.z.tgz>
+# The remote side runs scripts/fork/remote.sh deploy as a transient systemd unit,
+# so it survives the ssh session dropping when the server restarts.
+set -euo pipefail
+
+case "${1:-}" in
+  -h|--help|"") sed -n 2,5p "$0" | sed 's/^# //'; [ -n "${1:-}" ]; exit $? ;;
+esac
+host=$1
+tgz=$2
+here=$(cd "$(dirname "$0")" && pwd)
+remote_tgz=/tmp/bb-app-fork.tgz
+
+local_sum=$(sha256sum "$tgz" | cut -d' ' -f1)
+scp "$tgz" "$host:$remote_tgz"
+scp "$here/remote.sh" "$host:bb-fork-remote.sh"
+remote_sum=$(ssh "$host" "sha256sum $remote_tgz" | cut -d' ' -f1)
+[ "$local_sum" = "$remote_sum" ] || { echo "Checksum mismatch after copy" >&2; exit 1; }
+
+ssh "$host" "systemd-run --user --unit=bb-fork-deploy --collect bash \$HOME/bb-fork-remote.sh deploy $remote_tgz"
+
+echo "Waiting for the deploy unit to finish..."
+for _ in $(seq 1 60); do
+  sleep 5
+  state=$(ssh "$host" 'systemctl --user is-active bb-fork-deploy 2>/dev/null' || true)
+  [ "$state" = active ] || [ "$state" = activating ] || break
+done
+ssh "$host" 'bash $HOME/bb-fork-remote.sh status'
