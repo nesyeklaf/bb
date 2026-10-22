@@ -139,7 +139,6 @@ export function RootComposeSecondaryContent({
       <SecondaryPanelLayout
         open={isSecondaryPanelOpen}
         onToggle={onToggleSecondaryPanel}
-        onSwipeOpen={onToggleSecondaryPanel}
         onClose={threadSecondaryPanelProps.onClose}
         resetKey="new-thread"
         contentKey="new-thread"
