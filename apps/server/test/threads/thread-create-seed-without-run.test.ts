@@ -1028,6 +1028,85 @@ describe("thread creation child-thread boundary validation", () => {
     });
   });
 
+  it("lets a personal child reuse its parent's unmanaged environment", async () => {
+    await withTestHarness(async (harness) => {
+      const { host } = seedHostSession(harness.deps, {
+        id: "host-personal-child-parent-environment",
+      });
+      ensurePersonalProject(harness.db);
+      const parentEnvironment = seedEnvironment(harness.deps, {
+        hostId: host.id,
+        path: "/tmp/personal-child-parent",
+        projectId: PERSONAL_PROJECT_ID,
+      });
+      const parentThread = seedThread(harness.deps, {
+        environmentId: parentEnvironment.id,
+        projectId: PERSONAL_PROJECT_ID,
+      });
+
+      const child = await createThreadFromRequest(harness.deps, {
+        environment: {
+          type: "reuse",
+          environmentId: parentEnvironment.id,
+        },
+        input: textInput("Read the parent's checkout"),
+        origin: "app",
+        parentThreadId: parentThread.id,
+        projectId: PERSONAL_PROJECT_ID,
+        providerId: "codex",
+        startedOnBehalfOf: null,
+      });
+
+      expect(getThread(harness.db, child.id)).toMatchObject({
+        environmentId: parentEnvironment.id,
+        parentThreadId: parentThread.id,
+      });
+    });
+  });
+
+  it("rejects a personal child that reuses an unmanaged environment its parent does not run in", async () => {
+    await withTestHarness(async (harness) => {
+      const { host } = seedHostSession(harness.deps, {
+        id: "host-personal-child-other-environment",
+      });
+      ensurePersonalProject(harness.db);
+      const parentEnvironment = seedEnvironment(harness.deps, {
+        hostId: host.id,
+        path: "/tmp/personal-child-parent-own",
+        projectId: PERSONAL_PROJECT_ID,
+      });
+      const otherEnvironment = seedEnvironment(harness.deps, {
+        hostId: host.id,
+        path: "/tmp/personal-child-other",
+        projectId: PERSONAL_PROJECT_ID,
+      });
+      const parentThread = seedThread(harness.deps, {
+        environmentId: parentEnvironment.id,
+        projectId: PERSONAL_PROJECT_ID,
+      });
+
+      await expect(
+        createThreadFromRequest(harness.deps, {
+          environment: {
+            type: "reuse",
+            environmentId: otherEnvironment.id,
+          },
+          input: textInput("Reuse someone else's checkout"),
+          origin: "app",
+          parentThreadId: parentThread.id,
+          projectId: PERSONAL_PROJECT_ID,
+          providerId: "codex",
+          startedOnBehalfOf: null,
+        }),
+      ).rejects.toMatchObject({
+        body: {
+          message: "Personal project threads must reuse a personal workspace",
+        },
+        status: 409,
+      });
+    });
+  });
+
   it("auto-sends a queued first side-chat message after preload settles idle", async () => {
     await withChildBoundaryHarness(
       "empty-side-chat-preload-queued-message",
