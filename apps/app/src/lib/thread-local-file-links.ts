@@ -58,6 +58,7 @@ interface ThreadLocalFileLinkErrorResolution {
 interface ThreadWorkspaceFileLinkOpenResolution {
   kind: "open-workspace-path";
   request: ThreadWorkspaceFileLinkOpenRequest;
+  storageFallback: ThreadStorageFileLinkOpenRequest | null;
 }
 
 interface ThreadHostFileLinkOpenResolution {
@@ -130,6 +131,54 @@ function normalizeLocalFilePathWithinRoot(
   };
 }
 
+const THREAD_STORAGE_VARIABLE_PREFIX = "$BB_THREAD_STORAGE/";
+
+interface ResolveStorageRequestForWorkspaceRelativePathArgs {
+  lineRange: FilePreviewLineRange | null;
+  relativePath: string;
+  threadStorageRootPath: string;
+}
+
+interface StorageRequestForWorkspaceRelativePath {
+  kind: "storage-variable" | "same-relative-path";
+  request: ThreadStorageFileLinkOpenRequest;
+}
+
+function resolveStorageRequestForWorkspaceRelativePath({
+  lineRange,
+  relativePath,
+  threadStorageRootPath,
+}: ResolveStorageRequestForWorkspaceRelativePathArgs): StorageRequestForWorkspaceRelativePath | null {
+  const isStorageVariablePath = relativePath.startsWith(
+    THREAD_STORAGE_VARIABLE_PREFIX,
+  );
+  const storageRelativePath = isStorageVariablePath
+    ? relativePath.slice(THREAD_STORAGE_VARIABLE_PREFIX.length)
+    : relativePath;
+  const normalizedRootPath = normalizeAbsoluteFilePath({
+    path: threadStorageRootPath,
+  });
+  if (normalizedRootPath === null) {
+    return null;
+  }
+  const storagePath = normalizeLocalFilePathWithinRoot({
+    linkPath: `${normalizedRootPath}/${storageRelativePath}`,
+    rootPath: normalizedRootPath,
+  });
+  if (storagePath === null) {
+    return null;
+  }
+  return {
+    kind: isStorageVariablePath ? "storage-variable" : "same-relative-path",
+    request: {
+      lineRange,
+      path: storagePath.path,
+      relativePath: storagePath.relativePath,
+      threadStorageRootPath: storagePath.rootPath,
+    },
+  };
+}
+
 export function resolveThreadLocalFileLink(
   args: ResolveThreadLocalFileLinkArgs,
 ): ThreadLocalFileLinkResolution {
@@ -168,6 +217,20 @@ export function resolveThreadLocalFileLink(
         });
 
   if (openRequest) {
+    const storageRequest =
+      args.threadStorageRootPath === null
+        ? null
+        : resolveStorageRequestForWorkspaceRelativePath({
+            lineRange: args.link.lineRange,
+            relativePath: openRequest.relativePath,
+            threadStorageRootPath: args.threadStorageRootPath,
+          });
+    if (storageRequest?.kind === "storage-variable") {
+      return {
+        kind: "open-thread-storage-path",
+        request: storageRequest.request,
+      };
+    }
     return {
       kind: "open-workspace-path",
       request: {
@@ -176,6 +239,7 @@ export function resolveThreadLocalFileLink(
         relativePath: openRequest.relativePath,
         workspaceRootPath: openRequest.rootPath,
       },
+      storageFallback: storageRequest?.request ?? null,
     };
   }
 
