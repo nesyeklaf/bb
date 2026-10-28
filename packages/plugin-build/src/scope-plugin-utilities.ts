@@ -14,12 +14,18 @@ interface Statement {
   body: string | null;
 }
 
-export function pluginScopeRoots(pluginId: string): string {
-  return `[data-bb-plugin="${pluginId}"], [data-bb-plugin-root]:not([data-bb-plugin])`;
+export function pluginScopeRoots(pluginId: string): readonly string[] {
+  return [
+    `[data-bb-plugin="${pluginId}"]`,
+    "[data-bb-plugin-root]:not([data-bb-plugin])",
+  ];
 }
 
-export function scopePluginUtilities(css: string, scopeRoots: string): string {
-  const scope = `:where(${scopeRoots})`;
+export function scopePluginUtilities(
+  css: string,
+  scopeRoots: readonly string[],
+): string {
+  const scope = scopeRoots.map((root) => `:where(${root})`);
 
   return splitStatements(css)
     .map((statement) => {
@@ -166,7 +172,7 @@ function isUtilitiesLayer(prelude: string): boolean {
   return /^@layer\s+utilities$/.test(prelude.trim());
 }
 
-function scopeStatements(css: string, scope: string): string {
+function scopeStatements(css: string, scope: readonly string[]): string {
   return splitStatements(css)
     .map((statement) => {
       if (statement.body === null) return statement.prelude;
@@ -183,9 +189,11 @@ function scopeStatements(css: string, scope: string): string {
       const nestedSibling = hasNestedSiblingRule(statement.body);
       const originalSelectors = splitSelectorList(prelude);
       const selectors = originalSelectors.flatMap((selector) =>
-        nestedSibling || hasSiblingCombinator(selector)
-          ? [`${scope} ${selector}`]
-          : [`${scope} ${selector}`, `${scope}${selector}`],
+        scope.flatMap((root) =>
+          nestedSibling || hasSiblingCombinator(selector)
+            ? [`${root} ${selector}`]
+            : [`${root} ${selector}`, `${root}${selector}`],
+        ),
       );
       return (
         originalSelectors.length === 1 ? selectors : [selectors.join(",")]

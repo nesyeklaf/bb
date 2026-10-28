@@ -131,8 +131,9 @@ describe("plugin component registry", () => {
     expect(js).not.toMatch(/from\s*["']react["']/);
 
     const css = await readFile(result.cssPath, "utf8");
+    expect(css).toContain(":where([data-bb-plugin=registry-fixture])");
     expect(css).toContain(
-      ":where([data-bb-plugin=registry-fixture],[data-bb-plugin-root]:not([data-bb-plugin]))",
+      ":where([data-bb-plugin-root]:not([data-bb-plugin]))",
     );
     expect(css).toMatch(/var\(--background\)/);
   });
