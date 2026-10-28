@@ -100,6 +100,130 @@ export function dropHostProvidedTailwind(
     .join("");
 }
 
+const SHORTHAND_FAMILIES: Record<string, readonly string[]> = {
+  top: ["inset"],
+  right: ["inset"],
+  bottom: ["inset"],
+  left: ["inset"],
+  "row-gap": ["gap"],
+  "column-gap": ["gap"],
+  "align-items": ["place"],
+  "justify-items": ["place"],
+  "align-content": ["place"],
+  "justify-content": ["place"],
+  "align-self": ["place"],
+  "justify-self": ["place"],
+  "line-height": ["font"],
+  width: ["size"],
+  height: ["size"],
+  outline: ["border"],
+};
+
+function propertyFamilies(property: string): readonly string[] {
+  if (property.startsWith("--")) return [property];
+  const family = property.split("-")[0] ?? property;
+  return [family, ...(SHORTHAND_FAMILIES[property] ?? [])];
+}
+
+function hostUtilityRuleKeys(hostCss: string): Set<string> {
+  const keys = new Set<string>();
+  const visit = (css: string, context: string) => {
+    for (const statement of splitStatements(css)) {
+      if (statement.body === null) continue;
+      const prelude = normalizePrelude(statement.prelude);
+      if (prelude.startsWith("@")) {
+        visit(statement.body, `${context}${prelude}{`);
+        continue;
+      }
+      for (const selector of splitSelectorList(prelude)) {
+        keys.add(`${context}${selector}{${statement.body}}`);
+      }
+    }
+  };
+  visit(hostCss, "");
+  return keys;
+}
+
+function normalizePrelude(prelude: string): string {
+  return prelude.replace(/\s+/g, " ").trim();
+}
+
+function scopeRootVariants(root: string): string[] {
+  const unquoted = root.replace(/="([\w-]+)"\]/g, "=$1]");
+  return unquoted === root ? [root] : [root, unquoted];
+}
+
+function unscopedSelectors(
+  prelude: string,
+  scope: readonly string[],
+): string[] | null {
+  const originals: string[] = [];
+  for (const selector of splitSelectorList(prelude)) {
+    const root = scope.find((candidate) => selector.startsWith(candidate));
+    if (root === undefined) return null;
+    const original = selector.slice(root.length).replace(/^ /, "");
+    if (original.length === 0) return null;
+    if (!originals.includes(original)) originals.push(original);
+  }
+  return originals.length === 0 ? null : originals;
+}
+
+let hostUtilityKeysCache: { source: string; keys: Set<string> } | null = null;
+
+export function dropHostDuplicateUtilities(
+  css: string,
+  hostCss: string,
+  pluginId: string,
+): string {
+  if (hostUtilityKeysCache?.source !== hostCss) {
+    hostUtilityKeysCache = {
+      source: hostCss,
+      keys: hostUtilityRuleKeys(hostCss),
+    };
+  }
+  const hostKeys = hostUtilityKeysCache.keys;
+  const scope = pluginScopeRoots(pluginId)
+    .flatMap(scopeRootVariants)
+    .map((root) => `:where(${root})`);
+  const claimed = new Set<string>();
+
+  const filter = (body: string, context: string): string | null => {
+    const kept = splitStatements(body).flatMap((statement) => {
+      if (statement.body === null) return [statement.prelude];
+      const prelude = normalizePrelude(statement.prelude);
+      if (prelude.startsWith("@")) {
+        const nested = filter(statement.body, `${context}${prelude}{`);
+        return nested === null ? [] : [`${statement.prelude}{${nested}}`];
+      }
+      const families = declarationsIn(statement.body).flatMap((declaration) =>
+        propertyFamilies(declaration.slice(0, declaration.indexOf(":"))),
+      );
+      const originals = unscopedSelectors(prelude, scope);
+      const duplicate =
+        originals !== null &&
+        originals.every((selector) =>
+          hostKeys.has(`${context}${selector}{${statement.body}}`),
+        ) &&
+        !families.some((family) => claimed.has(family));
+      if (duplicate) return [];
+      for (const family of families) claimed.add(family);
+      return [`${statement.prelude}{${statement.body}}`];
+    });
+    return kept.length === 0 ? null : kept.join("");
+  };
+
+  return splitStatements(css)
+    .map((statement) => {
+      if (statement.body === null) return statement.prelude;
+      if (!isUtilitiesLayer(statement.prelude)) {
+        return `${statement.prelude}{${statement.body}}`;
+      }
+      const body = filter(statement.body, "@layer utilities{");
+      return body === null ? "" : `${statement.prelude}{${body}}`;
+    })
+    .join("");
+}
+
 function isLayer(statement: Statement, name: string): boolean {
   return (
     statement.body !== null &&

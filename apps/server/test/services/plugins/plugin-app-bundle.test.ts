@@ -8,8 +8,13 @@ import { join } from "node:path";
 import { promisify } from "node:util";
 import { brotliDecompressSync, gunzipSync } from "node:zlib";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { Hono } from "hono";
 import { upsertInstalledPlugin } from "@bb/db";
 import { PLUGIN_SDK_MAJOR, PLUGIN_SDK_VERSION } from "@bb/domain";
+import { loadHostStylesheet } from "../../../src/host-stylesheet.js";
+import { registerPluginRoutes } from "../../../src/routes/plugins.js";
+import { createPluginInstallJobs } from "../../../src/services/plugins/plugin-install-jobs.js";
+import { createPluginUpdateJobs } from "../../../src/services/plugins/plugin-update-jobs.js";
 import {
   createTestAppHarness,
   type TestAppHarness,
@@ -259,6 +264,55 @@ describe("plugin app bundles (build policy, inventory, asset routes)", () => {
       `${BASE}/api/v1/plugins/appy/assets/evil.js`,
     );
     expect(unknownFile.status).toBe(404);
+  }, 60_000);
+
+  it("drops utilities the served host stylesheet already declares only for that stylesheet", async () => {
+    const rootDir = join(harness.config.dataDir, "fixtures", "bb-plugin-dup");
+    await writeAppPluginFixture(rootDir, {
+      name: "bb-plugin-dup",
+      appSource: `export default function App() {\n  return <div className="flex text-center">hi</div>;\n}\n`,
+    });
+    const staticDir = join(harness.config.dataDir, "static-app");
+    await mkdir(join(staticDir, "assets"), { recursive: true });
+    await writeFile(
+      join(staticDir, "index.html"),
+      '<html><head><link fetchpriority="high" rel="stylesheet" crossorigin href="/assets/index-Ab_1.css"></head></html>',
+    );
+    await writeFile(
+      join(staticDir, "assets", "index-Ab_1.css"),
+      "@layer utilities{.flex{display:flex}}",
+    );
+    const hostStylesheet = loadHostStylesheet(staticDir);
+    expect(hostStylesheet?.key).toBe("index-Ab_1.css");
+
+    const entry = await harness.pluginService.installPath(rootDir);
+    const bundle = entry.app.bundle;
+    if (bundle === null || bundle.cssUrl === null)
+      throw new Error("plugin built no stylesheet");
+    const app = new Hono();
+    registerPluginRoutes(
+      app,
+      { config: { serverPort: 3334 }, db: harness.deps.db, hostStylesheet },
+      harness.pluginService,
+      createPluginInstallJobs({ notifyChanged: () => {} }),
+      createPluginUpdateJobs({ notifyChanged: () => {} }),
+    );
+    const cssFor = async (hostCss: string | null) => {
+      const query = `host-tailwind=${HOST_TAILWIND_VERSION}${hostCss === null ? "" : `&host-css=${hostCss}`}`;
+      const response = await app.request(
+        `${BASE}${bundle.cssUrl}?${query}`.replace("/api/v1", ""),
+      );
+      expect(response.status).toBe(200);
+      return response.text();
+    };
+
+    const withoutHostTailwind = await cssFor(null);
+    expect(withoutHostTailwind).toContain(".flex{display:flex}");
+    expect(await cssFor("index-Stale.css")).toBe(withoutHostTailwind);
+    const deduped = await cssFor("index-Ab_1.css");
+    expect(deduped).not.toContain(".flex{");
+    expect(deduped).toContain(".text-center{text-align:center}");
+    expect(await cssFor(null)).toBe(withoutHostTailwind);
   }, 60_000);
 
   it("reports hasApp:false for headless plugins and 404s their assets", async () => {

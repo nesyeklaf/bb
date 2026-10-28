@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  dropHostDuplicateUtilities,
   dropHostProvidedTailwind,
   pluginScopeRoots,
   scopePluginUtilities,
@@ -229,5 +230,64 @@ describe("dropHostProvidedTailwind", () => {
         HOST,
       ),
     ).toBe("@layer utilities{.a{color:red}}");
+  });
+});
+
+describe("dropHostDuplicateUtilities", () => {
+  const HOST_APP =
+    "@layer theme{:root{--spacing:0.25rem}}" +
+    "@layer utilities{.flex{display:flex}.hidden{display:none}.p-1{padding:4px}" +
+    "@media (width>=40rem){.sm\\:flex{display:flex}}}";
+  const BASE = "@layer base{button{color:red}}";
+
+  function drop(utilities: string, base = ""): string {
+    return dropHostDuplicateUtilities(
+      `${base}@layer utilities{${utilities}}`,
+      HOST_APP,
+      "demo",
+    );
+  }
+
+  it("drops a scoped utility the host already declares identically", () => {
+    expect(drop(each(".flex", "display:flex") + each(".a", "color:red"))).toBe(
+      `@layer utilities{${each(".a", "color:red")}}`,
+    );
+  });
+
+  it("matches the root a minifier wrote without attribute quotes", () => {
+    const unquoted = both(".p-1").replace(/"demo"/g, "demo");
+    expect(drop(`${unquoted}{padding:4px}`)).toBe("");
+  });
+
+  it("keeps a utility whose declarations differ from the host's", () => {
+    const css = each(".p-1", "padding:8px");
+    expect(drop(css)).toBe(`@layer utilities{${css}}`);
+  });
+
+  it("keeps a duplicate that sits in another at-rule context than the host's", () => {
+    const css = `@media (width>=48rem){${each(".flex", "display:flex")}}`;
+    expect(drop(css)).toBe(`@layer utilities{${css}}`);
+  });
+
+  it("drops a duplicate inside the same at-rule context", () => {
+    expect(
+      drop(`@media (width>=40rem){${each(".sm\\:flex", "display:flex")}}`),
+    ).toBe("");
+  });
+
+  it("keeps a duplicate that must still win over an earlier plugin-only rule", () => {
+    const css =
+      each(".grid-ish", "display:grid") + each(".hidden", "display:none");
+    expect(drop(css)).toBe(`@layer utilities{${css}}`);
+  });
+
+  it("drops a duplicate before a plugin-only rule of the same property", () => {
+    expect(
+      drop(each(".hidden", "display:none") + each(".grid-ish", "display:grid")),
+    ).toBe(`@layer utilities{${each(".grid-ish", "display:grid")}}`);
+  });
+
+  it("leaves layers other than utilities alone", () => {
+    expect(drop("", BASE)).toBe(BASE);
   });
 });

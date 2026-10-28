@@ -25,6 +25,10 @@ import type {
   PluginMentionTrigger,
   PluginWebSocketRouteRecord,
 } from "../services/plugins/plugin-api.js";
+import type {
+  HostStylesheet,
+  PluginCssVariant,
+} from "../services/plugins/app-bundle.js";
 import { PluginSettingsValidationError } from "../services/plugins/plugin-settings.js";
 import { PLUGIN_RPC_CALLER_HEADER } from "../services/plugins/plugin-rpc-caller.js";
 import type { PluginInstallJobs } from "../services/plugins/plugin-install-jobs.js";
@@ -56,6 +60,30 @@ import {
 interface PluginRoutesDeps {
   config: Pick<ServerRuntimeConfig, "serverPort" | "appUrl" | "devAppPort">;
   db: import("@bb/db").DbConnection;
+  hostStylesheet: HostStylesheet | null;
+}
+
+function pluginCssVariant(
+  context: Context,
+  kind: "js" | "css",
+  hostStylesheet: HostStylesheet | null,
+): PluginCssVariant {
+  if (
+    kind !== "css" ||
+    context.req.query("host-tailwind") !== HOST_TAILWIND_VERSION
+  ) {
+    return { kind: "original" };
+  }
+  return hostStylesheet !== null &&
+    context.req.query("host-css") === hostStylesheet.key
+    ? { kind: "withoutHostUtilities", host: hostStylesheet }
+    : { kind: "withoutHostTailwind" };
+}
+
+function pluginCssVariantKey(variant: PluginCssVariant): string {
+  return variant.kind === "withoutHostUtilities"
+    ? `${variant.kind}:${variant.host.key}`
+    : variant.kind;
 }
 
 type WireAuthProblem = BrowserRequestProblem | { status: 401; error: string };
@@ -560,17 +588,15 @@ export function registerPluginRoutes(
         404,
       );
     }
-    const hostTailwind =
-      spec.kind === "css" &&
-      context.req.query("host-tailwind") === HOST_TAILWIND_VERSION;
+    const variant = pluginCssVariant(context, spec.kind, deps.hostStylesheet);
     let bytes: Buffer;
     try {
-      bytes = await asset.read(hostTailwind);
+      bytes = await asset.read(variant);
     } catch {
       return context.json({ ok: false, error: "bundle file missing" }, 404);
     }
     return appAssetResponse(context, bytes, {
-      assetKey: `${hash}:${spec.kind}:${hostTailwind}`,
+      assetKey: `${hash}:${spec.kind}:${pluginCssVariantKey(variant)}`,
       cache: appAssetCompressionCache,
       contentType: spec.contentType,
       cacheControl: "public, max-age=31536000, immutable",
@@ -625,12 +651,10 @@ export function registerPluginRoutes(
         404,
       );
     }
-    const hostTailwind =
-      spec.kind === "css" &&
-      context.req.query("host-tailwind") === HOST_TAILWIND_VERSION;
+    const variant = pluginCssVariant(context, spec.kind, deps.hostStylesheet);
     let bytes: Buffer;
     try {
-      bytes = await asset.read(hostTailwind);
+      bytes = await asset.read(variant);
     } catch {
       return context.json({ ok: false, error: "bundle file missing" }, 404);
     }
@@ -639,7 +663,7 @@ export function registerPluginRoutes(
       asset.hash,
     );
     return appAssetResponse(context, bytes, {
-      assetKey: `${context.req.param("id")}:${spec.kind}:${hostTailwind}`,
+      assetKey: `${context.req.param("id")}:${spec.kind}:${pluginCssVariantKey(variant)}`,
       cache: appAssetCompressionCache,
       contentType: spec.contentType,
       cacheControl,
