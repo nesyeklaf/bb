@@ -3,6 +3,7 @@ import { dirname, join } from "node:path";
 import { runSettlementError } from "./run-settlement.js";
 import { experimental_buildBridgeToolCallContent as buildBridgeToolCallContent } from "@get-bb/plugin-sdk/provider-bridge";
 import type { ImageContent } from "@earendil-works/pi-ai";
+import { z } from "zod";
 import {
   NO_REQUEST_TIMEOUT,
   PiRpcChild,
@@ -72,6 +73,16 @@ export interface PiInputDispatch {
 
 interface PendingRunSettlement {
   resolve: (outcome: PiPromptRunOutcome) => void;
+}
+
+const piPromptDispositionSchema = z.enum(["started", "queued", "handled"]);
+type PiPromptDisposition = z.infer<typeof piPromptDispositionSchema>;
+
+function parsePiPromptDisposition(data: unknown): PiPromptDisposition | null {
+  const parsed = z
+    .object({ disposition: piPromptDispositionSchema })
+    .safeParse(data);
+  return parsed.success ? parsed.data.disposition : null;
 }
 
 interface SettlementReport {
@@ -405,9 +416,11 @@ export class PiRpcSession {
     }
     this.isProcessing = true;
     const tracked = this.trackPendingInputConsumption("followUp");
+    let pendingSettlement: PendingRunSettlement = { resolve: () => undefined };
     const settlement = new Promise<PiPromptRunOutcome>((resolve) => {
-      this.pendingRunSettlements.push({ resolve });
+      pendingSettlement = { resolve };
     });
+    this.pendingRunSettlements.push(pendingSettlement);
     const settled = this.dispatchPromptAfterManualCompaction(
       child,
       {
@@ -418,9 +431,17 @@ export class PiRpcSession {
       },
       tracked.pending,
     ).then(
-      async (): Promise<PiPromptRunOutcome | null> => {
+      async (disposition): Promise<PiPromptRunOutcome | null> => {
+        if (disposition === "handled") {
+          this.dropRunSettlement(pendingSettlement);
+          this.resolvePendingInputConsumption(tracked.pending);
+          if (this.pendingRunSettlements.length === 0) {
+            this.isProcessing = false;
+          }
+          return {};
+        }
         if (tracked.pending.queuedText !== null) {
-          this.dropRunSettlement();
+          this.dropRunSettlement(pendingSettlement);
           return null;
         }
         this.resolvePendingInputConsumption(tracked.pending);
@@ -429,7 +450,7 @@ export class PiRpcSession {
       },
       (error: unknown): PiPromptRunOutcome | null => {
         this.isProcessing = false;
-        this.dropRunSettlement();
+        this.dropRunSettlement(pendingSettlement);
         const queued = tracked.pending.queuedText !== null;
         this.rejectPendingInputConsumption(tracked.pending, asError(error));
         this.rejectPendingInputConsumptions(
@@ -590,7 +611,7 @@ export class PiRpcSession {
     child: PiRpcChild,
     command: Record<string, unknown>,
     pending: PendingInputConsumption,
-  ): Promise<void> {
+  ): Promise<PiPromptDisposition | null> {
     for (let attempt = 0; ; attempt += 1) {
       if (this.piManualCompactionActive) {
         this.resolvePendingInputConsumption(pending);
@@ -601,12 +622,11 @@ export class PiRpcSession {
       }
       this.isProcessing = true;
       try {
-        await this.dispatchWithTransientAuthRetry(
+        return await this.dispatchWithTransientAuthRetry(
           child,
           command,
           NO_REQUEST_TIMEOUT,
         );
-        return;
       } catch (error) {
         if (
           !isPiCompactionPromptRejection(error) ||
@@ -642,11 +662,12 @@ export class PiRpcSession {
     child: PiRpcChild,
     command: Record<string, unknown>,
     timeoutMs?: number,
-  ): Promise<void> {
+  ): Promise<PiPromptDisposition | null> {
     for (let attempt = 0; ; attempt += 1) {
       try {
-        await child.requestOk(command, timeoutMs);
-        return;
+        return parsePiPromptDisposition(
+          await child.requestOk(command, timeoutMs),
+        );
       } catch (error) {
         if (
           !(error instanceof Error) ||
@@ -870,8 +891,9 @@ export class PiRpcSession {
     });
   }
 
-  private dropRunSettlement(): void {
-    this.pendingRunSettlements.pop();
+  private dropRunSettlement(settlement: PendingRunSettlement): void {
+    const index = this.pendingRunSettlements.indexOf(settlement);
+    if (index !== -1) this.pendingRunSettlements.splice(index, 1);
   }
 
   private async refreshLeafId(
