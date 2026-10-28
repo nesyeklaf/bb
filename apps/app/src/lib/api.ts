@@ -141,6 +141,21 @@ function responseMimeType(response: Response): string {
   return normalizeFilePreviewMimeType(response.headers.get("content-type"));
 }
 
+const NOT_FOUND_STATUS = 404;
+
+export async function isFileMissing(url: string): Promise<boolean> {
+  const response = await fetch(
+    url,
+    appSurfaceRequestInit({
+      method: "GET",
+      cache: "no-store",
+      headers: { range: "bytes=0-0" },
+    }),
+  );
+  await response.body?.cancel();
+  return response.status === NOT_FOUND_STATUS;
+}
+
 export async function loadFilePreview(
   target: FilePreviewTarget,
   signal?: AbortSignal,

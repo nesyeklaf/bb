@@ -158,6 +158,8 @@ import {
 import { SelectionAddToChatContext } from "@/components/thread/SelectionAddToChatContext";
 import { usePluginSlots } from "@/lib/plugin-slots";
 import { getFileExtension } from "@/lib/plugin-slot-resolvers";
+import { isFileMissing } from "@/lib/api";
+import { buildThreadHostFileContentUrl } from "@/lib/file-content-urls";
 import { Icon } from "@bb/shared-ui/icon";
 import { getBbDesktopInfo, isDesktopBrowserAvailable } from "@/lib/bb-desktop";
 import { UrlOpenRoutingProvider } from "@/lib/url-open-routing";
@@ -1236,15 +1238,44 @@ function ThreadDetailViewInternal(
       }
 
       if (resolution.kind === "open-workspace-path") {
-        openWorkspaceFile(
-          {
-            lineRange: resolution.request.lineRange,
-            path: resolution.request.relativePath,
-            source: { kind: "working-tree" },
-            statusLabel: null,
-          },
-          options,
-        );
+        const openInWorkspace = () =>
+          openWorkspaceFile(
+            {
+              lineRange: resolution.request.lineRange,
+              path: resolution.request.relativePath,
+              source: { kind: "working-tree" },
+              statusLabel: null,
+            },
+            options,
+          );
+        const storageFallback = resolution.storageFallback;
+        if (storageFallback === null || threadId === null) {
+          openInWorkspace();
+          return true;
+        }
+        void (async () => {
+          const opensFromStorage =
+            (await isFileMissing(
+              buildThreadHostFileContentUrl(
+                threadId,
+                resolution.request.path,
+              ),
+            )) &&
+            !(await isFileMissing(
+              buildThreadHostFileContentUrl(threadId, storageFallback.path),
+            ));
+          if (!opensFromStorage) {
+            openInWorkspace();
+            return;
+          }
+          openStorageFile(
+            {
+              lineRange: storageFallback.lineRange,
+              path: storageFallback.relativePath,
+            },
+            options,
+          );
+        })().catch(openInWorkspace);
         return true;
       }
 
@@ -1268,7 +1299,13 @@ function ThreadDetailViewInternal(
       );
       return true;
     },
-    [openHostFile, openPathInFileTarget, openStorageFile, openWorkspaceFile],
+    [
+      openHostFile,
+      openPathInFileTarget,
+      openStorageFile,
+      openWorkspaceFile,
+      threadId,
+    ],
   );
   const handleOpenTimelineLocalFileLink = useCallback(
     (

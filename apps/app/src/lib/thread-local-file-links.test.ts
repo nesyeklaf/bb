@@ -105,6 +105,7 @@ describe("resolveThreadLocalFileLink", () => {
         relativePath: "src/file.ts",
         workspaceRootPath: "/Users/me/project",
       },
+      storageFallback: null,
     });
   });
 
@@ -129,6 +130,7 @@ describe("resolveThreadLocalFileLink", () => {
         relativePath: "packages/app/file.ts",
         workspaceRootPath: "C:\\src\\repo",
       },
+      storageFallback: null,
     });
   });
 
@@ -172,6 +174,7 @@ describe("resolveThreadLocalFileLink", () => {
         relativePath: "src/file.ts",
         workspaceRootPath: "/projects/my-repo",
       },
+      storageFallback: null,
     });
   });
 
@@ -234,6 +237,61 @@ describe("resolveThreadLocalFileLink", () => {
         path: "/Users/me/project/review.diff",
         relativePath: "review.diff",
         workspaceRootPath: "/Users/me/project",
+      },
+      storageFallback: null,
+    });
+  });
+
+  it("opens $BB_THREAD_STORAGE links in the thread storage", () => {
+    expect(
+      resolveThreadLocalFileLink({
+        fileOpenTargetIds: [],
+        hostFileLinksAvailable: true,
+        link: {
+          lineRange: null,
+          openTargetId: null,
+          path: "/Users/me/project/$BB_THREAD_STORAGE/review/notes.md",
+        },
+        threadStorageRootPath: "/Users/me/.bb/thread-storage/thr_one",
+        workspaceRootPath: "/Users/me/project",
+      }),
+    ).toEqual({
+      kind: "open-thread-storage-path",
+      request: {
+        lineRange: null,
+        path: "/Users/me/.bb/thread-storage/thr_one/review/notes.md",
+        relativePath: "review/notes.md",
+        threadStorageRootPath: "/Users/me/.bb/thread-storage/thr_one",
+      },
+    });
+  });
+
+  it("offers the same path in the thread storage as a fallback for workspace links", () => {
+    expect(
+      resolveThreadLocalFileLink({
+        fileOpenTargetIds: [],
+        hostFileLinksAvailable: true,
+        link: {
+          lineRange: { startLineNumber: 3, endLineNumber: 3 },
+          openTargetId: null,
+          path: "/Users/me/project/directions/a-phone.png",
+        },
+        threadStorageRootPath: "/Users/me/.bb/thread-storage/thr_one",
+        workspaceRootPath: "/Users/me/project",
+      }),
+    ).toEqual({
+      kind: "open-workspace-path",
+      request: {
+        lineRange: { startLineNumber: 3, endLineNumber: 3 },
+        path: "/Users/me/project/directions/a-phone.png",
+        relativePath: "directions/a-phone.png",
+        workspaceRootPath: "/Users/me/project",
+      },
+      storageFallback: {
+        lineRange: { startLineNumber: 3, endLineNumber: 3 },
+        path: "/Users/me/.bb/thread-storage/thr_one/directions/a-phone.png",
+        relativePath: "directions/a-phone.png",
+        threadStorageRootPath: "/Users/me/.bb/thread-storage/thr_one",
       },
     });
   });
