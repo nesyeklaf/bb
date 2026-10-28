@@ -1027,7 +1027,6 @@ export function PromptBoxInternal({
   history,
   voice,
 }: ExperimentalComposerInput) {
-  const compactWhen = compact?.when ?? null;
   const compactPlaceholder = compact?.placeholder;
   const renderer = useComposerRenderer();
   const rendererRef = useRef(renderer);
@@ -2239,7 +2238,7 @@ export function PromptBoxInternal({
     formElement.addEventListener("transitionend", handleTransitionEnd);
 
     return cleanup;
-  }, [compactWhen, showCompactLayout]);
+  }, [showCompactLayout]);
 
   const trimmedValue = value.trim();
   const hasAttachments = attachments.length > 0;
