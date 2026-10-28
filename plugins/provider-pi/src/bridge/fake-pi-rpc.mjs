@@ -46,6 +46,10 @@ const processLogPath = process.env.FAKE_PI_PROCESS_LOG;
 const commandLogPath = process.env.FAKE_PI_COMMAND_LOG;
 const supportsSettlement = process.env.FAKE_PI_SETTLEMENT !== "0";
 const promptDumpPath = process.env.FAKE_PI_PROMPT_DUMP;
+const reportsDispositions = process.env.FAKE_PI_DISPOSITIONS === "1";
+function promptAck(id, disposition) {
+  respond(id, "prompt", reportsDispositions ? { disposition } : undefined);
+}
 if (process.env.FAKE_PI_ENV_LOG) {
   appendFileSync(
     process.env.FAKE_PI_ENV_LOG,
@@ -791,6 +795,14 @@ async function handle(command) {
         announceCompaction?.();
         return;
       }
+      if (
+        reportsDispositions &&
+        typeof command.message === "string" &&
+        command.message.startsWith("/handled")
+      ) {
+        promptAck(id, "handled");
+        return;
+      }
       if (isStreaming && command.streamingBehavior === "steer") {
         steering.push(command.message);
         queueUpdate();
@@ -802,7 +814,7 @@ async function handle(command) {
             success: true,
           });
         } else {
-          respond(id, "prompt");
+          promptAck(id, "queued");
         }
         if (holdAbort) {
           holdAbort("steer");
@@ -812,10 +824,10 @@ async function handle(command) {
       if (isStreaming) {
         followUp.push(command.message);
         queueUpdate();
-        respond(id, "prompt");
+        promptAck(id, "queued");
         return;
       }
-      respond(id, "prompt");
+      promptAck(id, "started");
       await runPrompt(command.message);
       await drainFollowUps();
       await emitSettlement();

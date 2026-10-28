@@ -32,7 +32,7 @@ function deferred() {
 function harness(settlement = true) {
   const events: PiRpcEvent[] = [];
   const aDelivered = deferred();
-  const requestOk = vi.fn(async () => undefined);
+  const requestOk = vi.fn(async (): Promise<unknown> => undefined);
   const onDone = vi.fn();
   const kill = vi.fn();
   const session = new PiRpcSession(
@@ -118,6 +118,24 @@ function harness(settlement = true) {
     kill,
   };
 }
+
+it("drops only the handled prompt's settlement and keeps the running turn processing", async () => {
+  const h = harness();
+  const a = h.session.prompt("A");
+  await a.consumed;
+  h.event({ type: "agent_start", name: "A" });
+  h.requestOk.mockImplementationOnce(async () => ({ disposition: "handled" }));
+  const handled = h.session.prompt("/goal-status");
+  await handled.consumed;
+  expect(await handled.settled).toEqual({});
+  expect(h.control.pendingRunSettlements).toHaveLength(1);
+  expect(h.control.isProcessing).toBe(true);
+  h.end("A");
+  h.settle("A");
+  expect(await a.settled).toEqual({ boundaryDelivered: true });
+  expect(h.control.isProcessing).toBe(false);
+  expect(h.control.pendingRunSettlements).toHaveLength(0);
+});
 
 it("keeps B processing and checkpoints run-local when A delivery is delayed", async () => {
   const h = harness();
