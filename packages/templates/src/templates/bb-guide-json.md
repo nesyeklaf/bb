@@ -35,11 +35,15 @@ List commands do not share one wrapper. Most print a bare array; a few wrap it.
 Fields beyond those shown exist; these are the ones scripts use. The `--help` of
 the most-parsed commands ends with the same shape.
 
+Timestamps (createdAt, updatedAt, archivedAt and every other field ending in At)
+are Unix epoch milliseconds, numbers, never ISO strings. In jq,
+`.updatedAt / 1000 | todate` turns one into a date.
+
   bb status --json
     {project: {id, name} | null, thread: {id, status, title, parentThreadId, environment: {hostId, display} | null} | null, childThreads: [{id, status, title}] | null, pendingTodos, pluginsNeedingAttention: [{id, status}], dataDir}
 
   bb thread list --json
-    [{id, projectId, environmentId, providerId, title, status, parentThreadId, sectionId, visibility, archivedAt, pinnedAt, createdAt, updatedAt, activity}]    (bare array; title can be null)
+    [{id, projectId, environmentId, providerId, title, status, parentThreadId, sectionId, visibility, archivedAt, pinnedAt, createdAt, updatedAt, activity}]    (bare array; title can be null; *At fields are epoch milliseconds)
 
   bb thread show <id> --json
     {thread: {id, status, title, projectId, environmentId, parentThreadId, ...}, environment: {id, hostId, path, branchName, ...} | null, pendingTodos}    (thread fields are under .thread)
