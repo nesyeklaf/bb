@@ -70,7 +70,6 @@ function EmptyCatalogPicker({
           serviceTierValue={undefined}
           serviceTierOptions={[]}
           onServiceTierChange={() => {}}
-          modal={false}
         />
       </div>
     </ModelPickerStoryQueryProvider>

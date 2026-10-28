@@ -53,7 +53,6 @@ it("keeps search typing and keyboard selection across the first menu download", 
       serviceTierValue={undefined}
       serviceTierOptions={[]}
       onServiceTierChange={() => {}}
-      modal={false}
     />,
     { wrapper },
   );
