@@ -406,3 +406,93 @@ describe("child parent-notification policy", () => {
     },
   );
 });
+
+describe("child turns that only compact context", () => {
+  async function completeChildTurn(
+    harness: TestAppHarness,
+    sessionId: string,
+    childId: string,
+    turnId: string,
+  ) {
+    const response = await harness.app.request("/internal/session/events", {
+      method: "POST",
+      headers: internalAuthHeaders(harness),
+      body: JSON.stringify({
+        sessionId,
+        eventGroups: groupHostDaemonEvents([
+          {
+            threadId: childId,
+            event: {
+              type: "turn/completed",
+              threadId: childId,
+              providerThreadId: "provider-" + turnId,
+              scope: turnScope(turnId),
+              status: "completed",
+            },
+          },
+        ]),
+      }),
+    });
+    expect(response.status).toBe(200);
+  }
+
+  it.each([
+    { label: "only compacts", withMessage: false, expectedNotices: 0 },
+    { label: "also answers", withMessage: true, expectedNotices: 1 },
+  ])(
+    "sends $expectedNotices parent notices when the turn $label",
+    async ({ withMessage, expectedNotices }) => {
+      await withTestHarness(async (harness) => {
+        const { parent, child, environment, session } = seedParentAndChild(
+          harness,
+          "active",
+        );
+        seedTurnStarted(harness.deps, {
+          environmentId: environment.id,
+          threadId: child.id,
+          turnId: "child-turn",
+        });
+        seedEvent(harness.deps, {
+          threadId: child.id,
+          environmentId: environment.id,
+          providerThreadId: "provider-child-turn",
+          sequence: 2,
+          type: "item/started",
+          scope: turnScope("child-turn"),
+          data: {
+            providerThreadId: "provider-child-turn",
+            item: { type: "contextCompaction", id: "compaction-1" },
+          },
+        });
+        if (withMessage) {
+          seedEvent(harness.deps, {
+            threadId: child.id,
+            environmentId: environment.id,
+            providerThreadId: "provider-child-turn",
+            sequence: 3,
+            type: "item/completed",
+            scope: turnScope("child-turn"),
+            data: {
+              providerThreadId: "provider-child-turn",
+              item: { type: "agentMessage", id: "message-1", text: "Done." },
+            },
+          });
+        }
+
+        vi.useFakeTimers();
+        await completeChildTurn(harness, session.id, child.id, "child-turn");
+        await vi.advanceTimersByTimeAsync(2_000);
+        if (expectedNotices === 1) {
+          await vi.waitFor(() =>
+            expect(parentSystemRequests(harness, parent.id)).toHaveLength(1),
+          );
+        } else {
+          await vi.advanceTimersByTimeAsync(2_000);
+          vi.useRealTimers();
+          await new Promise((resolve) => setTimeout(resolve, 50));
+          expect(parentSystemRequests(harness, parent.id)).toHaveLength(0);
+        }
+      });
+    },
+  );
+});
