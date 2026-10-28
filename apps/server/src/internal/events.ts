@@ -1,6 +1,6 @@
 import { performance } from "node:perf_hooks";
 import { Buffer } from "node:buffer";
-import { and, desc, eq, gt, lt, sql } from "drizzle-orm";
+import { and, desc, eq, gt, isNotNull, lt, sql } from "drizzle-orm";
 import {
   appendDaemonEventsInTransaction,
   deriveStoredEventItemFields,
@@ -536,7 +536,17 @@ async function applyEventEffects(
                 threadId: turnCompleted.thread.id,
                 turnId,
               }));
-          if (!alreadyHandledByCommandFailure && !manuallyStopped) {
+          const compactionOnly =
+            event.status === "completed" &&
+            isCompactionOnlyTurn(deps, {
+              threadId: turnCompleted.thread.id,
+              turnId,
+            });
+          if (
+            !alreadyHandledByCommandFailure &&
+            !manuallyStopped &&
+            !compactionOnly
+          ) {
             addParentTurnNotificationFollowUp({
               failedParentNotificationThreadIds,
               followUps: continuation ? deferredParentNotifications : followUps,
@@ -806,6 +816,31 @@ function wasTurnManuallyStopped(
       )
       .limit(1)
       .get() !== undefined
+  );
+}
+
+// A provider can run a turn that only compacts context (pi does this before
+// the next input, and also when compaction is skipped). Such a turn has no
+// new output, so telling the parent "completed" would repeat the previous
+// final message as if it were new.
+function isCompactionOnlyTurn(
+  deps: Pick<AppDeps, "db">,
+  args: HasThreadStopBeforeTurnStartedArgs,
+): boolean {
+  const kinds = deps.db
+    .selectDistinct({ itemKind: storedEvents.itemKind })
+    .from(storedEvents)
+    .where(
+      and(
+        eq(storedEvents.threadId, args.threadId),
+        eq(storedEvents.turnId, args.turnId),
+        isNotNull(storedEvents.itemKind),
+      ),
+    )
+    .all()
+    .map((row) => row.itemKind);
+  return (
+    kinds.length > 0 && kinds.every((kind) => kind === "contextCompaction")
   );
 }
 
