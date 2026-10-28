@@ -153,9 +153,15 @@ export async function summarizeCommanderError(args: {
       break;
     }
     case "commander.unknownOption": {
-      const suggestion =
-        token === null ? null : suggestOption(invocation.command, token);
-      if (suggestion !== null) hintLines.push(`Did you mean ${suggestion}?`);
+      if (token !== null && /\s/u.test(token)) {
+        hintLines.push(
+          "This looks like text, not an option: a value that starts with '-' is read as an option. Put -- before it, or pass it with a file option.",
+        );
+      } else {
+        const suggestion =
+          token === null ? null : suggestOption(invocation.command, token);
+        if (suggestion !== null) hintLines.push(`Did you mean ${suggestion}?`);
+      }
       hintLines.push(formatUsageLine(invocation));
       const options = formatOptionList(invocation.command);
       if (options.length > 0) hintLines.push(`Options: ${options}`);

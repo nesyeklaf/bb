@@ -111,6 +111,18 @@ describe("summarizeCommanderError", () => {
     ]);
   });
 
+  it("explains -- when text that starts with a dash was read as an option", async () => {
+    const summary = await summarize(
+      ["thread", "spawn", "--project", "p", "- first point"],
+      "commander.unknownOption",
+      "error: unknown option '- first point'",
+    );
+    expect(summary.hintLines[0]).toBe(
+      "This looks like text, not an option: a value that starts with '-' is read as an option. Put -- before it, or pass it with a file option.",
+    );
+    expect(summary.hintLines).not.toContain("Did you mean --project?");
+  });
+
   it("suggests the real verb and lists the group's commands", async () => {
     const summary = await summarize(
       ["thread", "info", "thr_1"],
