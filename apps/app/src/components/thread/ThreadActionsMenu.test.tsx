@@ -1066,6 +1066,59 @@ describe("thread action data input", () => {
     expect(seen).toEqual([[], ["thr_open"]]);
   });
 
+  it("keeps menu rows still when only a header action's data changes", async () => {
+    const headerData: PluginThreadActionRegistration<readonly string[]> = {
+      id: "header-data",
+      title: "Header data",
+      icon: "GitBranch",
+      group: "git",
+      placement: "header",
+      useData: ({ threadIds }) => threadIds,
+      item: () => null,
+    };
+    setPluginSlotRegistrations(
+      "fixture",
+      makePluginRegistrationSet({ threadActions: [headerData] }),
+    );
+    const rowRendered = vi.fn();
+    function CountedRow({ id }: { id: string }) {
+      rowRendered(id);
+      useThreadActionEntries(
+        threadListEntryActionTarget({ ...baseThread, id }),
+        { keys: ["bb--core/pin"] },
+      );
+      return null;
+    }
+    function Header({ id }: { id: string }) {
+      useThreadHeaderActionEntries(
+        threadListEntryActionTarget({ ...baseThread, id }),
+      );
+      return null;
+    }
+    const queryClient = new QueryClient();
+    function Surface({ openId }: { openId: string }) {
+      return (
+        <QueryClientProvider client={queryClient}>
+          <MemoryRouter>
+            <ThreadActionCollectors
+              coreRegistrations={CORE_THREAD_ACTIONS}
+              requestRename={defaultRequestRename}
+            />
+            <CountedRow id="thr_row_a" />
+            <CountedRow id="thr_row_b" />
+            <Header id={openId} />
+          </MemoryRouter>
+        </QueryClientProvider>
+      );
+    }
+    const view = render(<Surface openId="thr_open" />);
+    await settle();
+    rowRendered.mockClear();
+    view.rerender(<Surface openId="thr_next" />);
+    await settle();
+    expect(rowRendered.mock.calls.length).toBeLessThanOrEqual(2);
+  });
+
   it("counts no ids from a hidden surface until it is shown", async () => {
     const { seen, Surface } = renderRecorder();
     const ids = Array.from({ length: 250 }, (_, index) => `thr_${index}`);

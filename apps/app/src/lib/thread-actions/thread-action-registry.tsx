@@ -4,6 +4,7 @@ import {
   useContext,
   useEffect,
   useLayoutEffect,
+  useMemo,
   useRef,
   useState,
   useSyncExternalStore,
@@ -483,11 +484,64 @@ function evaluateThreadActions(
   });
 }
 
+function sliceRegistry(
+  registry: ThreadActionRegistrySnapshot,
+  placement: PluginThreadActionPlacement,
+  keys: ReadonlySet<string> | null,
+): ThreadActionRegistrySnapshot {
+  const records = registry.records.filter(
+    (record) =>
+      hasPlacement(record, placement) &&
+      (keys === null || keys.has(record.key)),
+  );
+  const collected = new Map<string, CollectedThreadAction>();
+  for (const record of records) {
+    const input = registry.collected.get(record.key);
+    if (input !== undefined) collected.set(record.key, input);
+  }
+  return { records, collected, requestRename: registry.requestRename };
+}
+
+function sameRegistrySlice(
+  a: ThreadActionRegistrySnapshot,
+  b: ThreadActionRegistrySnapshot,
+): boolean {
+  return (
+    a.requestRename === b.requestRename &&
+    a.records.length === b.records.length &&
+    a.records.every((record, index) => record === b.records[index]) &&
+    a.collected.size === b.collected.size &&
+    [...a.collected].every(([key, value]) => b.collected.get(key) === value)
+  );
+}
+
+function registrySliceReader(
+  placement: PluginThreadActionPlacement,
+  keysKey: string | null,
+): () => ThreadActionRegistrySnapshot {
+  const wanted = keysKey === null ? null : new Set(keysKey.split("\n"));
+  let source: ThreadActionRegistrySnapshot | null = null;
+  let slice: ThreadActionRegistrySnapshot | null = null;
+  return () => {
+    if (slice !== null && source === snapshot) return slice;
+    const next = sliceRegistry(snapshot, placement, wanted);
+    source = snapshot;
+    if (slice === null || !sameRegistrySlice(slice, next)) slice = next;
+    return slice;
+  };
+}
+
 function useRetainedThreadRegistry(
   threadId: string,
   placement: PluginThreadActionPlacement,
+  keys?: readonly string[],
 ): ThreadActionRegistrySnapshot {
-  const registry = useSyncExternalStore(subscribe, getSnapshot);
+  const keysKey = keys === undefined ? null : keys.join("\n");
+  const getSlice = useMemo(
+    () => registrySliceReader(placement, keysKey),
+    [keysKey, placement],
+  );
+  const registry = useSyncExternalStore(subscribe, getSlice);
   const surfaceVisible = useContext(ThreadActionSurfaceVisibleContext);
   useEffect(
     () => (surfaceVisible ? retainThreadId(threadId, placement) : undefined),
@@ -500,7 +554,7 @@ export function useThreadActionEntries(
   thread: PluginThreadActionTarget,
   options?: PluginThreadActionsOptions,
 ): readonly PluginThreadActionEntry[] {
-  const registry = useRetainedThreadRegistry(thread.id, "menu");
+  const registry = useRetainedThreadRegistry(thread.id, "menu", options?.keys);
   return evaluateThreadActions(
     registry,
     { kind: "thread", thread },
