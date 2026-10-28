@@ -128,8 +128,11 @@ describe("buildPluginApp", () => {
     expect(css).toContain("--text-sm:.8125rem");
     expect(css).toContain(".animate-in");
     expect(css).toContain(".fade-in-0");
-    const scope =
-      ":where([data-bb-plugin=fixture],[data-bb-plugin-root]:not([data-bb-plugin]))";
+    const scope = ":where([data-bb-plugin=fixture])";
+    expect(css).not.toContain(",[data-bb-plugin-root]");
+    expect(css).toContain(
+      ":where([data-bb-plugin-root]:not([data-bb-plugin]))",
+    );
     expect(css).toContain(`${scope} .animate-in`);
     expect(css).toContain(`${scope}.animate-in`);
     expect(css).not.toContain("@scope");
