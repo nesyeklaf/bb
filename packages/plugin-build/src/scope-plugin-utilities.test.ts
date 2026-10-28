@@ -6,7 +6,19 @@ import {
 } from "./scope-plugin-utilities.js";
 
 const ROOTS = pluginScopeRoots("demo");
-const SCOPE = `:where(${ROOTS})`;
+const OWNED = ':where([data-bb-plugin="demo"])';
+const PORTAL = ":where([data-bb-plugin-root]:not([data-bb-plugin]))";
+
+function both(selector: string): string {
+  return `${OWNED} ${selector},${OWNED}${selector},${PORTAL} ${selector},${PORTAL}${selector}`;
+}
+
+function each(selector: string, body: string): string {
+  return both(selector)
+    .split(",")
+    .map((arm) => `${arm}{${body}}`)
+    .join("");
+}
 
 function scopeUtilities(utilities: string): string {
   return scopePluginUtilities(`@layer utilities{${utilities}}`, ROOTS);
@@ -14,82 +26,89 @@ function scopeUtilities(utilities: string): string {
 
 describe("scopePluginUtilities", () => {
   it("preserves owned and anonymous portal roots", () => {
-    expect(pluginScopeRoots("demo")).toBe(
-      '[data-bb-plugin="demo"], [data-bb-plugin-root]:not([data-bb-plugin])',
-    );
+    expect(pluginScopeRoots("demo")).toEqual([
+      '[data-bb-plugin="demo"]',
+      "[data-bb-plugin-root]:not([data-bb-plugin])",
+    ]);
   });
 
-  it("emits separate descendant and self rules per selector", () => {
+  it("gives every root its own selector so no selector carries a root list", () => {
+    const scoped = scopeUtilities(".a{color:red}");
+    expect(scoped).not.toMatch(/:where\([^()]*,/);
+    expect(scoped).not.toContain(":is(");
+  });
+
+  it("emits descendant and self selectors per root", () => {
     expect(scopeUtilities(".flex-col{flex-direction:column}")).toBe(
-      `@layer utilities{${SCOPE} .flex-col{flex-direction:column}${SCOPE}.flex-col{flex-direction:column}}`,
+      `@layer utilities{${each(".flex-col", "flex-direction:column")}}`,
     );
   });
 
   it("scopes each selector in a list", () => {
     expect(scopeUtilities(".a,.b{color:red}")).toBe(
-      `@layer utilities{${SCOPE} .a,${SCOPE}.a,${SCOPE} .b,${SCOPE}.b{color:red}}`,
+      `@layer utilities{${both(".a")},${both(".b")}{color:red}}`,
     );
   });
 
   it("preserves nesting specificity when the original selector list has different specificities", () => {
     expect(scopeUtilities(".a,#b{&:hover{color:red}}")).toBe(
-      `@layer utilities{${SCOPE} .a,${SCOPE}.a,${SCOPE} #b,${SCOPE}#b{&:hover{color:red}}}`,
+      `@layer utilities{${both(".a")},${both("#b")}{&:hover{color:red}}}`,
     );
   });
 
   it("keeps commas inside :is()/:not() out of the selector split", () => {
     const scoped = scopeUtilities(":is(.a,.b) > .c{color:red}");
     expect(scoped).toBe(
-      `@layer utilities{${SCOPE} :is(.a,.b) > .c{color:red}${SCOPE}:is(.a,.b) > .c{color:red}}`,
+      `@layer utilities{${[OWNED, PORTAL].flatMap((root) => [`${root} :is(.a,.b) > .c{color:red}`, `${root}:is(.a,.b) > .c{color:red}`]).join("")}}`,
     );
   });
 
   it("drops the self arm for sibling combinators so a portal root cannot reach host siblings", () => {
     const hidden = String.raw`.\[\&\~\*\]\:hidden`;
     expect(scopeUtilities(`${hidden}{&~*{display:none}}`)).toBe(
-      `@layer utilities{${SCOPE} ${hidden}{&~*{display:none}}}`,
+      `@layer utilities{${OWNED} ${hidden}{&~*{display:none}}${PORTAL} ${hidden}{&~*{display:none}}}`,
     );
     expect(scopeUtilities(`${hidden} ~ *{display:none}`)).toBe(
-      `@layer utilities{${SCOPE} ${hidden} ~ *{display:none}}`,
+      `@layer utilities{${OWNED} ${hidden} ~ *{display:none}${PORTAL} ${hidden} ~ *{display:none}}`,
     );
     expect(scopeUtilities(".a{+ .b{color:red}}")).toBe(
-      `@layer utilities{${SCOPE} .a{+ .b{color:red}}}`,
+      `@layer utilities{${OWNED} .a{+ .b{color:red}}${PORTAL} .a{+ .b{color:red}}}`,
     );
     expect(
       scopeUtilities(".a{@media (hover:hover){&:hover + .b{color:red}}}"),
     ).toBe(
-      `@layer utilities{${SCOPE} .a{@media (hover:hover){&:hover + .b{color:red}}}}`,
+      `@layer utilities{${OWNED} .a{@media (hover:hover){&:hover + .b{color:red}}}${PORTAL} .a{@media (hover:hover){&:hover + .b{color:red}}}}`,
     );
   });
 
   it("keeps both arms when a sibling combinator precedes & so the subject stays on the element", () => {
     expect(scopeUtilities(".x{.a ~ &{color:red}}")).toBe(
-      `@layer utilities{${SCOPE} .x{.a ~ &{color:red}}${SCOPE}.x{.a ~ &{color:red}}}`,
+      `@layer utilities{${each(".x", ".a ~ &{color:red}")}}`,
     );
     expect(scopeUtilities(".x{&:hover{color:red}}")).toBe(
-      `@layer utilities{${SCOPE} .x{&:hover{color:red}}${SCOPE}.x{&:hover{color:red}}}`,
+      `@layer utilities{${each(".x", "&:hover{color:red}")}}`,
     );
   });
 
   it("keeps both arms when + or ~ only appear escaped, in attributes, or inside :is()", () => {
     const peer = String.raw`.peer-checked\:hidden:is(:where(.peer):checked ~ *)`;
     expect(scopeUtilities(`${peer}{display:none}`)).toContain(
-      `${SCOPE}${peer}`,
+      `${PORTAL}${peer}`,
     );
     const attr = String.raw`[data-x~="a"].mt-\[calc\(1px\+2px\)\]`;
-    expect(scopeUtilities(`${attr}{margin:0}`)).toContain(`${SCOPE}${attr}`);
+    expect(scopeUtilities(`${attr}{margin:0}`)).toContain(`${OWNED}${attr}`);
   });
 
   it("keeps the scope in front of a pseudo-element so the selector stays valid", () => {
     expect(scopeUtilities(".content-x::before{content:'x'}")).toContain(
-      `${SCOPE}.content-x::before`,
+      `${OWNED}.content-x::before`,
     );
   });
 
   it("survives escaped class names and braces inside strings", () => {
     const scoped = scopeUtilities(String.raw`.w-\[50\%\]{content:"}"}`);
     expect(scoped).toBe(
-      `@layer utilities{${SCOPE} .w-\\[50\\%\\]{content:"}"}${SCOPE}.w-\\[50\\%\\]{content:"}"}}`,
+      `@layer utilities{${each(String.raw`.w-\[50\%\]`, 'content:"}"')}}`,
     );
   });
 
@@ -98,7 +117,7 @@ describe("scopePluginUtilities", () => {
       "@media (min-width:40rem){.md-flex{display:flex}}",
     );
     expect(scoped).toBe(
-      `@layer utilities{@media (min-width:40rem){${SCOPE} .md-flex{display:flex}${SCOPE}.md-flex{display:flex}}}`,
+      `@layer utilities{@media (min-width:40rem){${each(".md-flex", "display:flex")}}}`,
     );
   });
 
@@ -122,7 +141,7 @@ describe("scopePluginUtilities", () => {
     expect(scoped).toContain(
       '@property --tw-scale-x{syntax:"*";inherits:false}',
     );
-    expect(scoped).toContain(`${SCOPE}.scale-x-50`);
+    expect(scoped).toContain(`${OWNED}.scale-x-50`);
   });
 
   it("preserves the license banner in readable optimized CSS", () => {
@@ -130,9 +149,7 @@ describe("scopePluginUtilities", () => {
       "/*! tailwindcss v4.3.0 | MIT License | https://tailwindcss.com */";
     expect(
       scopePluginUtilities(`${banner}@layer utilities{.a{color:red}}`, ROOTS),
-    ).toBe(
-      `${banner}@layer utilities{${SCOPE} .a{color:red}${SCOPE}.a{color:red}}`,
-    );
+    ).toBe(`${banner}@layer utilities{${each(".a", "color:red")}}`);
   });
 
   it("accepts a build with no utilities layer", () => {
