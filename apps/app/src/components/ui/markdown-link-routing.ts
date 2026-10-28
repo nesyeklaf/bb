@@ -42,6 +42,8 @@ type MarkdownLocalFileContextMenuItemsProvider = (
 export const MarkdownLocalFileContextMenuContext =
   createContext<MarkdownLocalFileContextMenuItemsProvider | null>(null);
 
+export const MarkdownHostHomePathContext = createContext<string | null>(null);
+
 export const MarkdownLocalFileOpenTargetsContext = createContext<
   readonly WorkspaceOpenTarget[]
 >([]);
