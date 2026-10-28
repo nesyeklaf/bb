@@ -51,6 +51,7 @@ import {
 } from "@/components/commands/AppCommandProvider";
 import { useRouteState } from "@/hooks/useRouteState";
 import { SidebarNavigationModelProvider } from "./SidebarNavigationModel";
+import { useSidebarThreadPrefetch } from "./useSidebarThreadPrefetch";
 import { SIDEBAR_FOOTER_MORE_ID } from "./sidebarFooterPreferences";
 import { LazySidebarFooterCustomize } from "./LazySidebarFooterCustomize";
 import {
@@ -113,6 +114,7 @@ export function AppSidebar({
     ReadonlyMap<string, SidebarThreadShortcutPresentation>
   >(EMPTY_SIDEBAR_THREAD_SHORTCUT_KEYS);
   const sidebarRef = useRef<HTMLDivElement | null>(null);
+  useSidebarThreadPrefetch(sidebarRef);
   const threadShortcutTargetsRef = useRef<
     readonly SidebarThreadShortcutTarget[]
   >([]);

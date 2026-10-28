@@ -30,6 +30,10 @@ vi.mock("@/components/commands/AppCommandProvider", () => ({
   useIsAppCommandModifierHeld: () => false,
 }));
 
+vi.mock("./useSidebarThreadPrefetch", () => ({
+  useSidebarThreadPrefetch: () => {},
+}));
+
 vi.mock("./PluginThreadList", () => ({
   PluginThreadList: () => <div data-testid="thread-list" />,
 }));

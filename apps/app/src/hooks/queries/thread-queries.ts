@@ -757,6 +757,20 @@ export function threadDetailBootstrapQueryOptions(
   });
 }
 
+const THREAD_OPEN_PREFETCH_GC_MS = 30_000;
+
+export function prefetchThreadOpen(
+  queryClient: QueryClient,
+  threadId: string,
+): void {
+  void queryClient.prefetchQuery({
+    ...threadDetailBootstrapQueryOptions(queryClient, threadId, {
+      timelinePrefetch: true,
+    }),
+    gcTime: THREAD_OPEN_PREFETCH_GC_MS,
+  });
+}
+
 export function useThreadDetailBootstrap(
   id: string,
   options?: ThreadDetailBootstrapQueryOptions,
