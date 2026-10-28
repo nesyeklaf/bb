@@ -181,8 +181,21 @@ function deactivateAfterFinalRelease(
   }, CSS_RELEASE_GRACE_MS);
 }
 
+function hostStylesheetKey(): string | null {
+  const href = document
+    .querySelector('link[rel="stylesheet"][href^="/assets/index-"]')
+    ?.getAttribute("href");
+  return href === undefined || href === null
+    ? null
+    : href.slice("/assets/".length);
+}
+
 function hostTailwindUrl(url: string): string {
-  return `${url}${url.includes("?") ? "&" : "?"}host-tailwind=${HOST_TAILWIND_VERSION}`;
+  const hostTailwind = `${url}${url.includes("?") ? "&" : "?"}host-tailwind=${HOST_TAILWIND_VERSION}`;
+  const hostCss = hostStylesheetKey();
+  return hostCss === null
+    ? hostTailwind
+    : `${hostTailwind}&host-css=${encodeURIComponent(hostCss)}`;
 }
 
 export function prefetchPluginCss(url: string): void {
