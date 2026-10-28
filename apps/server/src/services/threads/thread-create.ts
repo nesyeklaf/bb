@@ -652,6 +652,18 @@ export async function createThreadFromRequest(
     requestInput.environment.environmentId === sourceThread.environmentId
       ? sourceThread.environmentId
       : undefined);
+  // A personal-project thread may reuse an unmanaged environment only where it
+  // continues work already running there: a fork of the thread that owns it, or
+  // a child of a parent that runs in it (a delegate reading its parent's checkout).
+  const unmanagedPersonalReuseEnvironmentId =
+    forkSourceEnvironmentId ??
+    (parentThread !== null &&
+    parentThread.projectId === requestInput.projectId &&
+    parentThread.environmentId !== null &&
+    requestInput.environment.type === "reuse" &&
+    requestInput.environment.environmentId === parentThread.environmentId
+      ? parentThread.environmentId
+      : undefined);
   if (requestInput.startedOnBehalfOf !== null) {
     const senderThread = sourceThread ?? parentThread;
     if (senderThread === null) {
@@ -751,7 +763,7 @@ export async function createThreadFromRequest(
       ? null
       : resolveStableThreadRequestEnvironment(deps, {
           allowUnmanagedPersonalProjectReuseEnvironmentId:
-            forkSourceEnvironmentId,
+            unmanagedPersonalReuseEnvironmentId,
           environment: requestedEnvironment,
           projectId: request.projectId,
         });
@@ -814,10 +826,10 @@ export async function createThreadFromRequest(
 
   const { environmentId, environmentIntent } =
     await resolveThreadEnvironmentPlacement(deps, {
-      ...(forkSourceEnvironmentId !== undefined
+      ...(unmanagedPersonalReuseEnvironmentId !== undefined
         ? {
             allowUnmanagedPersonalProjectReuseEnvironmentId:
-              forkSourceEnvironmentId,
+              unmanagedPersonalReuseEnvironmentId,
           }
         : {}),
       projectId: request.projectId,
