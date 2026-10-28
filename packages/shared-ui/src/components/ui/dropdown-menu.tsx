@@ -74,6 +74,7 @@ function DropdownMenu({
   open: controlledOpen,
   onOpenChange: controlledOnChange,
   defaultOpen,
+  modal = false,
   ...props
 }: React.ComponentProps<typeof DropdownMenuPrimitive.Root>) {
   const ctx = useResponsiveRoot(
@@ -94,6 +95,7 @@ function DropdownMenu({
     <DropdownMenuPrimitive.Root
       open={ctx.open}
       onOpenChange={ctx.onOpenChange}
+      modal={modal}
       {...props}
     >
       <ResponsiveMenuContext.Provider value={ctx}>
