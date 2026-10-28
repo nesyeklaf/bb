@@ -103,6 +103,19 @@ export function useHostDiscoveredRepos(
   });
 }
 
+export function useHostHomePath(hostId: string | null): string | null {
+  const query = useQuery({
+    queryKey: hostDirectoryQueryKey(hostId, null),
+    queryFn: ({ signal }) =>
+      sdk.hosts.directory({ hostId: hostId as string, signal }),
+    enabled: hostId != null,
+    select: (listing: HostDirectoryListing) => listing.directory,
+    staleTime: Number.POSITIVE_INFINITY,
+    retry: false,
+  });
+  return query.data ?? null;
+}
+
 export function useHostDirectory(hostId: string | null, path: string | null) {
   return useQuery<HostDirectoryListing>({
     queryKey: hostDirectoryQueryKey(hostId, path),

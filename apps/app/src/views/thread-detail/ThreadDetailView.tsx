@@ -43,9 +43,7 @@ import {
   useThreadTimelineController,
 } from "@/components/thread/timeline";
 import { ThreadProviderContext } from "@/components/thread/thread-provider-context";
-import {
-  type ThreadListEntry,
-} from "@bb/domain";
+import { type ThreadListEntry } from "@bb/domain";
 import type { TerminalSession } from "@bb/server-contract";
 import type { WorkspaceOpenTarget } from "@bb/host-daemon-contract";
 import { appToast } from "@/components/ui/app-toast";
@@ -93,7 +91,11 @@ import { useHostDaemon } from "@/hooks/useHostDaemon";
 import { useCanOpenFileExternally } from "@/hooks/useCanOpenFileExternally";
 import type { LiveFileRoot } from "@/hooks/useResolvedLiveFileTarget";
 import { useLocalOpenTargets } from "@/hooks/useLocalOpenTargets";
-import { selectHosts, useHosts } from "@/hooks/queries/host-queries";
+import {
+  selectHosts,
+  useHostHomePath,
+  useHosts,
+} from "@/hooks/queries/host-queries";
 import { useConnectionAwareQueryState } from "@/hooks/queries/connection-aware-query-state";
 import { useThreadTerminals } from "@/hooks/queries/thread-terminal-queries";
 import { usePanelBrowser } from "@/components/secondary-panel/usePanelBrowser";
@@ -204,6 +206,7 @@ import {
   type ThreadLocalFileLinkResolution,
 } from "@/lib/thread-local-file-links";
 import {
+  MarkdownHostHomePathContext,
   MarkdownLocalFileContextMenuContext,
   MarkdownLocalFileOpenTargetsContext,
   type MarkdownLinkRouting,
@@ -752,6 +755,13 @@ function ThreadDetailViewInternal(
     id: thread?.id ?? "",
     projectId: thread?.projectId ?? projectId,
   });
+  const hostHomePath = useHostHomePath(
+    environment !== null &&
+      environment !== undefined &&
+      connectedHostIds.has(environment.hostId)
+      ? environment.hostId
+      : null,
+  );
   const canCreateTerminal =
     !executionUnavailable &&
     thread?.environmentId !== null &&
@@ -1267,10 +1277,7 @@ function ThreadDetailViewInternal(
         void (async () => {
           const opensFromStorage =
             (await isFileMissing(
-              buildThreadHostFileContentUrl(
-                threadId,
-                resolution.request.path,
-              ),
+              buildThreadHostFileContentUrl(threadId, resolution.request.path),
             )) &&
             !(await isFileMissing(
               buildThreadHostFileContentUrl(threadId, storageFallback.path),
@@ -2103,9 +2110,11 @@ function ThreadDetailViewInternal(
                 <MarkdownLocalFileOpenTargetsContext.Provider
                   value={fileOpenTargets}
                 >
-                  <UrlOpenRoutingProvider openInAppBrowser={openBrowser}>
-                    {panel}
-                  </UrlOpenRoutingProvider>
+                  <MarkdownHostHomePathContext.Provider value={hostHomePath}>
+                    <UrlOpenRoutingProvider openInAppBrowser={openBrowser}>
+                      {panel}
+                    </UrlOpenRoutingProvider>
+                  </MarkdownHostHomePathContext.Provider>
                 </MarkdownLocalFileOpenTargetsContext.Provider>
               </MarkdownLocalFileContextMenuContext.Provider>
             )}
@@ -2162,13 +2171,15 @@ function ThreadDetailViewInternal(
       <ThreadProviderContext.Provider value={threadProviderContextValue}>
         <PluginDetailPanelContext.Provider value={pluginDetails}>
           <MarkdownLocalFileOpenTargetsContext.Provider value={fileOpenTargets}>
-            <AttachmentOpenerContext.Provider value={openAttachment}>
-              <SelectionAddToChatContext.Provider
-                value={handleSelectionAddToChat}
-              >
-                {threadDetailContent}
-              </SelectionAddToChatContext.Provider>
-            </AttachmentOpenerContext.Provider>
+            <MarkdownHostHomePathContext.Provider value={hostHomePath}>
+              <AttachmentOpenerContext.Provider value={openAttachment}>
+                <SelectionAddToChatContext.Provider
+                  value={handleSelectionAddToChat}
+                >
+                  {threadDetailContent}
+                </SelectionAddToChatContext.Provider>
+              </AttachmentOpenerContext.Provider>
+            </MarkdownHostHomePathContext.Provider>
           </MarkdownLocalFileOpenTargetsContext.Provider>
         </PluginDetailPanelContext.Provider>
       </ThreadProviderContext.Provider>

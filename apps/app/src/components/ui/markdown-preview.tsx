@@ -74,6 +74,7 @@ import "./markdown-code-highlight.css";
 import { normalizeLocalFileMarkdownLinks } from "./markdown-local-file-link-normalize.js";
 import {
   buildLocalFileAnchorHref,
+  expandHomeRelativeHref,
   parseLocalFileHref,
   resolveRelativeLocalFileHref,
   type MarkdownAbsoluteLocalFileLinkRouting,
@@ -81,6 +82,7 @@ import {
   type MarkdownRelativeLocalFileLinkRouting,
 } from "./markdown-local-file-link.js";
 import {
+  MarkdownHostHomePathContext,
   MarkdownLocalFileContextMenuContext,
   MarkdownLocalFileOpenTargetsContext,
   type MarkdownLinkRouting,
@@ -338,7 +340,11 @@ function areMarkdownAbsoluteLocalFileLinkRoutingsEqual({
   if (previous === undefined || next === undefined) return false;
   if (previous.kind !== next.kind) return false;
   if (previous.kind === "trusted-host" || next.kind === "trusted-host") {
-    return true;
+    return (
+      previous.kind === "trusted-host" &&
+      next.kind === "trusted-host" &&
+      previous.homePath === next.homePath
+    );
   }
   return previous.rootPath === next.rootPath;
 }
@@ -498,6 +504,19 @@ function resolveMarkdownLocalFileTarget(
   absolute: MarkdownAbsoluteLocalFileLinkRouting,
   relative: MarkdownRelativeLocalFileLinkRouting | undefined,
 ): ResolvedMarkdownLocalFileTarget | null {
+  const homeExpandedHref = expandHomeRelativeHref({
+    absoluteLinks: absolute,
+    href: value,
+  });
+  if (homeExpandedHref !== null) {
+    const homeLink = parseLocalFileHref({
+      absoluteLinks: absolute,
+      href: homeExpandedHref,
+    });
+    return homeLink === null
+      ? null
+      : { href: homeExpandedHref, link: homeLink, sourceKind: "absolute" };
+  }
   const absoluteLink =
     parseLocalFileHref({ absoluteLinks: absolute, href: value }) ??
     (absolute.kind === "trusted-host" && relative !== undefined
@@ -1814,6 +1833,44 @@ function MarkdownFrontmatter({ source }: { source: string }) {
   );
 }
 
+function withHostHomePath(
+  routing: MarkdownAbsoluteLocalFileLinkRouting,
+  homePath: string,
+): MarkdownAbsoluteLocalFileLinkRouting {
+  return routing.kind === "trusted-host" && routing.homePath === undefined
+    ? { ...routing, homePath }
+    : routing;
+}
+
+function applyHostHomePath(
+  routing: MarkdownLinkRouting | undefined,
+  homePath: string | null,
+): MarkdownLinkRouting | undefined {
+  if (routing === undefined || homePath === null) {
+    return routing;
+  }
+  const { localFile, localImage } = routing;
+  return {
+    ...routing,
+    ...(localFile === undefined
+      ? {}
+      : {
+          localFile: {
+            ...localFile,
+            absoluteLinks: withHostHomePath(localFile.absoluteLinks, homePath),
+          },
+        }),
+    ...(localImage === undefined
+      ? {}
+      : {
+          localImage: {
+            ...localImage,
+            absolutePaths: withHostHomePath(localImage.absolutePaths, homePath),
+          },
+        }),
+  };
+}
+
 function MarkdownPreviewComponent({
   allowHtml = false,
   className,
@@ -1822,12 +1879,17 @@ function MarkdownPreviewComponent({
   imagePolicy = "render",
   incrementalBlocks = false,
   tableLayout = "breakout",
-  linkRouting,
+  linkRouting: linkRoutingProp,
   threadMentions,
   promptMentions,
   messageDirectives,
   urlTransform,
 }: MarkdownPreviewProps) {
+  const hostHomePath = useContext(MarkdownHostHomePathContext);
+  const linkRouting = useMemo(
+    () => applyHostHomePath(linkRoutingProp, hostHomePath),
+    [hostHomePath, linkRoutingProp],
+  );
   const applicationLinksEnabled = useApplicationLinksEnabled();
   const preferredTheme = usePreferredTheme();
   const [rewriteLocalhostLinks] = useRewriteLocalhostLinksPreference();
