@@ -20,6 +20,7 @@ import { highlightMarkdownCode } from "./markdown-code-highlight";
 import { MarkdownPreview } from "./markdown-preview";
 import { MARKDOWN_TABLE_START_OFFSET_VARIABLE } from "./markdown-table-breakout";
 import {
+  MarkdownHostHomePathContext,
   MarkdownLocalFileContextMenuContext,
   MarkdownLocalFileOpenTargetsContext,
   type MarkdownLinkRouting,
@@ -674,6 +675,68 @@ describe("MarkdownPreview", () => {
     expect(
       screen.getByRole("link", { name: "local thread" }).getAttribute("href"),
     ).toBe(href);
+  });
+
+  it("opens ~ links and images under the host's home directory", () => {
+    const onOpenLocalFileLink = vi.fn(() => true);
+
+    const { container } = render(
+      <MarkdownHostHomePathContext.Provider value="/home/me">
+        <MarkdownPreview
+          content={
+            "See [layers](~/notes/layers.md:12), [other](~alice/notes.md) and ![shot](~/shots/a.png)."
+          }
+          linkRouting={{
+            localFile: {
+              absoluteLinks: { kind: "trusted-host" },
+              relativeLinks: { baseDir: "/workspace", rootPath: "/workspace" },
+              onOpenLink: onOpenLocalFileLink,
+            },
+            localImage: {
+              absolutePaths: { kind: "trusted-host" },
+              resolveSrc: ({ path }) =>
+                `/content?path=${encodeURIComponent(path)}`,
+            },
+          }}
+        />
+      </MarkdownHostHomePathContext.Provider>,
+    );
+
+    fireEvent.click(screen.getByRole("link", { name: "layers" }));
+    expect(onOpenLocalFileLink.mock.calls).toEqual([
+      [
+        {
+          lineRange: { endLineNumber: 12, startLineNumber: 12 },
+          openTargetId: null,
+          path: "/home/me/notes/layers.md",
+        },
+      ],
+    ]);
+    expect(container.querySelector("img")?.getAttribute("src")).toBe(
+      "/content?path=%2Fhome%2Fme%2Fshots%2Fa.png",
+    );
+    fireEvent.click(screen.getByText("other"));
+    expect(onOpenLocalFileLink).toHaveBeenCalledTimes(1);
+  });
+
+  it("leaves ~ links unresolved when the host's home directory is unknown", () => {
+    const onOpenLocalFileLink = vi.fn(() => true);
+
+    render(
+      <MarkdownPreview
+        content="See [layers](~/notes/layers.md)."
+        linkRouting={{
+          localFile: {
+            absoluteLinks: { kind: "trusted-host" },
+            relativeLinks: { baseDir: "/workspace", rootPath: "/workspace" },
+            onOpenLink: onOpenLocalFileLink,
+          },
+        }}
+      />,
+    );
+
+    fireEvent.click(screen.getByText("layers"));
+    expect(onOpenLocalFileLink).not.toHaveBeenCalled();
   });
 
   it("routes editor file links to the local file handler with their editor", () => {

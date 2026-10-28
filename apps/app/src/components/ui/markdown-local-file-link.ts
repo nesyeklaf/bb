@@ -31,6 +31,7 @@ export type MarkdownPreviewLocalFileLinkHandler = (
 ) => boolean;
 
 interface MarkdownTrustedAbsoluteLocalFileLinkRouting {
+  homePath?: string;
   kind: "trusted-host";
 }
 
@@ -289,6 +290,30 @@ function parseAbsoluteLocalFileHref(
 const URI_SCHEME_PATTERN = /^[a-zA-Z][a-zA-Z0-9+.-]*:/u;
 
 const HOME_RELATIVE_PATH_PATTERN = /^~(?:[^/]*\/|$)/u;
+const CURRENT_USER_HOME_PATH_PATTERN = /^~(?=\/|$)/u;
+
+interface ExpandHomeRelativeHrefArgs {
+  absoluteLinks: MarkdownAbsoluteLocalFileLinkRouting;
+  href: string;
+}
+
+export function expandHomeRelativeHref({
+  absoluteLinks,
+  href,
+}: ExpandHomeRelativeHrefArgs): string | null {
+  if (
+    absoluteLinks.kind !== "trusted-host" ||
+    absoluteLinks.homePath === undefined
+  ) {
+    return null;
+  }
+  const decodedHref = safeDecodeURIComponent(href);
+  if (!CURRENT_USER_HOME_PATH_PATTERN.test(decodedHref)) {
+    return null;
+  }
+  const homePath = absoluteLinks.homePath.replace(/[/\\]+$/u, "");
+  return homePath.length === 0 ? null : `${homePath}${decodedHref.slice(1)}`;
+}
 
 export function resolveRelativeLocalFileHref({
   baseDir,
