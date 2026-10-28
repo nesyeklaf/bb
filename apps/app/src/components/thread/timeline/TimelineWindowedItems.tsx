@@ -15,6 +15,7 @@ import type { ScrollPositionKeeper } from "@/components/ui/scroll-position-keepe
 export const DEFAULT_WINDOWING_MIN_ITEM_COUNT = 20;
 const MAX_MEASUREMENTS = 2_000;
 const OVERSCAN_ITEMS = 8;
+const INITIAL_OVERSCAN_ITEMS = 3;
 const EDGE_MARGIN_ITEMS = 2;
 const TOP_MOUNT_VIEWPORTS = 2;
 const MAX_INTERACTION_PINS = 24;
@@ -158,10 +159,11 @@ function windowKeysAround(
   itemKeys: readonly string[],
   visible: IndexRange,
   mountToTop: boolean,
+  overscan: number,
 ): Set<string> {
   const keys = new Set<string>();
-  const start = mountToTop ? 0 : Math.max(0, visible.start - OVERSCAN_ITEMS);
-  const end = Math.min(itemKeys.length - 1, visible.end + OVERSCAN_ITEMS);
+  const start = mountToTop ? 0 : Math.max(0, visible.start - overscan);
+  const end = Math.min(itemKeys.length - 1, visible.end + overscan);
   for (let index = start; index <= end; index += 1) {
     const key = itemKeys[index];
     if (key !== undefined) keys.add(key);
@@ -262,6 +264,7 @@ export function TimelineWindowedItems({
         itemKeys,
         visible,
         reachesListTop(model, visible, viewportHeight),
+        INITIAL_OVERSCAN_ITEMS,
       ),
       heights,
     };
@@ -492,7 +495,12 @@ export function TimelineWindowedItems({
         (!mountToTop && visible.start - first > 3 * OVERSCAN_ITEMS) ||
         last - visible.end > 3 * OVERSCAN_ITEMS;
       if (!uncovered && !nearEdge) return;
-      const keys = windowKeysAround(live.itemKeys, visible, mountToTop);
+      const keys = windowKeysAround(
+        live.itemKeys,
+        visible,
+        mountToTop,
+        OVERSCAN_ITEMS,
+      );
       const heldKey = heldKeyOf(positionKeeper);
       if (heldKey !== null && live.indexByKey.has(heldKey)) keys.add(heldKey);
       if (sameKeys(keys, live.windowKeys) || !takeFrameUpdate()) return;
