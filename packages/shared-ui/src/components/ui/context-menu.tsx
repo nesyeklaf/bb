@@ -78,7 +78,12 @@ type ContextMenuShortcutProps = React.HTMLAttributes<HTMLSpanElement>;
 
 const CONTEXT_MENU_LAYER_CLASS = "z-[70]";
 
-const ContextMenu = ContextMenuPrimitive.Root;
+function ContextMenu({
+  modal = false,
+  ...props
+}: React.ComponentProps<typeof ContextMenuPrimitive.Root>) {
+  return <ContextMenuPrimitive.Root modal={modal} {...props} />;
+}
 const ContextMenuTrigger = ContextMenuPrimitive.Trigger;
 const ContextMenuGroup = ContextMenuPrimitive.Group;
 const ContextMenuPortal = ContextMenuPrimitive.Portal;
