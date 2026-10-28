@@ -49,6 +49,7 @@ import { registerTerminalRoutes } from "./routes/terminals.js";
 import { registerThreadRoutes } from "./routes/threads/index.js";
 import { registerQueueRoutes } from "./routes/queue.js";
 import { registerPluginRoutes } from "./routes/plugins.js";
+import { loadHostStylesheet } from "./host-stylesheet.js";
 import { registerPluginCatalogRoutes } from "./routes/plugin-catalog.js";
 import { registerPluginInstallJobRoutes } from "./routes/plugin-install-jobs.js";
 import { createPluginInstallJobs } from "./services/plugins/plugin-install-jobs.js";
@@ -942,7 +943,13 @@ export function createApp(
   );
   registerPluginRoutes(
     publicApi,
-    deps,
+    {
+      config: deps.config,
+      db: deps.db,
+      hostStylesheet: options?.staticDir
+        ? loadHostStylesheet(options.staticDir)
+        : null,
+    },
     pluginService,
     pluginInstallJobs,
     pluginUpdateJobs,

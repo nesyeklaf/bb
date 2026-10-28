@@ -7,6 +7,7 @@ import {
   assertValidPluginCompactIconSvg,
   assertValidPluginIconSvg,
   RUNTIME_SLOT_BY_SPECIFIER,
+  dropHostDuplicateUtilities,
   dropHostProvidedTailwind,
 } from "@bb/plugin-build";
 
@@ -44,15 +45,52 @@ interface PluginAppState {
   bundle: PluginAppBundleInfo | null;
 }
 
+export interface HostStylesheet {
+  key: string;
+  css: string;
+}
+
+interface PluginAppCss {
+  original: Buffer;
+  withoutHostTailwind: Buffer;
+  withoutHostUtilities: { key: string; bytes: Buffer } | null;
+}
+
 interface PluginAppAssets {
+  pluginId: string;
   jsPath: string;
-  css: { original: Buffer; withoutHostTailwind: Buffer } | null;
+  css: PluginAppCss | null;
   hash: string;
 }
 
+export type PluginCssVariant =
+  | { kind: "original" }
+  | { kind: "withoutHostTailwind" }
+  | { kind: "withoutHostUtilities"; host: HostStylesheet };
+
 export interface PluginAppAsset {
   hash: string;
-  read(hostTailwind: boolean): Promise<Buffer>;
+  read(variant: PluginCssVariant): Promise<Buffer>;
+}
+
+function withoutHostUtilities(
+  pluginId: string,
+  css: PluginAppCss,
+  host: HostStylesheet,
+): Buffer {
+  if (css.withoutHostUtilities?.key !== host.key) {
+    css.withoutHostUtilities = {
+      key: host.key,
+      bytes: Buffer.from(
+        dropHostDuplicateUtilities(
+          css.withoutHostTailwind.toString("utf8"),
+          host.css,
+          pluginId,
+        ),
+      ),
+    };
+  }
+  return css.withoutHostUtilities.bytes;
 }
 
 export function pluginAppAsset(
@@ -66,8 +104,12 @@ export function pluginAppAsset(
     ? undefined
     : {
         hash: assets.hash,
-        read: async (hostTailwind) =>
-          hostTailwind ? css.withoutHostTailwind : css.original,
+        read: async (variant) => {
+          if (variant.kind === "original") return css.original;
+          if (variant.kind === "withoutHostTailwind")
+            return css.withoutHostTailwind;
+          return withoutHostUtilities(assets.pluginId, css, variant.host);
+        },
       };
 }
 
@@ -363,6 +405,7 @@ export async function loadPluginAppBundle(
       withoutHostTailwind: Buffer.from(
         dropHostProvidedTailwind(original.toString("utf8")),
       ),
+      withoutHostUtilities: null,
     };
   } catch {
     css = null;
@@ -391,6 +434,6 @@ export async function loadPluginAppBundle(
         runtimeSlots: meta.runtimeSlots ?? ALL_RUNTIME_SLOTS,
       },
     },
-    assets: { jsPath, css, hash },
+    assets: { pluginId, jsPath, css, hash },
   };
 }
