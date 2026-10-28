@@ -203,7 +203,6 @@ interface ModelReasoningPickerProps {
   serviceTierSupportByProvider?: Record<string, boolean>;
   className?: string;
   muted?: boolean;
-  modal?: boolean;
   align?: "start" | "center" | "end";
   disabled?: boolean;
   handoff?: ModelReasoningPickerHandoff;
@@ -237,7 +236,6 @@ export function ModelReasoningPicker({
   serviceTierSupportByProvider,
   className,
   muted,
-  modal = true,
   align = "start",
   disabled,
   handoff,
@@ -1042,7 +1040,7 @@ export function ModelReasoningPicker({
         MODEL_SEARCH_MIN_OPTIONS);
 
   return (
-    <Popover open={open} onOpenChange={setOpen} modal={modal}>
+    <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>{trigger}</PopoverTrigger>
       <PopoverContent
         align={align}

@@ -253,7 +253,6 @@ function renderPicker({
         onServiceTierChange={onServiceTierChange}
         serviceTierSupportByProvider={serviceTierSupportByProvider}
         muted={muted}
-        modal={false}
         handoff={handoff}
         agentSections={agentSections}
         onAgentOptionChange={onAgentOptionChange}
