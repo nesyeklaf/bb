@@ -260,6 +260,34 @@ inaccessible WAL files report a null size with a sample timestamp. WAL size
 can include space reused by earlier generations; it does not measure uncheckpointed backlog or identify
 checkpoint progress. Resource sampling is also disabled with the live gate.
 
+## Server-Timing Header
+
+Every `/api/v1/*` and `/internal/*` response carries a `Server-Timing` header
+(WebSocket upgrades excluded):
+
+```
+server-timing: total;dur=2.3, db;dur=0.2, app;desc="/api/v1/threads/:threadId"
+```
+
+- `total` is the time from entering the server middleware until the handler's
+  response (including JSON compression) is ready, in milliseconds. For
+  streaming and SSE responses it is the time to the response headers; the body
+  keeps streaming afterwards.
+- `db` is the time this request spent inside SQLite calls (statements, `exec`
+  and transactions, counted once per outermost operation). It is accumulated in
+  an `AsyncLocalStorage` store per request, so concurrent requests never mix.
+  It is absent when the request ran no query.
+- `app;desc` is the matched route pattern, the stable key for grouping
+  field data. Wildcard middleware and the static shell catch-all are skipped.
+- `Timing-Allow-Origin` is copied from `Access-Control-Allow-Origin` when the
+  CORS policy allows the caller, so a dev app on another port can read the
+  timings; same-origin pages need nothing. The header survives bb connect
+  because the gate only strips hop-by-hop response headers.
+
+Read it in DevTools under Network > Timing > Server Timing, or in the page with
+`performance.getEntriesByType("resource")[i].serverTiming`. It is an HTTP
+header only; it is not part of the server/daemon protocol.
+
 ## Pending Question Drafts
 
 Native provider questions and Ask User Question plugin forms save partial
