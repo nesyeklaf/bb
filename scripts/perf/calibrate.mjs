@@ -23,7 +23,7 @@ it by running the benchmark on the throttled main thread.
 
 Options:
   --device-score <n>    The device's bbBenchmarkIndex
-  --field               Read the device score as the median benchmarkIndex in bb field-latency report --json
+  --field               Read the device score as the median benchmarkIndex of the devices in bb field-latency report --json
   --since <duration>    With --field, how far back to read (default 7d)
   --runs <n>            Benchmark runs per measurement (default 5)
   --refine <n>          Correction steps when the throttled score misses the target by more than 10% (default 2)
@@ -57,7 +57,7 @@ const readFieldScore = () => {
   const { score, sessions } = fieldDeviceScore(JSON.parse(output));
   if (score === null) {
     console.error(
-      "bb field-latency report --json has no benchmarkIndex yet. Pass --device-score <n>.",
+      "bb field-latency report --json lists no device with a benchmarkIndex in that window. Pass --device-score <n>.",
     );
     process.exit(2);
   }
@@ -105,7 +105,7 @@ try {
       device.score +
       (device.sessions === null
         ? ""
-        : " (median of " + device.sessions + " field sessions)") +
+        : " (median of " + device.sessions + " field devices)") +
       "  ->  factor " +
       recommendation.raw,
   );

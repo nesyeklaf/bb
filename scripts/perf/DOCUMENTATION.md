@@ -161,7 +161,7 @@ node scripts/perf/calibrate.mjs --field --since 14d
 
 - It runs `bbBenchmarkIndex` (`lib/calibration.mjs`), the exact function the field-latency plugin runs in the user's browser, 5 times (`--runs`) in a dedicated worker in headless Chrome and takes the median as the lab score. The factor is lab score / device score.
 - CDP CPU throttling does not slow dedicated workers (a worker scores the same at 4x), so the check runs the benchmark on the throttled main thread. It passes when the median lands within 10% of the device score, and corrects the rate up to `--refine` times (default 2) when it misses.
-- `--field` reads the median `benchmarkIndex` from `bb field-latency report --json`. The report does not carry it yet; until it does, the command says so and exits 2.
+- `--field` reads the median `benchmarkIndex` over the `devices` rows of `bb field-latency report --json` (field-latency 0.3.0 or later; `device` is only an alias of the newest row and is read only when `devices` is missing). When no device in the window has a benchmark, the command says so and exits 2.
 - A device faster than the lab machine needs no throttle; the command says so and exits 0.
 
 ## Regression check

@@ -38,20 +38,15 @@ export const withinTolerance = (measured, target, tolerance = TOLERANCE) =>
 export const refineRate = (rate, measured, target) =>
   Math.max(1, Math.round(((rate * measured) / target) * 100) / 100);
 
-export const fieldBenchmarkScores = (report) => {
-  const scores = [];
-  const visit = (value) => {
-    if (Array.isArray(value)) value.forEach(visit);
-    else if (value !== null && typeof value === "object")
-      for (const [key, inner] of Object.entries(value)) {
-        if (key === "benchmarkIndex" && typeof inner === "number" && inner > 0)
-          scores.push(inner);
-        else visit(inner);
-      }
-  };
-  visit(report);
-  return scores;
+const reportDevices = (report) => {
+  if (Array.isArray(report?.devices)) return report.devices;
+  return report?.device ? [report.device] : [];
 };
+
+export const fieldBenchmarkScores = (report) =>
+  reportDevices(report)
+    .map((device) => device?.benchmarkIndex)
+    .filter((score) => typeof score === "number" && score > 0);
 
 export const fieldDeviceScore = (report) => {
   const scores = fieldBenchmarkScores(report);
