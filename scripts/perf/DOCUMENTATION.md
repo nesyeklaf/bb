@@ -137,6 +137,25 @@ Both need the Perfetto trace processor: `curl -LO https://get.perfetto.dev/trace
 - `ab.mjs` prints the mean per kind and stores each wait's attribution in `ab.json`; `run.mjs` stores it per capture.
 - `trace-sql.mjs <trace> --sql js-attribution.sql --windows 'bb:switch'` ranks functions per window in Perfetto, for traces recorded elsewhere. Perfetto keeps no source location for Chrome JSON profiles, so it ranks by function name only.
 
+## Firefox lab
+
+`firefox-lab.mjs` measures thread switches in headless Firefox, where field switches are slow and revisits are no faster than first visits:
+
+```sh
+node scripts/perf/firefox-lab.mjs --url http://127.0.0.1:38886 --compare-chrome --profile --sourcemaps <dir>
+```
+
+- It drives Firefox over WebDriver BiDi (`lib/firefox.mjs`), started with `--headless --remote-debugging-port` on a throwaway profile. `--firefox`, `BB_PERF_FIREFOX` or `~/bb-perf/firefox/firefox/firefox` picks the binary; Firefox 159 and later also need `MOZ_REMOTE_ALLOW_SYSTEM_ACCESS=1`, which the driver sets. Content runs in a tab the driver opens, because BiDi refuses viewports and preload scripts on the privileged first tab.
+- Each round opens `--start` in a fresh browser at the field viewport (2396x1318), then switches through `--threads` visible sidebar threads twice, first visit then revisit. A click is a real pointer: it rests `--hover-ms` on the link, which starts the sidebar's hover prefetch as a mouse does, then presses for `--press-ms`.
+- Per switch it reports the wait (pointerdown until the frame after the thread is usable, as in `ab.mjs`), the app's `bb:switch` total and its input, render, timeline and paint phases, and the slowest request for the thread's data as `network` with its `Server-Timing` total as `server`. These are the field-latency plugin's phases, so lab and field compare directly. The report gives n, p50 and p75 per browser and visit.
+- `--compare-chrome` runs every round in headless Chrome as well, with the same input and viewport, alternating which browser goes first.
+- `--profile` adds `--profile-rounds` Firefox rounds under the Gecko profiler (features `js`, `cpu`, `nomarkerstacks`; threads GeckoMain, Renderer, Compositor, StyleThread). Their timings are reported apart, because the profiler slows the page. `lib/gecko-profile.mjs` finds the content process main thread that recorded the `bb:switch` spans and attributes every `lab:switch` window and its render and paint phases: time per Gecko category and subcategory, self time per innermost JS function (time in native code below it counts for the function; `jsMs` is the part in the JavaScript category), and the CPU time of the same process's Stylo threads. Samples weigh up to 10 ms, as in Chrome attribution. The profiles are kept as `.json.gz` and open in profiler.firefox.com.
+- Function locations go through source maps like the Chrome attribution. The live app ships without maps, but a build of the same commit maps it: `cd apps/app && npx vite build --outDir <dir> --emptyOutDir --sourcemap hidden`, then `--sourcemaps <dir>/assets`. Check that the chunk names match the served ones. Plugin bundles stay unmapped.
+- The validity checks are the ones below that apply without a trace: the page is visible, rAF produces frames, timers do not drift and the host CPU is quiet before each round. An invalid round is listed and left out of the summary.
+- Everything goes to `--out` as `firefox-lab.json`.
+
+Headless Firefox renders offscreen, without a window, the desktop compositor or the GPU path a user's browser takes. Main-thread work (input, render, JS, style, layout) compares with the field; paint and composite time does not.
+
 ## Scroll smoothness
 
 `scroll-smoothness` (and `ab.mjs --scenario scroll`) opens a thread at the bottom, scrolls the timeline up with a 6000 px wheel gesture at 1200 px/s, then flings it up with a 400 px touch drag in 80 ms. CDP's synthesized touch scroll gesture does not move the timeline in headless Chrome, so the fling is dispatched as raw touch events and the compositor's fling animation carries it on.
@@ -201,6 +220,7 @@ Every capture records a ledger of checks before it reports numbers, so a broken 
 - `profiling-proxy.mjs`: serves the profiling build in front of a running server.
 - `ab.mjs`, `lib/ab-run.mjs`, `lib/ab-stats.mjs`: interleaved A/B runs and their statistics. `ab.mjs` is the CLI; `runAb` and `printAbReport` in `lib/ab-run.mjs` run and print them for `ab.mjs` and `regression.mjs`.
 - `lib/attribution.mjs`, `lib/sourcemap.mjs`: CPU profile and React component attribution per window, source map decoding.
+- `firefox-lab.mjs`, `lib/firefox-run.mjs`: Firefox switch rounds, optionally against Chrome; `lib/firefox.mjs` is the WebDriver BiDi driver and Gecko profiler control, `lib/gecko-profile.mjs` the Gecko profile attribution.
 - `lib/smoothness.mjs`: scroll gestures and frame pacing, shared by `scroll-smoothness` and `ab.mjs --scenario scroll`.
 - `calibrate.mjs`, `lib/calibration.mjs`: throttle calibration.
 - `regression.mjs`, `lib/regression-verdict.mjs`, `budgets.json`: base against head with budgets.
