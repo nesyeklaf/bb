@@ -38,6 +38,7 @@ function Popover({
   ...props
 }: React.ComponentProps<typeof PopoverPrimitive.Root>) {
   const ctx = useResponsiveRoot(
+    "popover",
     controlledOpen,
     controlledOnChange,
     defaultOpen,

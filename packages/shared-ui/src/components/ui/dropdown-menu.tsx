@@ -78,6 +78,7 @@ function DropdownMenu({
   ...props
 }: React.ComponentProps<typeof DropdownMenuPrimitive.Root>) {
   const ctx = useResponsiveRoot(
+    "menu",
     controlledOpen,
     controlledOnChange,
     defaultOpen,

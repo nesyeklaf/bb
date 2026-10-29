@@ -80,6 +80,7 @@ function Select({
   ...props
 }: React.ComponentProps<typeof SelectPrimitive.Root>) {
   const overlay = useResponsiveRoot(
+    "select",
     controlledOpen,
     controlledOnOpenChange,
     defaultOpen,

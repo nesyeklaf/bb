@@ -57,6 +57,7 @@ import {
 import { getThreadDisplayTitle } from "@/lib/thread-title";
 import { getThreadRoutePath } from "@/lib/route-paths";
 import { showMutationErrorToast } from "@/lib/mutation-errors";
+import { useThreadSwitchTrace } from "@/lib/thread-switch-trace";
 import { getPromptDraftAccessor } from "@/hooks/usePromptDraftStorage";
 import { useSystemConfig } from "@/hooks/queries/system-queries";
 import {
@@ -533,6 +534,7 @@ export function ThreadScreen({
     useState<string | null>(null);
   const { timelineLoading, timelineRows } = timeline;
   const isThreadTimelinePending = timelineLoading && timelineRows.length === 0;
+  useThreadSwitchTrace(thread.id, !isThreadTimelinePending);
 
   const { handleEditSentMessage, inlineMessageEditor, sentMessageEdit } =
     useSentMessageEditing({

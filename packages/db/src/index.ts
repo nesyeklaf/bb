@@ -1,4 +1,9 @@
 export { afterCommit, createConnection } from "./connection.js";
+export {
+  createDbTimeAccumulator,
+  runWithDbTimeAccumulator,
+} from "./request-db-time.js";
+export type { DbTimeAccumulator } from "./request-db-time.js";
 export type {
   DbConnection,
   DbQueryConnection,

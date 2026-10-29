@@ -11,6 +11,7 @@ import {
 } from "./menu-item-hover.js";
 import { LIST_HOVER_TRANSITION } from "./motion.js";
 import { Icon } from "../../components/ui/icon.js";
+import { OverlayOpenTracer } from "./overlay-open-tracer.js";
 
 type ContextMenuSubTriggerElement = React.ComponentRef<
   typeof ContextMenuPrimitive.SubTrigger
@@ -167,6 +168,7 @@ const ContextMenuContent = React.forwardRef<
         if (event.button !== 0) event.preventDefault();
       }}
     >
+      <OverlayOpenTracer kind="context-menu" />
       <MenuHoverProvider>{children}</MenuHoverProvider>
     </ContextMenuPrimitive.Content>
   </ContextMenuPrimitive.Portal>

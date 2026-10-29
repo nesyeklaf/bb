@@ -186,12 +186,20 @@
       "type": "registry:ui"
     },
     {
+      "name": "overlay-open-tracer",
+      "type": "registry:ui"
+    },
+    {
       "name": "overlay-trigger",
       "type": "registry:ui"
     },
     {
       "name": "pagination",
       "type": "registry:ui"
+    },
+    {
+      "name": "perf-trace",
+      "type": "registry:lib"
     },
     {
       "name": "pill",
