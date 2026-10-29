@@ -3,10 +3,18 @@ import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { parseArgs } from "node:util";
 import { abOrder, compareMedians, median } from "./lib/ab-stats.mjs";
+import {
+  REACT_DEVTOOLS_STUB,
+  attributeTrace,
+  cpuProfiles,
+  frameUrls,
+  summarizeAttribution,
+} from "./lib/attribution.mjs";
 import { PerfBrowser } from "./lib/browser.mjs";
 import { wait } from "./lib/cdp.mjs";
 import { querySqlFile, writeTrace } from "./lib/perfetto.mjs";
-import { startTrace, stopTrace } from "./lib/trace.mjs";
+import { loadSourceMaps, sourceResolver } from "./lib/sourcemap.mjs";
+import { ATTRIBUTION_CATEGORIES, startTrace, stopTrace } from "./lib/trace.mjs";
 import {
   SELECTORS,
   openThread,
@@ -30,6 +38,11 @@ Options:
   --viewport <w,h>      Window size (default 1600,1000)
   --trace               Record a Chrome trace per run and break each wait down with Perfetto SQL
   --keep-traces         Keep the trace files (about 100 MB per run) instead of deleting them after the query
+  --attribute           Also sample the JS CPU profile and list the top functions and modules inside each wait,
+                        mapped to source through the bundle's source maps (implies --trace)
+  --react-components    With --attribute, also list the React components that rendered inside each wait.
+                        Needs a React profiling build (scripts/perf/profiling-proxy.mjs) and slows renders down
+  --sourcemaps <dir>    Read <chunk>.map from this directory before fetching <chunk url>.map from the server
   --out <dir>           Output directory (default: <tmp>/bb-perf-ab/<timestamp>)
 `;
 
@@ -45,6 +58,9 @@ const { values } = parseArgs({
     viewport: { type: "string", default: "1600,1000" },
     trace: { type: "boolean", default: false },
     "keep-traces": { type: "boolean", default: false },
+    attribute: { type: "boolean", default: false },
+    "react-components": { type: "boolean", default: false },
+    sourcemaps: { type: "string" },
     out: { type: "string" },
     chrome: { type: "string" },
     help: { type: "boolean", default: false },
@@ -56,6 +72,9 @@ if (values.help || !values.a || !values.b) {
 }
 
 const urls = { a: values.a.replace(/\/$/, ""), b: values.b.replace(/\/$/, "") };
+const attribute = values.attribute || values["react-components"];
+const tracing = values.trace || attribute;
+const sourceMapCache = new Map();
 const rounds = Number(values.rounds);
 const threadCount = Number(values.threads);
 const menuCount = Number(values.menus);
@@ -132,9 +151,17 @@ const runVariant = async (variant, plan) => {
     await browser.client.send("Page.addScriptToEvaluateOnNewDocument", {
       source: MEASURE_COLLECTOR,
     });
+    if (values["react-components"])
+      await browser.client.send("Page.addScriptToEvaluateOnNewDocument", {
+        source: REACT_DEVTOOLS_STUB,
+      });
     await openThread(browser, urls[variant], plan.start);
     await settle(browser, { quietMs: 600, timeoutMs: 15_000 });
-    const trace = values.trace ? await startTrace(browser.client) : null;
+    const trace = tracing
+      ? await startTrace(browser.client, {
+          extraCategories: attribute ? ATTRIBUTION_CATEGORIES : [],
+        })
+      : null;
     for (const [index, thread] of plan.sequence.entries()) {
       const selector =
         "[data-sidebar-thread-id=" + JSON.stringify(thread.id) + "]";
@@ -181,6 +208,20 @@ const runVariant = async (variant, plan) => {
       const rows = querySqlFile(tracePath, "interaction-breakdown.sql");
       if (!values["keep-traces"]) rmSync(tracePath);
       const measured = samples.filter((sample) => sample.waitMs !== null);
+      if (attribute) {
+        await loadSourceMaps(frameUrls(cpuProfiles(events)), {
+          directory: values.sourcemaps ?? null,
+          cache: sourceMapCache,
+        });
+        const attributions = attributeTrace(events, {
+          resolve: sourceResolver(sourceMapCache),
+          components: values["react-components"],
+        });
+        if (attributions.length === measured.length)
+          measured.forEach((sample, index) => {
+            sample.attribution = attributions[index];
+          });
+      }
       if (rows.length === measured.length)
         measured.forEach((sample, index) => {
           sample.breakdown = rows[index];
@@ -342,6 +383,21 @@ const breakdowns = groups
     }),
   )
   .filter((row) => row.samples > 0);
+const attributions = attribute
+  ? ["switch", "open"].flatMap((kind) =>
+      ["a", "b"].map((variant) => ({
+        kind,
+        variant,
+        ...summarizeAttribution(
+          runs
+            .filter((run) => run.variant === variant)
+            .flatMap((run) => run.samples)
+            .filter((sample) => sample.kind === kind && sample.attribution)
+            .map((sample) => sample.attribution),
+        ),
+      })),
+    )
+  : [];
 const spans = ["a", "b"].map((variant) => {
   const measures = runs
     .filter((run) => run.variant === variant)
@@ -368,6 +424,7 @@ const report = {
   threads: threads.map((thread) => thread.id),
   comparisons,
   breakdowns,
+  attributions,
   spans,
   runs,
 };
@@ -407,6 +464,50 @@ if (breakdowns.length > 0) {
       (row.kind + " " + row.visit + " " + row.variant).padEnd(20) +
         BREAKDOWN_FIELDS.map((field) => fmt(row[field]).padStart(8)).join(""),
     );
+}
+const shorten = (text, width) =>
+  text.length > width ? "…" + text.slice(text.length - width + 1) : text;
+for (const summary of attributions.filter((entry) => entry.waits > 0)) {
+  console.log(
+    "\nJS self time per " +
+      summary.kind +
+      " wait, " +
+      summary.variant +
+      ", mean ms over " +
+      summary.waits +
+      " waits (" +
+      fmt(summary.sampledMs) +
+      " ms sampled)",
+  );
+  for (const entry of summary.functions.slice(0, 8))
+    console.log(
+      entry.selfMs.toFixed(1).padStart(8) +
+        "  " +
+        shorten(entry.name, 32).padEnd(32) +
+        " " +
+        shorten(entry.location, 60),
+    );
+  console.log("  modules:");
+  for (const entry of summary.modules.slice(0, 6))
+    console.log(
+      entry.selfMs.toFixed(1).padStart(8) + "  " + shorten(entry.module, 80),
+    );
+  if (summary.components !== null && summary.components.length === 0)
+    console.log(
+      "  React components: none recorded, the server does not run a React profiling build",
+    );
+  else if (summary.components !== null) {
+    console.log("  React components (self render time):");
+    for (const entry of summary.components.slice(0, 6))
+      console.log(
+        entry.selfMs.toFixed(1).padStart(8) +
+          "  " +
+          shorten(entry.component, 40).padEnd(40) +
+          " " +
+          entry.renders +
+          " renders",
+      );
+  }
 }
 for (const { variant, spans: list } of spans)
   if (list.length > 0)
