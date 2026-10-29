@@ -62,7 +62,7 @@ const fetchJson = async (url) => {
   return response.json();
 };
 
-const threadInfo = async (base, id) => {
+export const threadInfo = async (base, id) => {
   const body = await fetchJson(base + "/api/v1/threads/" + id);
   const thread = body.thread ?? body;
   return {
@@ -72,14 +72,14 @@ const threadInfo = async (base, id) => {
   };
 };
 
-const visibleSidebarThreads = (browser) =>
+export const visibleSidebarThreads = (browser) =>
   browser.evaluate(
     "[...document.querySelectorAll(" +
       JSON.stringify(SELECTORS.sidebarThread) +
       ")].filter((node) => { const rect = node.getBoundingClientRect(); return rect.height > 0 && rect.top >= 0 && rect.bottom <= innerHeight }).map((node) => node.getAttribute('data-sidebar-thread-id')).filter((id, index, all) => all.indexOf(id) === index)",
   );
 
-const timedAction = async (browser, kind, readyExpression, act) => {
+export const timedAction = async (browser, kind, readyExpression, act) => {
   await browser.evaluate(
     "window.__bbperf.arm(" + JSON.stringify(readyExpression) + ", 20000)",
   );
