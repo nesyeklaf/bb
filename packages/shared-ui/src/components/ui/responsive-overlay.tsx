@@ -13,6 +13,7 @@ import { useIsCompactViewport } from "./hooks/use-compact-viewport.js";
 import { usePointerCoarse } from "./hooks/use-pointer-coarse.js";
 import { usePortalScopeProps } from "../../lib/portal-scope.js";
 import { cn } from "../../lib/utils.js";
+import { traceOverlayOpen } from "../../lib/perf-trace.js";
 
 export interface ResponsiveOverlayContextValue {
   isCompactViewport: boolean;
@@ -115,7 +116,10 @@ export function useResponsiveOverlayBehavior() {
   };
 }
 
+export type ResponsiveOverlayKind = "menu" | "popover" | "select" | "dialog";
+
 export function useResponsiveRoot(
+  kind: ResponsiveOverlayKind,
   controlledOpen: boolean | undefined,
   controlledOnChange: ((open: boolean) => void) | undefined,
   defaultOpen: boolean = false,
@@ -125,6 +129,10 @@ export function useResponsiveRoot(
   const [internalOpen, setInternalOpen] = React.useState(defaultOpen);
   const isControlled = controlledOpen !== undefined;
   const open = isControlled ? controlledOpen : internalOpen;
+
+  React.useLayoutEffect(() => {
+    if (open) traceOverlayOpen(kind);
+  }, [kind, open]);
 
   const onOpenChange = React.useCallback(
     (next: boolean) => {

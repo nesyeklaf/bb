@@ -254,6 +254,11 @@
       "types": "./src/lib/utils.ts",
       "default": "./src/lib/utils.ts"
     },
+    "./lib/perf-trace": {
+      "source": "./src/lib/perf-trace.ts",
+      "types": "./src/lib/perf-trace.ts",
+      "default": "./src/lib/perf-trace.ts"
+    },
     "./lib/portal-scope": {
       "source": "./src/lib/portal-scope.ts",
       "types": "./src/lib/portal-scope.ts",
