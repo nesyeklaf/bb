@@ -11,6 +11,7 @@ import { sharedUiEnvSeam } from "./vite-shared-ui-seam.js";
 import { cachedReactCompiler } from "./vite-react-compiler.js";
 
 const appDir = dirname(fileURLToPath(import.meta.url));
+const profiling = process.env.BB_APP_PROFILING === "1";
 
 export const sharedViteConfig = {
   plugins: [
@@ -30,6 +31,9 @@ export const sharedViteConfig = {
   cacheDir: "node_modules/.vite/app",
   build: {
     reportCompressedSize: false,
+    minify: !profiling,
+    cssMinify: true,
+    sourcemap: profiling,
     assetsInlineLimit: (filePath) =>
       filePath.includes("/workspace-open-target-icons/") ? false : undefined,
     rolldownOptions: {
@@ -61,6 +65,7 @@ export const sharedViteConfig = {
     conditions: ["source"],
     alias: {
       "@": resolve(appDir, "./src"),
+      ...(profiling ? { "react-dom/client": "react-dom/profiling" } : {}),
     },
   },
 } satisfies UserConfig;

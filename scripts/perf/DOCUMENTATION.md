@@ -66,6 +66,27 @@ Artifacts land in `<out>/<scenario>/run-<n>.json` (headline, ledger of checks, c
 | `drawers-panels`  | Right panel and tabs, sidebar collapse, phone-width sidebar drawer  | perceived wait per control, frame budget at both sizes             |
 | `server-latency`  | HTTP latency of the app's endpoints, cold, warm and in a burst      | first, p50, p95 per endpoint, burst wall time                      |
 
+## App measures
+
+The app records thread switches and overlay opens as `performance.measure` entries, so DevTools, Perfetto and the field-latency plugin read the same spans:
+
+- `bb:switch` from the input that started the switch until the frame after the timeline is ready, with phases `input`, `render`, `timeline` and `paint` (`bb:switch:<phase>`). A switch superseded by another one is dropped.
+- `bb:open` from the input that opened a dropdown, popover, select or responsive dialog until the frame after it rendered, with phases `render` and `paint`. Context menus are not covered.
+
+The spans appear on the "Interactions" and "Thread switch" or "Overlay open" custom tracks in the DevTools Performance panel. Each entry carries `detail.bb` with the kind, label and phase.
+
+## Profiling build
+
+A profiling build keeps names readable and adds React's performance tracks (Scheduler and Components) to the Performance panel:
+
+```sh
+pnpm exec turbo run build --filter=@bb/app^...
+pnpm --filter @bb/app run build:profiling
+node scripts/perf/profiling-proxy.mjs --upstream http://127.0.0.1:38886 --port 38887
+```
+
+`BB_APP_PROFILING=1` turns off JS minification, writes source maps and aliases `react-dom/client` to `react-dom/profiling`; the output goes to `apps/app/dist-profiling`. The proxy serves that build and forwards everything else, including WebSockets, to a running server, so the profiling app runs against the same data as the normal one on its own port. Plugins keep their own bundles.
+
 ## Validity checks
 
 Every capture records a ledger of checks before it reports numbers, so a broken capture cannot read as a fast one:
@@ -83,6 +104,7 @@ Every capture records a ledger of checks before it reports numbers, so a broken 
 - `lib/trace.mjs`, `lib/metrics.mjs`: trace parsing into the script/style/layout/paint/composite split, percentiles.
 - `lib/contract.mjs`: the contract applied to a capture; `lib/ui.mjs`, `lib/scroll.mjs`, `lib/api.mjs`: selectors, gestures and the thread ranking by event count.
 - `lib/app-server.mjs`, `lib/proc.mjs`: starting a server on a seeded dir, process CPU sampling.
+- `profiling-proxy.mjs`: serves the profiling build in front of a running server.
 - `scenarios/`: one file per scenario, registered in `scenarios/index.mjs`. A scenario exports `{ name, description, run(context) }` and returns `{ headline, data }`.
 - `fixtures/paced-stream-provider/`: the streaming provider plugin.
 
