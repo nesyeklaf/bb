@@ -22,6 +22,7 @@ Options:
   --chrome <path>       Chrome/Chromium executable (or BB_PERF_CHROME)
   --headed              Run a visible browser
   --viewport <w,h>      Browser window size (default 1600,1000)
+  --cpu-throttle <n>    Slow the page's CPU n times, 4 for an old laptop (default 1)
 `;
 
 const { values, positionals } = parseArgs({
@@ -37,6 +38,7 @@ const { values, positionals } = parseArgs({
     chrome: { type: "string" },
     headed: { type: "boolean", default: false },
     viewport: { type: "string", default: "1600,1000" },
+    "cpu-throttle": { type: "string", default: "1" },
     help: { type: "boolean", default: false },
   },
 });
@@ -140,6 +142,7 @@ try {
             chrome: values.chrome,
             headless: !values.headed,
             windowSize: values.viewport,
+            cpuThrottle: Number(values["cpu-throttle"]),
             ...options,
           });
           browsers.push(browser);

@@ -40,8 +40,17 @@ export const sampleHostBusyShare = async (durationMs = 1000) => {
 };
 
 export class PerfBrowser {
-  constructor({ client, proc, profileDir, port, headless, windowSize }) {
+  constructor({
+    client,
+    proc,
+    profileDir,
+    port,
+    headless,
+    windowSize,
+    cpuThrottle,
+  }) {
     this.client = client;
+    this.cpuThrottle = cpuThrottle;
     this.proc = proc;
     this.profileDir = profileDir;
     this.port = port;
@@ -55,6 +64,7 @@ export class PerfBrowser {
     headless = true,
     windowSize = "1600,1000",
     extraArgs = [],
+    cpuThrottle = 1,
   } = {}) {
     const port = await reservePort();
     const profileDir = mkdtempSync(join(tmpdir(), "bb-perf-chrome-"));
@@ -83,6 +93,7 @@ export class PerfBrowser {
       port,
       headless,
       windowSize,
+      cpuThrottle,
     });
     await browser.setup();
     return browser;
@@ -95,6 +106,10 @@ export class PerfBrowser {
     await client.send("Performance.enable");
     await client.send("Network.enable");
     await client.send("Emulation.setFocusEmulationEnabled", { enabled: true });
+    if (this.cpuThrottle > 1)
+      await client.send("Emulation.setCPUThrottlingRate", {
+        rate: this.cpuThrottle,
+      });
     await client.send("Page.addScriptToEvaluateOnNewDocument", {
       source: PAGE_PROBE_SOURCE,
     });
