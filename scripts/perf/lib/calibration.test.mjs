@@ -45,15 +45,29 @@ describe("calibration", () => {
     assert.equal(refineRate(2, 10, 30), 1);
   });
 
-  it("takes the median benchmarkIndex from any depth of the field report", () => {
-    const report = [
-      { kind: "switch", sessions: [{ client: { benchmarkIndex: 40 } }] },
-      { client: { benchmarkIndex: 20 } },
-      { client: { benchmarkIndex: 30 } },
-      { client: { benchmarkIndex: null } },
-    ];
-    assert.deepEqual(fieldDeviceScore(report), { score: 30, sessions: 3 });
-    assert.deepEqual(fieldDeviceScore([{ kind: "open", p50: 3 }]), {
+  it("takes the median benchmarkIndex over the report's devices once", () => {
+    const report = {
+      since: "2026-01-01 00:00",
+      device: { benchmarkIndex: 300 },
+      devices: [{ benchmarkIndex: 300 }, { benchmarkIndex: 100 }],
+      groups: [],
+    };
+    assert.deepEqual(fieldDeviceScore(report), { score: 200, sessions: 2 });
+  });
+
+  it("skips devices without a benchmark and falls back to device", () => {
+    assert.deepEqual(
+      fieldDeviceScore({
+        devices: [{ benchmarkIndex: null }, { benchmarkIndex: 40 }],
+        groups: [{ kind: "open", benchmarkIndex: 999 }],
+      }),
+      { score: 40, sessions: 1 },
+    );
+    assert.deepEqual(
+      fieldDeviceScore({ device: { benchmarkIndex: 30 }, groups: [] }),
+      { score: 30, sessions: 1 },
+    );
+    assert.deepEqual(fieldDeviceScore({ device: null, groups: [] }), {
       score: null,
       sessions: 0,
     });
