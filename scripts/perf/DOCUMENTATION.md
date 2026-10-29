@@ -118,7 +118,7 @@ node scripts/perf/ab.mjs --a http://127.0.0.1:38886 --b http://127.0.0.1:38887 -
 
 - Each round runs both variants in a fresh browser, in the order AB BA BA AB, so warm caches and background load hit both alike.
 - It opens `--start` and records its first load until the thread is painted as `load first`, then switches through `--threads` visible sidebar threads twice (first visit, revisit) and opens the thread actions menu `--menus` times. The wait runs from the input event until the frame after the content is usable, measured by the page probe, so it works on builds without the app measures.
-- The report gives the median wait per variant and a bootstrap 95% interval of the difference. "b faster" or "b slower" only when the whole interval is on one side of zero; otherwise "no difference".
+- The report gives the median wait per variant and a bootstrap 95% interval of the difference. The waits of one round share a browser, so the bootstrap resamples whole rounds (paired, the same rounds for a and b) instead of single waits, and needs at least 3 rounds with valid waits per variant. "b faster" or "b slower" only when the whole interval is on one side of zero; otherwise "no difference".
 - `--cpu-throttle 4` slows the page like an old laptop. `run.mjs` takes the same flag.
 - `--trace` records a Chrome trace per run, marks each wait as a `lab:switch` or `lab:open` measure and splits the main thread inside it into script, style, layout, paint, GC, other and idle time with `sql/interaction-breakdown.sql`. Traces are about 100 MB each and are deleted after the query unless `--keep-traces`.
 

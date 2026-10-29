@@ -1,6 +1,14 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { abOrder, compareMedians, median, quantile } from "./ab-stats.mjs";
+import {
+  abOrder,
+  compareMedians,
+  compareRounds,
+  median,
+  quantile,
+} from "./ab-stats.mjs";
+
+const repeat = (value, times) => Array.from({ length: times }, () => value);
 
 describe("ab-stats", () => {
   it("balances the order of the variants over every four rounds", () => {
@@ -32,5 +40,39 @@ describe("ab-stats", () => {
 
   it("gives no interval for too few samples", () => {
     assert.equal(compareMedians([1, 2], [3, 4]).delta, null);
+  });
+
+  it("resamples whole rounds so repeated actions in one browser are not independent", () => {
+    const heads = [1200, 1200, 800, 1200, 1200, 1200, 800, 1200];
+    const rounds = heads.map((head) => ({
+      a: repeat(1000, 4),
+      b: repeat(head, 4),
+    }));
+    const result = compareRounds(rounds);
+    assert.equal(result.delta, 200);
+    assert.ok(result.low <= 0);
+    assert.notEqual(result.verdict, "b slower");
+  });
+
+  it("reports a slower variant when every round is slower", () => {
+    const rounds = [0, 1, 2, 3, 4, 5].map((round) => ({
+      a: [1000 + round, 1010 - round],
+      b: [1100 + round, 1110 - round],
+    }));
+    const result = compareRounds(rounds);
+    assert.equal(result.verdict, "b slower");
+    assert.ok(result.low > 0);
+  });
+
+  it("needs three rounds with valid samples on each side", () => {
+    const rounds = [
+      { a: [1, 2, 3], b: [4, 5, 6] },
+      { a: [1, 2, 3], b: [4, 5, 6] },
+      { a: [1, 2, 3], b: [] },
+    ];
+    const result = compareRounds(rounds);
+    assert.equal(result.delta, null);
+    assert.equal(result.low, null);
+    assert.equal(result.b, 5);
   });
 });
