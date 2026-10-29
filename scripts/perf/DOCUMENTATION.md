@@ -105,6 +105,23 @@ node scripts/perf/ab.mjs --a http://127.0.0.1:38886 --b http://127.0.0.1:38887 -
 
 Both need the Perfetto trace processor: `curl -LO https://get.perfetto.dev/trace_processor && chmod +x trace_processor`, then set `BB_PERF_TRACE_PROCESSOR` to its path, or put `trace_processor_shell` on the PATH.
 
+## Regression check
+
+`regression.mjs` answers "did this change make bb slower than its base?" without a running server:
+
+```sh
+node scripts/perf/regression.mjs --base origin/main --head HEAD
+```
+
+- It checks out `--base` (default: the merge-base of `origin/main` and the head) and `--head` (default `HEAD`) as detached worktrees under `--out`, installs with pnpm, builds the app, server, host daemon and bundled plugins with Turbo (`TURBO_CACHE_DIR` is honoured), seeds one fixture with the base's `seed-perf-db.ts` (1200 threads, 400000 events, seed 1) and starts each ref on its own copy of it.
+- It then runs the A/B above with `--rounds 8 --cpu-throttle 4`, base as a and head as b, opening the heaviest idle thread first. Each browser's first load of that thread adds a `load first` metric next to the switches and menu opens.
+- `budgets.json` sets, per metric, `budgetMs` and `budgetPct` (the slowdown the head may add) and `ceilingMs` (the head median it should stay under at `cpuThrottle`). A metric fails when the whole 95% interval of head - base is above zero and the median slowdown exceeds both `budgetMs` and `budgetPct`, or when the head completed more than 20% fewer of its actions than the base. Too few samples, a missing budget and a broken ceiling only warn.
+- It prints and writes `summary.md` (a Markdown table starting with `<!-- bb-perf-regression -->`, also appended to `GITHUB_STEP_SUMMARY`), `regression.json` with the verdict and every row, `ab.json` with the raw samples, and the install, build, seed and server logs under `logs/`. Exit code 0 is PASS, 1 FAIL, 2 a broken run.
+- The worktrees and data are removed afterwards unless `--keep-worktrees`. A run takes about 10 minutes, mostly the browser rounds; `--rounds` trades time for a narrower interval.
+- `.github/workflows/perf-regression.yml` runs it on pull requests that touch the app, server, packages, plugins or this tooling, comparing the PR merge commit with its first parent, and on manual dispatch with any base and head. The report is the job summary and the `perf-regression` artifact.
+
+Budgets are deliberately wider than the A/A noise: an A/A run of the same commit on both sides must pass, and a head that blocks the main thread for 250 ms when a thread's timeline becomes ready must fail. Work off the critical path, such as 60 ms in the first render of a switch while the timeline still loads, does not lengthen the wait and does not fail. Raise a budget only with an A/A run that shows the noise is wider; lower it with an A/A run that shows it is narrower.
+
 ## Validity checks
 
 Every capture records a ledger of checks before it reports numbers, so a broken capture cannot read as a fast one:
@@ -123,7 +140,8 @@ Every capture records a ledger of checks before it reports numbers, so a broken 
 - `lib/contract.mjs`: the contract applied to a capture; `lib/ui.mjs`, `lib/scroll.mjs`, `lib/api.mjs`: selectors, gestures and the thread ranking by event count.
 - `lib/app-server.mjs`, `lib/proc.mjs`: starting a server on a seeded dir, process CPU sampling.
 - `profiling-proxy.mjs`: serves the profiling build in front of a running server.
-- `ab.mjs`, `lib/ab-stats.mjs`: interleaved A/B runs and their statistics (`node --test scripts/perf/lib/ab-stats.test.mjs`).
+- `ab.mjs`, `lib/ab-run.mjs`, `lib/ab-stats.mjs`: interleaved A/B runs and their statistics (`node --test scripts/perf/lib/ab-stats.test.mjs`).
+- `regression.mjs`, `lib/regression-verdict.mjs`, `budgets.json`: base against head with budgets (`node --test scripts/perf/lib/regression-verdict.test.mjs`).
 - `trace-sql.mjs`, `lib/perfetto.mjs`, `sql/`: Perfetto SQL on saved traces.
 - `scenarios/`: one file per scenario, registered in `scenarios/index.mjs`. A scenario exports `{ name, description, run(context) }` and returns `{ headline, data }`.
 - `fixtures/paced-stream-provider/`: the streaming provider plugin.

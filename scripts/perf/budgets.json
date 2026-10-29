@@ -1,0 +1,35 @@
+{
+  "cpuThrottle": 4,
+  "metrics": {
+    "load first": {
+      "label": "First load of the heaviest thread",
+      "budgetMs": 250,
+      "budgetPct": 10,
+      "ceilingMs": 12000
+    },
+    "switch first": {
+      "label": "Thread switch, first visit",
+      "budgetMs": 120,
+      "budgetPct": 10,
+      "ceilingMs": 2000
+    },
+    "switch revisit": {
+      "label": "Thread switch, revisit",
+      "budgetMs": 100,
+      "budgetPct": 10,
+      "ceilingMs": 1500
+    },
+    "open first": {
+      "label": "Thread actions menu, first open",
+      "budgetMs": 40,
+      "budgetPct": 20,
+      "ceilingMs": 400
+    },
+    "open revisit": {
+      "label": "Thread actions menu, reopen",
+      "budgetMs": 30,
+      "budgetPct": 20,
+      "ceilingMs": 250
+    }
+  }
+}
