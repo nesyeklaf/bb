@@ -11,8 +11,17 @@ import {
   resolveChrome,
   wait,
 } from "./cdp.mjs";
+import { attributeCpu, cpuProfiles, frameUrls } from "./attribution.mjs";
 import { summarize } from "./metrics.mjs";
-import { analyzeTrace, startTrace, stopTrace } from "./trace.mjs";
+import { loadSourceMaps, sourceResolver } from "./sourcemap.mjs";
+import {
+  ATTRIBUTION_CATEGORIES,
+  analyzeTrace,
+  startTrace,
+  stopTrace,
+} from "./trace.mjs";
+
+const SOURCE_MAP_CACHE = new Map();
 
 const PAGE_PROBE_SOURCE = readFileSync(
   join(dirname(fileURLToPath(import.meta.url)), "page-probe.js"),
@@ -48,9 +57,11 @@ export class PerfBrowser {
     headless,
     windowSize,
     cpuThrottle,
+    attribute,
   }) {
     this.client = client;
     this.cpuThrottle = cpuThrottle;
+    this.attribute = attribute;
     this.proc = proc;
     this.profileDir = profileDir;
     this.port = port;
@@ -65,6 +76,7 @@ export class PerfBrowser {
     windowSize = "1600,1000",
     extraArgs = [],
     cpuThrottle = 1,
+    attribute = false,
   } = {}) {
     const port = await reservePort();
     const profileDir = mkdtempSync(join(tmpdir(), "bb-perf-chrome-"));
@@ -94,6 +106,7 @@ export class PerfBrowser {
       headless,
       windowSize,
       cpuThrottle,
+      attribute,
     });
     await browser.setup();
     return browser;
@@ -443,7 +456,9 @@ export class PerfBrowser {
     await this.evaluate("window.__bbperf.reset()");
     const metricsBefore = await this.performanceMetrics();
     const before = await this.evaluate("window.__bbperf.collect()");
-    const handle = await startTrace(this.client);
+    const handle = await startTrace(this.client, {
+      extraCategories: this.attribute ? ATTRIBUTION_CATEGORIES : [],
+    });
     await this.evaluate("window.__bbperf.mark('bbperf:start')");
     const startedAt = Date.now();
     let actionResult;
@@ -508,11 +523,21 @@ export class PerfBrowser {
       after.visibility === "visible",
       { visibility: after.visibility, hasFocus: after.hasFocus },
     );
+    const attribution =
+      this.attribute && startMark && endMark
+        ? await this.attributeWindow(events, {
+            name: label,
+            pid: startMark.pid,
+            start: startMark.ts,
+            end: endMark.ts,
+          })
+        : null;
     return {
       label,
       actionResult,
       actionMs: elapsedMs,
       analysis,
+      attribution,
       page: {
         longTasks: summarize(after.longTasks.map((entry) => entry.duration)),
         longAnimationFrames: {
@@ -569,6 +594,15 @@ export class PerfBrowser {
         ),
       },
     };
+  }
+
+  async attributeWindow(events, window) {
+    const profiles = cpuProfiles(events);
+    await loadSourceMaps(frameUrls(profiles), { cache: SOURCE_MAP_CACHE });
+    const [attribution] = attributeCpu(profiles, [window], {
+      resolve: sourceResolver(SOURCE_MAP_CACHE),
+    });
+    return attribution;
   }
 
   async close() {
