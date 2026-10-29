@@ -1,6 +1,5 @@
 import Database from "better-sqlite3";
 import { resolve } from "node:path";
-import { performance } from "node:perf_hooks";
 import { resourceUsage, threadCpuUsage } from "node:process";
 import { drizzle } from "drizzle-orm/better-sqlite3";
 import { registerHostPathSqlFunctions } from "./data/host-path-sql.js";
@@ -9,6 +8,7 @@ import {
   finishQueryDiagnostics,
   type QueryDiagnosticsLogFields,
 } from "./query-diagnostics.js";
+import { beginDbOperation, endDbOperation } from "./request-db-time.js";
 import * as schema from "./schema.js";
 
 export interface SlowDbQueryLogFields {
@@ -73,7 +73,7 @@ export function prepareCachedQuery<TQuery>(
 }
 
 interface SlowDbQueryConfig {
-  logger: SlowDbQueryLogger;
+  logger: SlowDbQueryLogger | undefined;
   thresholdMs: number | (() => number);
   sampleWal: () => QueryDiagnosticsLogFields["wal"];
   diagnosticsEnabled: () => boolean;
@@ -115,23 +115,33 @@ function formatSqlForLog(source: string): string {
 function runTimedStatementOperation<TValue>(
   args: TimedStatementOperationArgs<TValue>,
 ): TValue {
-  const startedUsage = args.config.diagnosticsEnabled()
-    ? resourceUsage()
-    : null;
-  const startedCpu = threadCpuUsage();
-  const startedAt = performance.now();
+  const logger = args.config.logger;
+  const startedUsage =
+    logger !== undefined && args.config.diagnosticsEnabled()
+      ? resourceUsage()
+      : null;
+  const startedCpu = logger === undefined ? undefined : threadCpuUsage();
+  beginDbOperation();
+  const startedAt = process.hrtime.bigint();
   try {
     return args.work();
   } finally {
-    const durationMs = performance.now() - startedAt;
+    const durationMs = Number(process.hrtime.bigint() - startedAt) / 1e6;
+    endDbOperation(durationMs);
     const thresholdMs =
-      typeof args.config.thresholdMs === "function"
-        ? args.config.thresholdMs()
-        : args.config.thresholdMs;
-    if (durationMs >= thresholdMs) {
+      logger === undefined
+        ? Number.POSITIVE_INFINITY
+        : typeof args.config.thresholdMs === "function"
+          ? args.config.thresholdMs()
+          : args.config.thresholdMs;
+    if (
+      logger !== undefined &&
+      startedCpu !== undefined &&
+      durationMs >= thresholdMs
+    ) {
       const cpu = threadCpuUsage(startedCpu);
       const finishedUsage = startedUsage ? resourceUsage() : null;
-      args.config.logger.info(
+      logger.info(
         {
           bindingArgumentCount: args.bindingArgumentCount,
           durationMs: roundDurationMs(durationMs),
@@ -196,10 +206,6 @@ function instrumentSqliteClient(
   sqlite: Database.Database,
   options: CreateConnectionOptions,
 ): void {
-  if (!options.slowQueryLogger) {
-    return;
-  }
-
   const config: SlowDbQueryConfig = {
     logger: options.slowQueryLogger,
     thresholdMs:

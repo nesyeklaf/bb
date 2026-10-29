@@ -134,6 +134,7 @@ import {
 const PLUGIN_WIRE_HTTP_PATH = /^\/api\/v1\/plugins\/[^/]+\/http(?:\/|$)/u;
 import { rankAcceptedAssetEncodings } from "./asset-content-encoding.js";
 import { apiJsonCompression } from "./api-response-compression.js";
+import { serverTiming } from "./server-timing.js";
 import { APP_SURFACE_WEB, type AppSurface } from "@bb/config/app-surface";
 import type { ServerBindHost } from "@bb/config/server";
 import { registerServerMoveRoutes } from "./routes/server-move.js";
@@ -518,6 +519,7 @@ export function createApp(
   };
   const pendingServerMove = serverMoveOptions.pending;
 
+  app.use("*", serverTiming());
   app.use("*", async (context, next) => {
     const signal = context.req.raw.signal;
     await next();
