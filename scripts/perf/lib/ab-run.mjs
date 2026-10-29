@@ -1,6 +1,6 @@
 import { mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { abOrder, compareMedians, median } from "./ab-stats.mjs";
+import { abOrder, compareRounds, median } from "./ab-stats.mjs";
 import { AppApi } from "./api.mjs";
 import {
   REACT_DEVTOOLS_STUB,
@@ -455,6 +455,24 @@ export const runAb = async ({
     variantSamples(variant).filter(
       (sample) => sample.kind === kind && sample.visit === visit,
     ).length;
+  const validWaits = (run, kind, visit) =>
+    (run?.samples ?? [])
+      .filter(
+        (sample) =>
+          sample.kind === kind &&
+          sample.visit === visit &&
+          sample.waitMs !== null,
+      )
+      .map((sample) => sample.waitMs);
+  const roundWaits = (kind, visit) =>
+    [...new Set(runs.map((run) => run.round))].map((round) => {
+      const runOf = (variant) =>
+        runs.find((run) => run.round === round && run.variant === variant);
+      return {
+        a: validWaits(runOf("a"), kind, visit),
+        b: validWaits(runOf("b"), kind, visit),
+      };
+    });
   const comparisons = groups.map(([kind, visit]) => ({
     kind,
     visit,
@@ -466,7 +484,7 @@ export const runAb = async ({
       a: attempts("a", kind, visit),
       b: attempts("b", kind, visit),
     },
-    ...compareMedians(pick("a", kind, visit), pick("b", kind, visit)),
+    ...compareRounds(roundWaits(kind, visit)),
   }));
   const smoothnessOf = (variant, kind) =>
     variantSamples(variant)

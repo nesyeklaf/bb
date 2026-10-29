@@ -30,25 +30,54 @@ export const quantile = (values, q) => {
 const resample = (values, random) =>
   values.map(() => values[Math.floor(random() * values.length)]);
 
-export const compareMedians = (a, b, { iterations = 5000, seed = 1 } = {}) => {
-  if (a.length < 3 || b.length < 3)
-    return { a: median(a), b: median(b), delta: null, low: null, high: null };
-  const random = mulberry32(seed);
-  const deltas = [];
-  for (let index = 0; index < iterations; index += 1)
-    deltas.push(median(resample(b, random)) - median(resample(a, random)));
-  const delta = median(b) - median(a);
+const MIN_UNITS = 3;
+
+const comparison = (a, b, deltas) => {
+  const medianA = median(a);
+  const medianB = median(b);
+  if (deltas === null || deltas.length === 0)
+    return { a: medianA, b: medianB, delta: null, low: null, high: null };
+  const delta = medianB - medianA;
   const low = quantile(deltas, 0.025);
   const high = quantile(deltas, 0.975);
   return {
-    a: median(a),
-    b: median(b),
+    a: medianA,
+    b: medianB,
     delta,
-    relative: median(a) === 0 ? null : delta / median(a),
+    relative: medianA === 0 ? null : delta / medianA,
     low,
     high,
     verdict: high < 0 ? "b faster" : low > 0 ? "b slower" : "no difference",
   };
+};
+
+export const compareMedians = (a, b, { iterations = 5000, seed = 1 } = {}) => {
+  if (a.length < MIN_UNITS || b.length < MIN_UNITS)
+    return comparison(a, b, null);
+  const random = mulberry32(seed);
+  const deltas = [];
+  for (let index = 0; index < iterations; index += 1)
+    deltas.push(median(resample(b, random)) - median(resample(a, random)));
+  return comparison(a, b, deltas);
+};
+
+export const compareRounds = (rounds, { iterations = 5000, seed = 1 } = {}) => {
+  const pooledA = rounds.flatMap((round) => round.a);
+  const pooledB = rounds.flatMap((round) => round.b);
+  const roundsWith = (variant) =>
+    rounds.filter((round) => round[variant].length > 0).length;
+  if (roundsWith("a") < MIN_UNITS || roundsWith("b") < MIN_UNITS)
+    return comparison(pooledA, pooledB, null);
+  const random = mulberry32(seed);
+  const deltas = [];
+  for (let index = 0; index < iterations; index += 1) {
+    const drawn = resample(rounds, random);
+    const drawnA = drawn.flatMap((round) => round.a);
+    const drawnB = drawn.flatMap((round) => round.b);
+    if (drawnA.length > 0 && drawnB.length > 0)
+      deltas.push(median(drawnB) - median(drawnA));
+  }
+  return comparison(pooledA, pooledB, deltas);
 };
 
 export const abOrder = (round) =>
