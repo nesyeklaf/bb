@@ -186,6 +186,10 @@
       "type": "registry:ui"
     },
     {
+      "name": "overlay-open-tracer",
+      "type": "registry:ui"
+    },
+    {
       "name": "overlay-trigger",
       "type": "registry:ui"
     },
