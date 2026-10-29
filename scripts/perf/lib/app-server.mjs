@@ -54,6 +54,8 @@ export const startAppServer = async ({
   logPath,
   perfDiagnostics = false,
   timeoutMs = 180_000,
+  repoRoot = REPO_ROOT,
+  env = {},
 }) => {
   refuseProductionDataDir(dataDir);
   if (!existsSync(join(dataDir, "bb.db"))) {
@@ -72,7 +74,7 @@ export const startAppServer = async ({
     "--conditions=source",
     "--import",
     "tsx",
-    join(REPO_ROOT, "scripts/start-bb.mjs"),
+    join(repoRoot, "scripts/start-bb.mjs"),
     "--data-dir",
     dataDir,
     "--server-port",
@@ -83,10 +85,15 @@ export const startAppServer = async ({
   ];
   if (perfDiagnostics) args.push("--perf-diagnostics");
   const proc = spawn(process.execPath, args, {
-    cwd: REPO_ROOT,
+    cwd: repoRoot,
     detached: true,
     stdio: ["ignore", log, log],
-    env: { ...process.env, NODE_ENV: "production", BB_SKIP_ONBOARDING: "1" },
+    env: {
+      ...process.env,
+      ...env,
+      NODE_ENV: "production",
+      BB_SKIP_ONBOARDING: "1",
+    },
   });
   const url = "http://127.0.0.1:" + port;
   await waitForHttp(url + "/api/v1/sidebar-bootstrap", timeoutMs);
