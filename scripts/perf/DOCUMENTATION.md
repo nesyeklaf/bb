@@ -71,9 +71,27 @@ Artifacts land in `<out>/<scenario>/run-<n>.json` (headline, ledger of checks, c
 The app records thread switches and overlay opens as `performance.measure` entries, so DevTools, Perfetto and the field-latency plugin read the same spans:
 
 - `bb:switch` from the input that started the switch until the frame after the timeline is ready, with phases `input`, `render`, `timeline` and `paint` (`bb:switch:<phase>`). A switch superseded by another one is dropped.
-- `bb:open` from the input that opened a dropdown, popover, select or responsive dialog until the frame after it rendered, with phases `render` and `paint`. Context menus are not covered.
+- `bb:open` from the input that opened a dropdown, popover, select, dialog, alert dialog, sheet, drawer or context menu until the frame after it rendered, with phases `render` and `paint`. The label is the overlay kind (`menu`, `popover`, `select`, `dialog`, `alert-dialog`, `sheet`, `drawer`, `context-menu`).
 
 The spans appear on the "Interactions" and "Thread switch" or "Overlay open" custom tracks in the DevTools Performance panel. Each entry carries `detail.bb` with the kind, label and phase.
+
+## Server-Timing
+
+Every `/api/v1/*` and `/internal/*` response carries `Server-Timing: total;dur=<ms>, db;dur=<ms>, app;desc="<route pattern>"`. `total` is the server's handling time (time to headers for streaming responses), `db` the time spent in SQLite calls for that request (absent without queries), `app` the matched route pattern. The overhead measured on a local production server (1000 sequential requests, with and without the middleware) is below the noise of the run, about 0.01 to 0.05 ms per request.
+
+Read it in DevTools under Network > Timing > Server Timing, or in the page:
+
+```js
+performance
+  .getEntriesByType("resource")
+  .filter((entry) => entry.serverTiming.length > 0)
+  .map((entry) => [
+    entry.name,
+    entry.serverTiming.map((t) => `${t.name}=${t.duration}`),
+  ]);
+```
+
+Subtract `total` from the request's `responseEnd - requestStart` to see network and queueing time; compare `db` with `total` to see whether a slow endpoint waits on SQLite or on its own code. Same-origin pages read it directly. A page on another origin (the dev app on its own port) needs `Timing-Allow-Origin`, which the server sets to the allowed CORS origin. Through bb connect the header is forwarded unchanged.
 
 ## Profiling build
 
