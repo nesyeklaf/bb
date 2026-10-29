@@ -171,17 +171,20 @@ export const attributeCpu = (
     for (const profile of profiles) {
       if (profile.pid !== window.pid) continue;
       for (const sample of profile.samples) {
-        if (sample.ts < window.start || sample.ts >= window.end) continue;
+        const overlap =
+          Math.min(sample.ts + sample.weight, window.end) -
+          Math.max(sample.ts, window.start);
+        if (overlap <= 0) continue;
         const frame = frameFor(profile, sample.nodeId);
         if (frame.name === "(idle)") continue;
-        sampledUs += sample.weight;
+        sampledUs += overlap;
         addTo(
           functions,
           frame.name + " " + frame.location,
           { name: frame.name, location: frame.location },
-          sample.weight,
+          overlap,
         );
-        addTo(modules, frame.module, { module: frame.module }, sample.weight);
+        addTo(modules, frame.module, { module: frame.module }, overlap);
       }
     }
     return {
