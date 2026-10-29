@@ -101,7 +101,7 @@ describe("attribution", () => {
     ]);
     const [result] = attributeCpu(
       profiles,
-      [{ name: "lab:switch", pid: 1, start: 1000, end: 1250 }],
+      [{ name: "lab:switch", pid: 1, start: 1000, end: 1300 }],
       {
         resolve: (url) =>
           url.endsWith("app.js") ? { source: "src/app.tsx", line: 4 } : null,
@@ -116,6 +116,25 @@ describe("attribution", () => {
       { module: "src/app.tsx", selfMs: 0.1 },
       { module: "(v8)", selfMs: 0.1 },
     ]);
+  });
+
+  it("charges only the part of a sample that overlaps the window", () => {
+    const profile = {
+      pid: 1,
+      tid: 1,
+      nodes: new Map([[3, node(3, "render", "http://x/assets/app.js")]]),
+      samples: [{ ts: 900, nodeId: 3, weight: 10_000 }],
+    };
+    const [result] = attributeCpu(
+      [profile],
+      [{ name: "lab:switch", pid: 1, start: 0, end: 1000 }],
+    );
+    assert.equal(result.sampledMs, 0.1);
+    const [straddling] = attributeCpu(
+      [profile],
+      [{ name: "lab:switch", pid: 1, start: 1000, end: 3000 }],
+    );
+    assert.equal(straddling.sampledMs, 2);
   });
 
   it("subtracts nested component renders from their parent", () => {

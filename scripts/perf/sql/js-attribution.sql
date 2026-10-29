@@ -39,9 +39,12 @@ per_function AS (
     w.name,
     l.function_name,
     COUNT(*) AS samples,
-    SUM(l.weight) AS self_dur
+    SUM(MIN(l.ts + l.weight, w.ts + w.dur) - MAX(l.ts, w.ts)) AS self_dur
   FROM windows w
-  JOIN leaf l ON l.upid = w.upid AND l.ts >= w.ts AND l.ts < w.ts + w.dur
+  JOIN leaf l
+    ON l.upid = w.upid
+    AND l.ts < w.ts + w.dur
+    AND l.ts + l.weight > w.ts
   GROUP BY w.window_index, l.function_name
 ),
 ranked AS (
