@@ -194,6 +194,10 @@
       "type": "registry:ui"
     },
     {
+      "name": "perf-trace",
+      "type": "registry:lib"
+    },
+    {
       "name": "pill",
       "type": "registry:ui"
     },
