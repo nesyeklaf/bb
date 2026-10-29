@@ -133,6 +133,7 @@
       staleAtArm: armed.staleAtArm,
       timedOut: armed.timedOut,
       sawInput: armed.inputAt !== null,
+      startMs: start,
       waitMs: armed.paintedAt === null ? null : armed.paintedAt - start,
       readyMs: armed.satisfiedAt === null ? null : armed.satisfiedAt - start,
     };

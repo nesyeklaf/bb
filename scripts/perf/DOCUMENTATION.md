@@ -87,6 +87,24 @@ node scripts/perf/profiling-proxy.mjs --upstream http://127.0.0.1:38886 --port 3
 
 `BB_APP_PROFILING=1` turns off JS minification, writes source maps and aliases `react-dom/client` to `react-dom/profiling`; the output goes to `apps/app/dist-profiling`. The proxy serves that build and forwards everything else, including WebSockets, to a running server, so the profiling app runs against the same data as the normal one on its own port. Plugins keep their own bundles.
 
+## A/B runs
+
+`ab.mjs` compares two running servers on the same data, for example the live app and a candidate build behind `profiling-proxy.mjs` or a second server:
+
+```sh
+node scripts/perf/ab.mjs --a http://127.0.0.1:38886 --b http://127.0.0.1:38887 --start <thread id> --rounds 8 --cpu-throttle 4 --trace
+```
+
+- Each round runs both variants in a fresh browser, in the order AB BA BA AB, so warm caches and background load hit both alike.
+- It opens `--start`, switches through `--threads` visible sidebar threads twice (first visit, revisit) and opens the thread actions menu `--menus` times. The wait runs from the input event until the frame after the content is usable, measured by the page probe, so it works on builds without the app measures.
+- The report gives the median wait per variant and a bootstrap 95% interval of the difference. "b faster" or "b slower" only when the whole interval is on one side of zero; otherwise "no difference".
+- `--cpu-throttle 4` slows the page like an old laptop. `run.mjs` takes the same flag.
+- `--trace` records a Chrome trace per run, marks each wait as a `lab:switch` or `lab:open` measure and splits the main thread inside it into script, style, layout, paint, GC, other and idle time with `sql/interaction-breakdown.sql`. Traces are about 100 MB each and are deleted after the query unless `--keep-traces`.
+
+`trace-sql.mjs <trace.json>` runs the same breakdown, or another file in `sql/` (`--sql`), on any trace, for example one saved from the DevTools Performance panel. `--windows` picks the slices to split: `bb:*` (default) for the app's spans and their phases, `bb:switch` for switches only.
+
+Both need the Perfetto trace processor: `curl -LO https://get.perfetto.dev/trace_processor && chmod +x trace_processor`, then set `BB_PERF_TRACE_PROCESSOR` to its path, or put `trace_processor_shell` on the PATH.
+
 ## Validity checks
 
 Every capture records a ledger of checks before it reports numbers, so a broken capture cannot read as a fast one:
@@ -105,6 +123,8 @@ Every capture records a ledger of checks before it reports numbers, so a broken 
 - `lib/contract.mjs`: the contract applied to a capture; `lib/ui.mjs`, `lib/scroll.mjs`, `lib/api.mjs`: selectors, gestures and the thread ranking by event count.
 - `lib/app-server.mjs`, `lib/proc.mjs`: starting a server on a seeded dir, process CPU sampling.
 - `profiling-proxy.mjs`: serves the profiling build in front of a running server.
+- `ab.mjs`, `lib/ab-stats.mjs`: interleaved A/B runs and their statistics (`node --test scripts/perf/lib/ab-stats.test.mjs`).
+- `trace-sql.mjs`, `lib/perfetto.mjs`, `sql/`: Perfetto SQL on saved traces.
 - `scenarios/`: one file per scenario, registered in `scenarios/index.mjs`. A scenario exports `{ name, description, run(context) }` and returns `{ headline, data }`.
 - `fixtures/paced-stream-provider/`: the streaming provider plugin.
 
