@@ -1,0 +1,18 @@
+{
+  "$schema": "https://ui.shadcn.com/schema/registry-item.json",
+  "name": "overlay-open-tracer",
+  "type": "registry:ui",
+  "title": "overlay-open-tracer",
+  "description": "BB ui \"overlay-open-tracer\" — vendored from the BB app's own source (version-matched to this BB release).",
+  "registryDependencies": [
+    "@bb/perf-trace"
+  ],
+  "files": [
+    {
+      "path": "registry/components/ui/overlay-open-tracer.tsx",
+      "content": "import * as React from \"react\";\n\nimport { traceOverlayOpen } from \"../../lib/perf-trace.js\";\n\nexport function OverlayOpenTracer({ kind }: { kind: string }): null {\n  React.useLayoutEffect(() => {\n    traceOverlayOpen(kind);\n  }, [kind]);\n  return null;\n}\n",
+      "type": "registry:ui",
+      "target": "components/ui/overlay-open-tracer.tsx"
+    }
+  ]
+}
