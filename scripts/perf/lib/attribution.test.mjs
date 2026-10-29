@@ -118,6 +118,34 @@ describe("attribution", () => {
     ]);
   });
 
+  it("counts only the renderer main thread, not a worker in the same process", () => {
+    const worker = profileEvents(1, [3, 3, 3, 3], [0, 100, 100, 100]).map(
+      (event) => ({ ...event, id: "0x2", tid: 7 }),
+    );
+    const profiles = cpuProfiles([
+      {
+        ph: "M",
+        name: "thread_name",
+        pid: 1,
+        tid: 1,
+        args: { name: "CrRendererMain" },
+      },
+      {
+        ph: "M",
+        name: "thread_name",
+        pid: 1,
+        tid: 7,
+        args: { name: "DedicatedWorker thread" },
+      },
+      ...profileEvents(1, [3, 3, 3, 3], [0, 100, 100, 100]),
+      ...worker,
+    ]);
+    const [result] = attributeCpu(profiles, [
+      { name: "lab:switch", pid: 1, start: 1000, end: 1300 },
+    ]);
+    assert.equal(result.sampledMs, 0.3);
+  });
+
   it("charges only the part of a sample that overlaps the window", () => {
     const profile = {
       pid: 1,

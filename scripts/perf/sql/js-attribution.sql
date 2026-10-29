@@ -21,6 +21,7 @@ samples AS (
     ) AS weight
   FROM cpu_profile_stack_sample p
   JOIN thread t USING (utid)
+  WHERE t.name = 'CrRendererMain'
 ),
 leaf AS (
   SELECT
