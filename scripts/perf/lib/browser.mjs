@@ -378,6 +378,21 @@ export class PerfBrowser {
     });
   }
 
+  async touchFling({ x, y, distance, durationMs = 80, steps = 10 }) {
+    const startY = Math.round(y - distance / 2);
+    const touch = (type, pointY) =>
+      this.client.send("Input.dispatchTouchEvent", {
+        type,
+        touchPoints: type === "touchEnd" ? [] : [{ x, y: pointY }],
+      });
+    await touch("touchStart", startY);
+    for (let step = 1; step <= steps; step += 1) {
+      await touch("touchMove", Math.round(startY + (distance * step) / steps));
+      await wait(durationMs / steps);
+    }
+    await touch("touchEnd", startY + distance);
+  }
+
   async wheel(point, deltaY) {
     await this.client.send("Input.dispatchMouseEvent", {
       type: "mouseWheel",
@@ -445,6 +460,7 @@ export class PerfBrowser {
     expectFrames = true,
     expectActivity = true,
     minWindowMs = 0,
+    onTrace = null,
   }) {
     const hostBusy = await sampleHostBusyShare(500);
     ledger.record(
@@ -532,12 +548,14 @@ export class PerfBrowser {
             end: endMark.ts,
           })
         : null;
+    const inspected = onTrace === null ? null : onTrace(events);
     return {
       label,
       actionResult,
       actionMs: elapsedMs,
       analysis,
       attribution,
+      inspected,
       page: {
         longTasks: summarize(after.longTasks.map((entry) => entry.duration)),
         longAnimationFrames: {

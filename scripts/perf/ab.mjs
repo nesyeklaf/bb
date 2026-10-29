@@ -10,10 +10,19 @@ import {
   frameUrls,
   summarizeAttribution,
 } from "./lib/attribution.mjs";
+import { AppApi } from "./lib/api.mjs";
 import { PerfBrowser } from "./lib/browser.mjs";
 import { wait } from "./lib/cdp.mjs";
 import { querySqlFile, writeTrace } from "./lib/perfetto.mjs";
 import { loadSourceMaps, sourceResolver } from "./lib/sourcemap.mjs";
+import { scrollerPoint, SCROLLER_SELECTORS } from "./lib/scroll.mjs";
+import {
+  SCROLL_GESTURES,
+  attachPacing,
+  compareSmoothness,
+  measureScrollGesture,
+  tracePacing,
+} from "./lib/smoothness.mjs";
 import { ATTRIBUTION_CATEGORIES, startTrace, stopTrace } from "./lib/trace.mjs";
 import {
   SELECTORS,
@@ -24,13 +33,20 @@ import {
 
 const USAGE = `Usage: node scripts/perf/ab.mjs --a <url> --b <url> [options]
 
-Interleaved A/B of thread switches and menu opens between two running bb servers on the same data.
+Interleaved A/B between two running bb servers on the same data.
 Each round runs both variants in a fresh browser, in the order AB BA BA AB, so drift hits both alike.
+
+Scenarios:
+  switch                Thread switches and thread actions menu opens, timed until usable (default)
+  scroll                A continuous wheel scroll up and a touch fling up on one heavy thread, compared by
+                        frame pacing (presented frames from the trace, rAF and LoAF in the page)
 
 Options:
   --a <url>             Baseline server
   --b <url>             Candidate server
-  --start <thread id>   Thread to open first (default: the first idle thread in the sidebar)
+  --scenario <name>     switch or scroll (default switch)
+  --start <thread id>   Thread to open first, and the thread scrolled by --scenario scroll
+                        (default: the first idle sidebar thread; for scroll the heaviest idle thread)
   --threads <n>         Sidebar threads to switch between (default 4)
   --menus <n>           Thread actions menu opens per round (default 3)
   --rounds <n>          Rounds (default 8)
@@ -50,6 +66,7 @@ const { values } = parseArgs({
   options: {
     a: { type: "string" },
     b: { type: "string" },
+    scenario: { type: "string", default: "switch" },
     start: { type: "string" },
     threads: { type: "string", default: "4" },
     menus: { type: "string", default: "3" },
@@ -71,9 +88,14 @@ if (values.help || !values.a || !values.b) {
   process.exit(values.help ? 0 : 2);
 }
 
+if (!["switch", "scroll"].includes(values.scenario)) {
+  console.error("Unknown scenario '" + values.scenario + "'.\n\n" + USAGE);
+  process.exit(2);
+}
+const scrolling = values.scenario === "scroll";
 const urls = { a: values.a.replace(/\/$/, ""), b: values.b.replace(/\/$/, "") };
 const attribute = values.attribute || values["react-components"];
-const tracing = values.trace || attribute;
+const tracing = values.trace || attribute || scrolling;
 const sourceMapCache = new Map();
 const rounds = Number(values.rounds);
 const threadCount = Number(values.threads);
@@ -139,6 +161,65 @@ const timedAction = async (browser, kind, readyExpression, act) => {
   return result.waitMs;
 };
 
+const runSwitches = async (browser, plan, samples) => {
+  for (const [index, thread] of plan.sequence.entries()) {
+    const selector =
+      "[data-sidebar-thread-id=" + JSON.stringify(thread.id) + "]";
+    await browser.reveal(selector);
+    const waitMs = await timedAction(
+      browser,
+      "switch",
+      threadReadyExpression(thread),
+      () => browser.click(selector),
+    );
+    samples.push({
+      kind: "switch",
+      visit: index < plan.threads.length ? "first" : "revisit",
+      label: thread.id,
+      waitMs,
+    });
+    await settle(browser, { quietMs: 300, timeoutMs: 8000 });
+  }
+  for (let index = 0; index < menuCount; index += 1) {
+    const waitMs = await timedAction(
+      browser,
+      "open",
+      "Boolean(document.querySelector('[role=menu]'))",
+      () => browser.click(MENU_TRIGGER),
+    );
+    samples.push({
+      kind: "open",
+      visit: index === 0 ? "first" : "revisit",
+      label: "thread actions",
+      waitMs,
+    });
+    await browser.pressKey("Escape");
+    await settle(browser, { quietMs: 300, timeoutMs: 5000 });
+  }
+};
+
+const runScroll = async (browser, plan, samples) => {
+  const scroller = SCROLLER_SELECTORS.timeline;
+  const point = await scrollerPoint(browser, scroller);
+  for (const gesture of SCROLL_GESTURES) {
+    const smoothness = await measureScrollGesture(browser, {
+      scroller,
+      point,
+      gesture,
+    });
+    samples.push({
+      kind: gesture.name,
+      visit: "scroll",
+      label: plan.start.id,
+      waitMs:
+        smoothness.scrolled && smoothness.moved > 100
+          ? smoothness.durationMs
+          : null,
+      smoothness,
+    });
+  }
+};
+
 const runVariant = async (variant, plan) => {
   const browser = await PerfBrowser.launch({
     chrome: values.chrome,
@@ -162,40 +243,8 @@ const runVariant = async (variant, plan) => {
           extraCategories: attribute ? ATTRIBUTION_CATEGORIES : [],
         })
       : null;
-    for (const [index, thread] of plan.sequence.entries()) {
-      const selector =
-        "[data-sidebar-thread-id=" + JSON.stringify(thread.id) + "]";
-      await browser.reveal(selector);
-      const waitMs = await timedAction(
-        browser,
-        "switch",
-        threadReadyExpression(thread),
-        () => browser.click(selector),
-      );
-      samples.push({
-        kind: "switch",
-        visit: index < plan.threads.length ? "first" : "revisit",
-        label: thread.id,
-        waitMs,
-      });
-      await settle(browser, { quietMs: 300, timeoutMs: 8000 });
-    }
-    for (let index = 0; index < menuCount; index += 1) {
-      const waitMs = await timedAction(
-        browser,
-        "open",
-        "Boolean(document.querySelector('[role=menu]'))",
-        () => browser.click(MENU_TRIGGER),
-      );
-      samples.push({
-        kind: "open",
-        visit: index === 0 ? "first" : "revisit",
-        label: "thread actions",
-        waitMs,
-      });
-      await browser.pressKey("Escape");
-      await settle(browser, { quietMs: 300, timeoutMs: 5000 });
-    }
+    if (scrolling) await runScroll(browser, plan, samples);
+    else await runSwitches(browser, plan, samples);
     const measures = await browser.evaluate("window.__bbmeasures");
     let breakdown = null;
     if (trace !== null) {
@@ -204,6 +253,11 @@ const runVariant = async (variant, plan) => {
         outDir,
         "round-" + plan.round + "-" + variant + ".trace.json",
       );
+      if (scrolling)
+        attachPacing(
+          samples.map((sample) => sample.smoothness),
+          tracePacing(events),
+        );
       await writeTrace(tracePath, events);
       const rows = querySqlFile(tracePath, "interaction-breakdown.sql");
       if (!values["keep-traces"]) rmSync(tracePath);
@@ -243,7 +297,14 @@ const runVariant = async (variant, plan) => {
   }
 };
 
+const planScroll = async () => {
+  if (values.start) return { start: await threadInfo(urls.a, values.start) };
+  const [heaviest] = await new AppApi(urls.a).rankSidebarThreads(40);
+  return { start: heaviest };
+};
+
 const planThreads = async () => {
+  if (scrolling) return { ...(await planScroll()), threads: [] };
   const browser = await PerfBrowser.launch({
     chrome: values.chrome,
     windowSize: values.viewport,
@@ -287,11 +348,36 @@ const planThreads = async () => {
 const { start, threads } = await planThreads();
 const sequence = [...threads, ...threads];
 console.log(
-  "start " +
-    start.id +
-    ", switching between " +
-    threads.map((thread) => thread.id).join(" "),
+  scrolling
+    ? "scrolling " + start.id
+    : "start " +
+        start.id +
+        ", switching between " +
+        threads.map((thread) => thread.id).join(" "),
 );
+const roundLine = (samples) => {
+  if (!scrolling) {
+    const switches = samples.filter(
+      (sample) => sample.kind === "switch" && sample.waitMs !== null,
+    );
+    return (
+      "switch median " +
+      Math.round(median(switches.map((sample) => sample.waitMs)) ?? NaN) +
+      " ms"
+    );
+  }
+  return samples
+    .map(
+      (sample) =>
+        sample.kind +
+        " p95 " +
+        (sample.smoothness.presented?.p95Ms ?? "-") +
+        " ms dropped " +
+        (sample.smoothness.presented?.droppedPct ?? "-") +
+        "%",
+    )
+    .join(", ");
+};
 const runs = [];
 for (let round = 0; round < rounds; round += 1) {
   for (const variant of abOrder(round)) {
@@ -302,9 +388,6 @@ for (let round = 0; round < rounds; round += 1) {
       sequence,
     });
     runs.push({ round, variant, ...result });
-    const switches = result.samples.filter(
-      (sample) => sample.kind === "switch" && sample.waitMs !== null,
-    );
     console.log(
       "round " +
         (round + 1) +
@@ -312,21 +395,38 @@ for (let round = 0; round < rounds; round += 1) {
         rounds +
         " " +
         variant +
-        ": switch median " +
-        Math.round(median(switches.map((sample) => sample.waitMs)) ?? NaN) +
-        " ms, " +
+        ": " +
+        roundLine(result.samples) +
+        ", " +
         result.samples.filter((sample) => sample.waitMs === null).length +
         " invalid",
     );
   }
 }
 
-const groups = [
-  ["switch", "first"],
-  ["switch", "revisit"],
-  ["open", "first"],
-  ["open", "revisit"],
-];
+const groups = scrolling
+  ? SCROLL_GESTURES.map((gesture) => [gesture.name, "scroll"])
+  : [
+      ["switch", "first"],
+      ["switch", "revisit"],
+      ["open", "first"],
+      ["open", "revisit"],
+    ];
+const smoothnessOf = (variant, kind) =>
+  runs
+    .filter((run) => run.variant === variant)
+    .flatMap((run) => run.samples)
+    .filter((sample) => sample.kind === kind && sample.waitMs !== null)
+    .map((sample) => sample.smoothness);
+const smoothness = scrolling
+  ? SCROLL_GESTURES.map((gesture) => ({
+      gesture: gesture.name,
+      metrics: compareSmoothness(
+        smoothnessOf("a", gesture.name),
+        smoothnessOf("b", gesture.name),
+      ),
+    }))
+  : [];
 const pick = (variant, kind, visit) =>
   runs
     .filter((run) => run.variant === variant)
@@ -384,7 +484,7 @@ const breakdowns = groups
   )
   .filter((row) => row.samples > 0);
 const attributions = attribute
-  ? ["switch", "open"].flatMap((kind) =>
+  ? [...new Set(groups.map(([kind]) => kind))].flatMap((kind) =>
       ["a", "b"].map((variant) => ({
         kind,
         variant,
@@ -422,7 +522,9 @@ const report = {
   viewport: values.viewport,
   start: start.id,
   threads: threads.map((thread) => thread.id),
+  scenario: values.scenario,
   comparisons,
+  smoothness,
   breakdowns,
   attributions,
   spans,
@@ -431,11 +533,38 @@ const report = {
 writeFileSync(join(outDir, "ab.json"), JSON.stringify(report, null, 2));
 const fmt = (value) =>
   value === null || value === undefined ? "-" : String(Math.round(value));
-console.log(
-  "\nwait until usable, median ms (95% CI of b - a)" +
-    (cpuThrottle > 1 ? ", CPU " + cpuThrottle + "x slower" : ""),
-);
-for (const row of comparisons)
+const throttleNote = cpuThrottle > 1 ? ", CPU " + cpuThrottle + "x slower" : "";
+const decimal = (value) =>
+  value === null || value === undefined ? "-" : value.toFixed(1);
+for (const { gesture, metrics } of smoothness) {
+  console.log(
+    "\n" +
+      gesture +
+      ", median per run (95% CI of b - a), lower is smoother" +
+      throttleNote,
+  );
+  for (const row of metrics)
+    console.log(
+      row.metric.padEnd(22) +
+        " a " +
+        decimal(row.a).padStart(7) +
+        "  b " +
+        decimal(row.b).padStart(7) +
+        "  delta " +
+        decimal(row.delta).padStart(7) +
+        " [" +
+        decimal(row.low) +
+        ", " +
+        decimal(row.high) +
+        "]  " +
+        (row.verdict ?? "too few samples"),
+    );
+}
+if (!scrolling)
+  console.log(
+    "\nwait until usable, median ms (95% CI of b - a)" + throttleNote,
+  );
+for (const row of scrolling ? [] : comparisons)
   console.log(
     (row.kind + " " + row.visit).padEnd(16) +
       " a " +

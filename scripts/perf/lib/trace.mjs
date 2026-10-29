@@ -224,7 +224,7 @@ const computeSelfTimes = (mainEvents) => {
 const overlap = (aStart, aEnd, bStart, bEnd) =>
   Math.max(0, Math.min(aEnd, bEnd) - Math.max(aStart, bStart));
 
-const framesFrom = (events, pid, windowStart, windowEnd) => {
+export const framesFrom = (events, pid, windowStart, windowEnd) => {
   const pairs = pairAsync(
     events.filter((event) => event.pid === pid),
     (name) => name === "PipelineReporter",
