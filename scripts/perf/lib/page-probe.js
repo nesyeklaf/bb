@@ -41,6 +41,7 @@
         type: script.invokerType,
         source: script.sourceURL,
         fn: script.sourceFunctionName,
+        char: script.sourceCharPosition,
         duration: script.duration,
         forcedStyleAndLayout: script.forcedStyleAndLayoutDuration,
       })),
@@ -166,6 +167,63 @@
       setTimeout(step, intervalMs);
     });
 
+  const recordScroll = (selector) => {
+    const scroller = document.querySelector(selector);
+    if (!scroller) throw new Error("no scroller for " + selector);
+    const recording = {
+      scroller,
+      requestedAt: performance.now(),
+      startTop: scroller.scrollTop,
+      scrolls: [],
+      rafs: [],
+      running: true,
+    };
+    recording.onScroll = () => recording.scrolls.push(performance.now());
+    scroller.addEventListener("scroll", recording.onScroll, { passive: true });
+    const tick = (timestamp) => {
+      recording.rafs.push(timestamp);
+      if (recording.running) requestAnimationFrame(tick);
+    };
+    requestAnimationFrame(tick);
+    state.scrollRecording = recording;
+    return true;
+  };
+
+  const stopScroll = (quietMs) =>
+    new Promise((resolve) => {
+      const recording = state.scrollRecording;
+      const check = () => {
+        const last = recording.scrolls.at(-1) ?? recording.requestedAt;
+        if (performance.now() - last < quietMs) {
+          setTimeout(check, 16);
+          return;
+        }
+        recording.running = false;
+        recording.scroller.removeEventListener("scroll", recording.onScroll);
+        state.scrollRecording = null;
+        const first = recording.scrolls[0] ?? null;
+        const lastScroll = recording.scrolls.at(-1) ?? null;
+        const inside = (time) =>
+          first !== null && time >= first && time <= lastScroll;
+        resolve({
+          requestedAt: recording.requestedAt,
+          firstScrollAt: first,
+          lastScrollAt: lastScroll,
+          scrollCount: recording.scrolls.length,
+          startTop: recording.startTop,
+          endTop: recording.scroller.scrollTop,
+          rafTimes: recording.rafs.filter(inside),
+          loafs: state.loafs.filter(
+            (entry) =>
+              first !== null &&
+              entry.start + entry.duration >= first &&
+              entry.start <= lastScroll,
+          ),
+        });
+      };
+      setTimeout(check, quietMs);
+    });
+
   const watches = {
     results: {},
     pending: new Map(),
@@ -261,6 +319,8 @@
       }),
     collectArmed,
     rafProbe,
+    recordScroll,
+    stopScroll,
     timerDrift,
     reset() {
       state.longTasks.length = 0;

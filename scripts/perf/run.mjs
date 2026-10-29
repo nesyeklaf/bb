@@ -23,6 +23,9 @@ Options:
   --headed              Run a visible browser
   --viewport <w,h>      Browser window size (default 1600,1000)
   --cpu-throttle <n>    Slow the page's CPU n times, 4 for an old laptop (default 1)
+  --thread <id>         Thread for scenarios that scroll one thread (scroll-smoothness; default: the heaviest)
+  --attribute           Sample the JS CPU profile in every capture and store the top functions and modules,
+                        mapped through the bundle's source maps, as capture.attribution in run-<n>.json
 `;
 
 const { values, positionals } = parseArgs({
@@ -39,6 +42,8 @@ const { values, positionals } = parseArgs({
     headed: { type: "boolean", default: false },
     viewport: { type: "string", default: "1600,1000" },
     "cpu-throttle": { type: "string", default: "1" },
+    attribute: { type: "boolean", default: false },
+    thread: { type: "string" },
     help: { type: "boolean", default: false },
   },
 });
@@ -143,6 +148,7 @@ try {
             headless: !values.headed,
             windowSize: values.viewport,
             cpuThrottle: Number(values["cpu-throttle"]),
+            attribute: values.attribute,
             ...options,
           });
           browsers.push(browser);

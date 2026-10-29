@@ -88,7 +88,12 @@ const EVENT_TIMING_CLASSES = new Map([
   ["click", "click"],
 ]);
 
-export const startTrace = async (client) => {
+export const ATTRIBUTION_CATEGORIES = [
+  "disabled-by-default-v8.cpu_profiler",
+  "v8.execute",
+];
+
+export const startTrace = async (client, { extraCategories = [] } = {}) => {
   const events = [];
   const unsubscribe = client.on("Tracing.dataCollected", (params) => {
     for (const event of params.value ?? []) events.push(event);
@@ -96,7 +101,7 @@ export const startTrace = async (client) => {
   await client.send("Tracing.start", {
     traceConfig: {
       recordMode: "recordContinuously",
-      includedCategories: TRACE_CATEGORIES,
+      includedCategories: [...TRACE_CATEGORIES, ...extraCategories],
     },
     transferMode: "ReportEvents",
     bufferUsageReportingInterval: 1000,
@@ -219,7 +224,7 @@ const computeSelfTimes = (mainEvents) => {
 const overlap = (aStart, aEnd, bStart, bEnd) =>
   Math.max(0, Math.min(aEnd, bEnd) - Math.max(aStart, bStart));
 
-const framesFrom = (events, pid, windowStart, windowEnd) => {
+export const framesFrom = (events, pid, windowStart, windowEnd) => {
   const pairs = pairAsync(
     events.filter((event) => event.pid === pid),
     (name) => name === "PipelineReporter",

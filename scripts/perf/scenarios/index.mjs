@@ -2,6 +2,7 @@ import coldStart from "./cold-start.mjs";
 import composer from "./composer.mjs";
 import drawersPanels from "./drawers-panels.mjs";
 import idle from "./idle.mjs";
+import scrollSmoothness from "./scroll-smoothness.mjs";
 import serverLatency from "./server-latency.mjs";
 import sidebarScroll from "./sidebar-scroll.mjs";
 import streaming from "./streaming.mjs";
@@ -15,6 +16,7 @@ export const SCENARIOS = Object.fromEntries(
     threadSwitch,
     sidebarScroll,
     timelineScroll,
+    scrollSmoothness,
     streaming,
     composer,
     drawersPanels,
