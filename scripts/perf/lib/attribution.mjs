@@ -37,6 +37,7 @@ export const labWindows = (events, prefix = "lab:") => {
 
 export const cpuProfiles = (events) => {
   const profiles = new Map();
+  const threadNames = new Map();
   const profileFor = (event) => {
     const key = event.pid + "/" + event.id;
     if (!profiles.has(key))
@@ -51,7 +52,9 @@ export const cpuProfiles = (events) => {
     return profiles.get(key);
   };
   for (const event of events) {
-    if (event.name === "Profile") {
+    if (event.ph === "M" && event.name === "thread_name") {
+      threadNames.set(event.pid + "/" + event.tid, event.args?.name ?? null);
+    } else if (event.name === "Profile") {
       const profile = profileFor(event);
       profile.tid = event.tid;
       profile.startTime = event.args?.data?.startTime ?? event.ts;
@@ -76,6 +79,7 @@ export const cpuProfiles = (events) => {
       return {
         pid: profile.pid,
         tid: profile.tid,
+        threadName: threadNames.get(profile.pid + "/" + profile.tid) ?? null,
         nodes: profile.nodes,
         samples: timed.map((sample, index) => ({
           ...sample,
@@ -170,6 +174,8 @@ export const attributeCpu = (
     let sampledUs = 0;
     for (const profile of profiles) {
       if (profile.pid !== window.pid) continue;
+      const threadName = profile.threadName ?? null;
+      if (threadName !== null && threadName !== "CrRendererMain") continue;
       for (const sample of profile.samples) {
         const overlap =
           Math.min(sample.ts + sample.weight, window.end) -

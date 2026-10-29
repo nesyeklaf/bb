@@ -31,6 +31,7 @@ const resample = (values, random) =>
   values.map(() => values[Math.floor(random() * values.length)]);
 
 const MIN_UNITS = 3;
+export const MIN_ROUNDS = 5;
 
 const comparison = (a, b, deltas) => {
   const medianA = median(a);
@@ -66,7 +67,7 @@ export const compareRounds = (rounds, { iterations = 5000, seed = 1 } = {}) => {
   const pooledB = rounds.flatMap((round) => round.b);
   const roundsWith = (variant) =>
     rounds.filter((round) => round[variant].length > 0).length;
-  if (roundsWith("a") < MIN_UNITS || roundsWith("b") < MIN_UNITS)
+  if (roundsWith("a") < MIN_ROUNDS || roundsWith("b") < MIN_ROUNDS)
     return comparison(pooledA, pooledB, null);
   const random = mulberry32(seed);
   const deltas = [];

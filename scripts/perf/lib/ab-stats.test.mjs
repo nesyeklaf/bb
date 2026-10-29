@@ -64,7 +64,15 @@ describe("ab-stats", () => {
     assert.ok(result.low > 0);
   });
 
-  it("needs three rounds with valid samples on each side", () => {
+  it("gives no interval for four rounds even when b is slower in each", () => {
+    const rounds = [0, 1, 2, 3].map((round) => ({
+      a: [1000 + round, 1010 - round],
+      b: [1100 + round, 1110 - round],
+    }));
+    assert.equal(compareRounds(rounds).low, null);
+  });
+
+  it("needs five rounds with valid samples on each side", () => {
     const rounds = [
       { a: [1, 2, 3], b: [4, 5, 6] },
       { a: [1, 2, 3], b: [4, 5, 6] },
