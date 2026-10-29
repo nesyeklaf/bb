@@ -54,9 +54,71 @@ describe("regression verdict", () => {
     assert.match(judgement.reason, /head finished 6 of 12/);
   });
 
-  it("reports no data instead of passing silently with too few samples", () => {
+  it("reports no data for an unbudgeted metric with too few samples", () => {
     const row = comparison("open", "first", [100, 110], [100, 120]);
-    assert.equal(judgeComparison(row, BUDGET).status, "no-data");
+    assert.equal(judgeComparison(row, null).status, "no-data");
+  });
+
+  it("is inconclusive when a budgeted metric has too few samples", () => {
+    const row = comparison("open", "first", [100, 110], [100, 120]);
+    assert.equal(judgeComparison(row, BUDGET).status, "inconclusive");
+  });
+
+  it("is inconclusive when a probe broke both variants alike", () => {
+    const report = {
+      rounds: 8,
+      cpuThrottle: 4,
+      viewport: "1600,1000",
+      comparisons: [
+        comparison("switch", "first", BASE, BASE),
+        comparison("open", "first", [], [], { a: 32, b: 32 }),
+      ],
+    };
+    const budgets = {
+      cpuThrottle: 4,
+      metrics: { "switch first": BUDGET, "open first": BUDGET },
+    };
+    const evaluation = evaluateBudgets(report, budgets);
+    assert.equal(evaluation.rows[1].status, "inconclusive");
+    assert.equal(evaluation.verdict, "INCONCLUSIVE");
+    assert.ok(
+      evaluation.inconclusive.some((line) => line.includes("open first")),
+    );
+    const markdown = renderMarkdown({
+      evaluation,
+      base: { ref: "origin/main", sha: "a".repeat(40) },
+      head: { ref: "HEAD", sha: "b".repeat(40) },
+      report,
+    });
+    assert.match(markdown, /check: INCONCLUSIVE/);
+    assert.match(markdown, /0\/32, 0\/32 \| \*\*INCONCLUSIVE\*\*/);
+  });
+
+  it("is inconclusive when a budgeted metric was not measured or no round ran", () => {
+    const budgets = {
+      cpuThrottle: 4,
+      metrics: { "switch first": BUDGET, "open first": BUDGET },
+    };
+    const missing = evaluateBudgets(
+      {
+        rounds: 6,
+        cpuThrottle: 4,
+        viewport: "1600,1000",
+        comparisons: [comparison("switch", "first", BASE, BASE)],
+      },
+      budgets,
+    );
+    assert.equal(missing.verdict, "INCONCLUSIVE");
+    assert.ok(
+      missing.inconclusive.includes(
+        "open first has a budget but was not measured.",
+      ),
+    );
+    const empty = evaluateBudgets(
+      { rounds: 0, cpuThrottle: 4, viewport: "1600,1000", comparisons: [] },
+      { cpuThrottle: 4, metrics: {} },
+    );
+    assert.equal(empty.verdict, "INCONCLUSIVE");
   });
 
   it("warns on a ceiling only at the throttle the ceilings are set for", () => {
@@ -99,7 +161,7 @@ describe("regression verdict", () => {
     const evaluation = evaluateBudgets(report, budgets);
     assert.equal(evaluation.verdict, "FAIL");
     assert.ok(
-      evaluation.warnings.includes(
+      evaluation.inconclusive.includes(
         "open first has a budget but was not measured.",
       ),
     );

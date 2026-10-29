@@ -21,7 +21,8 @@ const USAGE = `Usage: node scripts/perf/regression.mjs [options]
 
 Builds two git refs in temporary worktrees, starts both on copies of one seeded fixture
 and runs the interleaved A/B (first load, thread switches, menu opens) with a CPU throttle.
-The verdict compares the head against scripts/perf/budgets.json: exit 1 on FAIL, 0 otherwise.
+The verdict compares the head against scripts/perf/budgets.json: exit 0 on PASS, 1 on FAIL,
+2 on INCONCLUSIVE (a budgeted metric without enough valid rounds) or a broken run.
 
 Options:
   --base <ref>            Baseline (default: merge-base of origin/main and the head)
@@ -297,6 +298,7 @@ try {
         budgets,
         rows: evaluation.rows,
         warnings: evaluation.warnings,
+        inconclusive: evaluation.inconclusive,
       },
       null,
       2,
@@ -319,7 +321,7 @@ try {
       Math.round((Date.now() - startedAt) / 1000) +
       " s",
   );
-  exitCode = evaluation.verdict === "FAIL" ? 1 : 0;
+  exitCode = { PASS: 0, FAIL: 1, INCONCLUSIVE: 2 }[evaluation.verdict];
 } catch (error) {
   console.error(error.stack ?? String(error));
   exitCode = 2;

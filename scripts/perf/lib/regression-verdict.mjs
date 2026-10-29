@@ -29,12 +29,16 @@ export const judgeComparison = (row, budget) => {
     };
   if (row.delta === null || row.low === null || row.high === null)
     return {
-      status: "no-data",
+      status: budget ? "inconclusive" : "no-data",
       reason:
         "too few valid samples (base " +
         row.samples.a +
+        "/" +
+        row.attempts.a +
         ", head " +
         row.samples.b +
+        "/" +
+        row.attempts.b +
         ")",
     };
   const slower = row.low > 0;
@@ -58,8 +62,15 @@ export const judgeComparison = (row, budget) => {
   return { status: "same", reason: null };
 };
 
+const overallVerdict = (rows, inconclusive) => {
+  if (rows.some((row) => row.status === "fail")) return "FAIL";
+  return inconclusive.length > 0 ? "INCONCLUSIVE" : "PASS";
+};
+
 export const evaluateBudgets = (report, budgets) => {
   const warnings = [];
+  const inconclusive = [];
+  if (!(report.rounds > 0)) inconclusive.push("No round ran.");
   const ceilingsApply = report.cpuThrottle === budgets.cpuThrottle;
   if (!ceilingsApply)
     warnings.push(
@@ -76,6 +87,8 @@ export const evaluateBudgets = (report, budgets) => {
     const judgement = judgeComparison(comparison, budget);
     if (judgement.status === "no-data")
       warnings.push(key + ": " + judgement.reason + ".");
+    if (judgement.status === "inconclusive")
+      inconclusive.push(key + ": " + judgement.reason + ".");
     const ceilingExceeded =
       ceilingsApply &&
       budget !== null &&
@@ -110,11 +123,12 @@ export const evaluateBudgets = (report, budgets) => {
   });
   for (const key of Object.keys(budgets.metrics))
     if (!rows.some((row) => row.key === key))
-      warnings.push(key + " has a budget but was not measured.");
+      inconclusive.push(key + " has a budget but was not measured.");
   return {
-    verdict: rows.some((row) => row.status === "fail") ? "FAIL" : "PASS",
+    verdict: overallVerdict(rows, inconclusive),
     rows,
     warnings,
+    inconclusive,
   };
 };
 
@@ -124,6 +138,7 @@ const STATUS_TEXT = {
   faster: "faster",
   same: "no difference",
   "no-data": "no data",
+  inconclusive: "**INCONCLUSIVE**",
 };
 
 const ms = (value) =>
@@ -195,13 +210,19 @@ export const renderMarkdown = ({ evaluation, base, head, report }) => {
         row.attempts.b +
         " | " +
         STATUS_TEXT[row.status] +
-        (row.reason && row.status === "fail" ? ": " + row.reason : "") +
+        (row.reason && (row.status === "fail" || row.status === "inconclusive")
+          ? ": " + row.reason
+          : "") +
         " |",
     );
   lines.push(
     "",
-    "A metric fails only when the whole 95% bootstrap interval of head - base is above zero and the median got slower by more than both budgets. Ceilings (:warning:) only warn.",
+    "A metric fails only when the whole 95% bootstrap interval of head - base is above zero and the median got slower by more than both budgets. A budgeted metric without enough valid rounds on either side makes the check inconclusive. Ceilings (:warning:) only warn.",
   );
+  if (evaluation.inconclusive.length > 0) {
+    lines.push("", "Inconclusive because:", "");
+    for (const reason of evaluation.inconclusive) lines.push("- " + reason);
+  }
   if (evaluation.warnings.length > 0) {
     lines.push("", "Warnings:", "");
     for (const warning of evaluation.warnings) lines.push("- " + warning);
