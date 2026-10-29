@@ -1,6 +1,8 @@
 import {
   createContext,
+  startTransition,
   useCallback,
+  useEffect,
   useLayoutEffect,
   useMemo,
   useRef,
@@ -171,6 +173,32 @@ function windowKeysAround(
   return keys;
 }
 
+function widenedWindowKeys(
+  itemKeys: readonly string[],
+  indexByKey: ReadonlyMap<string, number>,
+  keys: ReadonlySet<string>,
+  extra: number,
+): Set<string> | null {
+  let first = Number.POSITIVE_INFINITY;
+  let last = Number.NEGATIVE_INFINITY;
+  for (const key of keys) {
+    const index = indexByKey.get(key);
+    if (index === undefined) continue;
+    first = Math.min(first, index);
+    last = Math.max(last, index);
+  }
+  if (first > last) return null;
+  const start = Math.max(0, first - extra);
+  const end = Math.min(itemKeys.length - 1, last + extra);
+  if (start === first && end === last) return null;
+  const widened = new Set(keys);
+  for (let index = start; index <= end; index += 1) {
+    const key = itemKeys[index];
+    if (key !== undefined) widened.add(key);
+  }
+  return widened;
+}
+
 function heldKeyOf(positionKeeper: ScrollPositionKeeper): string | null {
   const position = positionKeeper.getPosition();
   return position.kind === "anchor"
@@ -323,6 +351,22 @@ export function TimelineWindowedItems({
       windowingEnabled,
     };
   });
+
+  useEffect(() => {
+    startTransition(() => {
+      setWindowState((current) => {
+        const live = liveRef.current;
+        if (!live.windowingEnabled) return current;
+        const keys = widenedWindowKeys(
+          live.itemKeys,
+          live.indexByKey,
+          current.keys,
+          OVERSCAN_ITEMS - INITIAL_OVERSCAN_ITEMS,
+        );
+        return keys === null ? current : { keys, heights: current.heights };
+      });
+    });
+  }, []);
 
   const modelCacheRef = useRef<{
     itemKeys: readonly string[];
