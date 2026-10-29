@@ -1,0 +1,83 @@
+name: Perf regression
+
+on:
+  pull_request:
+    paths:
+      - "apps/app/**"
+      - "apps/server/**"
+      - "packages/**"
+      - "plugins/**"
+      - "scripts/perf/**"
+      - "scripts/start-bb.mjs"
+      - "pnpm-lock.yaml"
+      - ".github/workflows/perf-regression.yml"
+  workflow_dispatch:
+    inputs:
+      base:
+        description: Baseline ref (default merge-base with origin/main)
+        required: false
+        default: ""
+      head:
+        description: Candidate ref
+        required: false
+        default: HEAD
+      rounds:
+        description: Interleaved rounds
+        required: false
+        default: "8"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: perf-regression-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  PRIMARY_NODE_VERSION: "22.x"
+  PNPM_VERSION: "9.15.0"
+
+jobs:
+  regression:
+    name: A/B against the base with budgets
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          fetch-depth: 0
+      - uses: ./.github/actions/setup-workspace-tools
+        with:
+          node-version: ${{ env.PRIMARY_NODE_VERSION }}
+          pnpm-version: ${{ env.PNPM_VERSION }}
+      - name: Restore Turbo cache
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9
+        with:
+          path: ${{ runner.temp }}/turbo-cache
+          key: perf-regression-turbo-${{ runner.os }}-${{ github.sha }}
+          restore-keys: perf-regression-turbo-${{ runner.os }}-
+      - name: Run the regression check
+        env:
+          TURBO_CACHE_DIR: ${{ runner.temp }}/turbo-cache
+          BB_PERF_CHROME: /usr/bin/google-chrome
+          BASE_REF: ${{ github.event_name == 'pull_request' && 'HEAD^1' || inputs.base }}
+          HEAD_REF: ${{ github.event_name == 'pull_request' && 'HEAD' || inputs.head }}
+          ROUNDS: ${{ inputs.rounds || '8' }}
+        run: |
+          args=(--head "$HEAD_REF" --rounds "$ROUNDS" --out "$RUNNER_TEMP/perf-regression")
+          if [ -n "$BASE_REF" ]; then
+            args+=(--base "$BASE_REF")
+          fi
+          node scripts/perf/regression.mjs "${args[@]}"
+      - name: Upload the report
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: perf-regression
+          path: |
+            ${{ runner.temp }}/perf-regression/summary.md
+            ${{ runner.temp }}/perf-regression/regression.json
+            ${{ runner.temp }}/perf-regression/ab.json
+            ${{ runner.temp }}/perf-regression/logs/
+          if-no-files-found: ignore
+          retention-days: 14
