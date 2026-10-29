@@ -225,6 +225,8 @@ export const runRound = async (options, browserName, plan, round, profile) => {
     const page = await checkLiveness(browser, ledger, "pre-switch");
     if (profile) await browser.startProfiler();
     for (const [index, thread] of plan.sequence.entries()) {
+      if (index === plan.threads.length && options.revisitGapMs > 0)
+        await wait(options.revisitGapMs);
       const sample = await measureSwitch(options, driver, thread);
       samples.push({
         browser: browserName,
@@ -414,6 +416,7 @@ export const runFirefoxLab = async (options) => {
     viewport: settings.viewport,
     hoverMs: settings.hoverMs,
     pressMs: settings.pressMs,
+    revisitGapMs: settings.revisitGapMs,
     versions: Object.fromEntries(
       rounds.map((round) => [round.browser, round.version]),
     ),
@@ -523,6 +526,8 @@ export const printFirefoxLabReport = (report, log = console.log) => {
       report.hoverMs +
       " ms, press " +
       report.pressMs +
+      " ms, revisit gap " +
+      report.revisitGapMs +
       " ms",
   );
   for (const invalid of report.invalidRounds)

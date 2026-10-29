@@ -1,3 +1,4 @@
+import { writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { parseArgs } from "node:util";
@@ -20,6 +21,7 @@ Options:
   --hover-ms <n>          Pointer rests on the link before pointerdown, which lets the hover prefetch start
                           (default 150)
   --press-ms <n>          Time between pointerdown and pointerup (default 80)
+  --revisit-gap-ms <n>    Idle time between the first visits and the revisits (default 0)
   --compare-chrome        Also run every round in headless Chrome with the same input, alternating the order
   --profile               Add profiled Firefox rounds and write their Gecko profiles as .json.gz
   --profile-rounds <n>    Profiled rounds with --profile (default 1)
@@ -38,6 +40,7 @@ const { values } = parseArgs({
     viewport: { type: "string", default: "2396,1318" },
     "hover-ms": { type: "string", default: "150" },
     "press-ms": { type: "string", default: "80" },
+    "revisit-gap-ms": { type: "string", default: "0" },
     "compare-chrome": { type: "boolean", default: false },
     profile: { type: "boolean", default: false },
     "profile-rounds": { type: "string", default: "1" },
@@ -70,6 +73,7 @@ const report = await runFirefoxLab({
   viewport: values.viewport,
   hoverMs: Number(values["hover-ms"]),
   pressMs: Number(values["press-ms"]),
+  revisitGapMs: Number(values["revisit-gap-ms"]),
   compareChrome: values["compare-chrome"],
   profileRounds: values.profile ? Number(values["profile-rounds"]) : 0,
   firefox: values.firefox,
@@ -93,5 +97,18 @@ const report = await runFirefoxLab({
     );
   },
 });
-printFirefoxLabReport(report);
+const lines = [];
+printFirefoxLabReport(report, (line) => {
+  console.log(line);
+  lines.push(line);
+});
+writeFileSync(
+  join(outDir, "summary.md"),
+  "# Firefox lab\n\n" +
+    report.url +
+    "\n\n```text\n" +
+    lines.join("\n").trim() +
+    "\n```\n",
+);
 console.log("\n" + join(outDir, "firefox-lab.json"));
+console.log(join(outDir, "summary.md"));
