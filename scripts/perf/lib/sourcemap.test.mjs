@@ -34,6 +34,26 @@ describe("sourcemap", () => {
     assert.equal(originalPosition(decoded, 4, 0), null);
   });
 
+  it("returns no position inside an unmapped segment", () => {
+    const decoded = decodeMappings("AAAA,K");
+    assert.deepEqual(originalPosition(decoded, 0, 3), {
+      sourceIndex: 0,
+      line: 0,
+      column: 0,
+    });
+    assert.equal(originalPosition(decoded, 0, 10), null);
+  });
+
+  it("returns no position before the first segment of a line", () => {
+    const decoded = decodeMappings("KAAA");
+    assert.equal(originalPosition(decoded, 0, 0), null);
+    assert.deepEqual(originalPosition(decoded, 0, 5), {
+      sourceIndex: 0,
+      line: 0,
+      column: 0,
+    });
+  });
+
   it("labels sources by package or by repository path", () => {
     assert.equal(
       sourceLabel(

@@ -37,7 +37,10 @@ export const decodeMappings = (mappings) => {
         if (segmentText === "") continue;
         const values = decodeSegment(segmentText);
         generatedColumn += values[0];
-        if (values.length < 4) continue;
+        if (values.length < 4) {
+          segments.push([generatedColumn]);
+          continue;
+        }
         sourceIndex += values[1];
         sourceLine += values[2];
         sourceColumn += values[3];
@@ -62,7 +65,9 @@ export const originalPosition = (decoded, line, column) => {
       low = middle + 1;
     } else high = middle - 1;
   }
-  const segment = segments[found === -1 ? 0 : found];
+  if (found === -1) return null;
+  const segment = segments[found];
+  if (segment.length < 4) return null;
   return { sourceIndex: segment[1], line: segment[2], column: segment[3] };
 };
 
