@@ -17,6 +17,7 @@ coverage
 # next.js
 .next
 dist
+dist-profiling
 out
 
 # production
