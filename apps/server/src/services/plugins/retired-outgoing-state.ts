@@ -11,17 +11,21 @@ import {
 } from "@bb/db";
 import { AI_TASKS } from "@bb/domain";
 
-const MARKER_KEY = "retiredState.outgoingConnections.v1";
+const MARKER_KEY = "retiredState.outgoingConnections.v2";
 const RETIRED_AI_PLUGIN_IDS: ReadonlySet<string> = new Set(["bb-ai"]);
-const RETIRED_PLUGIN_IDS = ["bb-ai", "environment-modal-sandbox"] as const;
-const ACCOUNT_PLUGIN_ID = "bb-account";
+const RETIRED_PLUGIN_IDS = [
+  "bb-ai",
+  "environment-modal-sandbox",
+  "bb-account",
+  "connect",
+  "bb--connect-next",
+] as const;
 const PUSH_PLUGIN_ID = "push-notifications";
 const PUSH_SUBSCRIPTION_KEY_PREFIX = "subscription:";
 
 export interface RetiredOutgoingStateReport {
   aiSelectionsReset: number;
   pushSubscriptionsRemoved: number;
-  accountKvRemoved: number;
   retiredPluginRowsCleared: number;
 }
 
@@ -32,7 +36,6 @@ export function removeRetiredOutgoingConnectionState(
   const report: RetiredOutgoingStateReport = {
     aiSelectionsReset: 0,
     pushSubscriptionsRemoved: 0,
-    accountKvRemoved: 0,
     retiredPluginRowsCleared: 0,
   };
   const selections = getAiServiceSelections(db);
@@ -55,7 +58,6 @@ export function removeRetiredOutgoingConnectionState(
       report.pushSubscriptionsRemoved++;
     }
   }
-  report.accountKvRemoved = deleteAllPluginKvValues(db, ACCOUNT_PLUGIN_ID);
   for (const pluginId of RETIRED_PLUGIN_IDS) {
     report.retiredPluginRowsCleared += deleteAllPluginKvValues(db, pluginId);
     deleteAllPluginSettings(db, pluginId);
