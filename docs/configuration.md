@@ -947,7 +947,6 @@ manifest:
 
 ```json
 {
-  "$schema": "https://getbb.app/schemas/plugins.schema.json",
   "schemaVersion": 1,
   "name": "acme-plugins",
   "plugins": [
@@ -1273,13 +1272,6 @@ and `pnpm start` load the repo-root
   prints the resolved ports and paths, and exits without starting services or
   migrating data. See [Prepared Worktree
   Restarts](debugging-and-qa.md#prepared-worktree-restarts).
-
-`pnpm dev` injects `BB_DEV_CONNECT_BASE_URL=http://bb.localhost:<worktree-cloud-port>`
-(`pnpm dev --staging` injects `https://vibecodethis.site`). With
-`NODE_ENV=development`, the bb account plugin uses it as the sign-in default
-and the connect plugin for its signed-out dashboard link. It is
-launcher-managed, not a `bb-app config` setting, and packaged builds keep
-`https://getbb.app`.
 
 `pnpm bb`, `pnpm bb:dev`, and `pnpm reset` wrap `@bb/scripts` and force
 `NODE_ENV` to the intended mode. `pnpm reset` and `pnpm reset:dev` clear

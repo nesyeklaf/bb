@@ -461,66 +461,6 @@ unset BB_SERVER_URL BB_HOST_DAEMON_PORT BB_THREAD_ID BB_ENVIRONMENT_ID BB_THREAD
 pnpm bb:dev thread spawn --project proj_personal --provider codex --permission-mode accept-edits --title "Smoke test" --prompt "Reply only with ok." --json
 ```
 
-## Local Cloud
-
-Run the Cloud dashboard, the Connect worker, and the AI gateway against one
-local D1 database:
-
-```bash
-pnpm cloud:dev
-```
-
-The command applies migrations and prints the dashboard URL. Create a local
-email/password account, claim a handle, create a pairing code, and run the
-displayed `bb account login --code` command against a bb started with
-`pnpm dev` (`bb connect --code` does the same and also turns remote access
-back on). A browser sign-in started with
-`bb account login` opens `<local origin>/link?code=…` on the same origin. The
-same worktree-specific local origin serves the dashboard at `bb.localhost`,
-sends `bb.localhost/api/ai/*` to the AI gateway worker, and routes
-`<handle>.bb.localhost` through the Connect worker. Email/password auth
-is enabled only for this loopback workflow; production remains GitHub-only.
-`pnpm dev` automatically sets `BB_DEV_CONNECT_BASE_URL` to that worktree's
-local Cloud origin. While the bb is signed out, Settings → bb account and
-Settings → Installed plugins → Connect therefore sign in against the local
-Cloud, and a pasted code redeems locally. An explicit `--base-url ...` (or
-`bb connect --server ...`) still wins, so the dev bb can still sign in to
-getbb.app.
-Local machine enrollment follows the same origin: local `http:` server URLs
-produce `ws:` machine tunnels and `http:` share URLs, while non-local machine
-enrollment remains HTTPS-only.
-
-For bb connect next, `pnpm cloud:dev` sets the Connect worker's and bb-web's
-`NEXT_BASE_DOMAIN` to `next.bb.localhost`. `BB_CLOUD_DEV_GATE_SECRET` sets the
-worker's `GATE_SECRET` (the account API answers 404 without it),
-`BB_CLOUD_DEV_GATE_PUBLIC_KEYS` sets bb-web's `GATE_PUBLIC_KEYS`, and
-`BB_CLOUD_DEV_STATE_DIR` moves the local D1 and Durable Object state away from
-`.wrangler/cloud-dev`. `apps/connect-next/scripts/e2e-local.sh` uses all three;
-see [connect-next.md](connect-next.md#local-end-to-end-run).
-
-The AI gateway answers `503 unavailable` until an OpenRouter key is present.
-Export `OPENROUTER_API_KEY` in the shell before `pnpm cloud:dev` to pass it
-through to the local worker; the startup banner says which mode is active.
-To exercise the whole chain without OpenRouter, export
-`BB_CLOUD_DEV_AI_UPSTREAM_BASE_URL` (for example `http://127.0.0.1:4599/api/v1`)
-pointing at a local OpenAI-compatible fake, plus any non-empty
-`OPENROUTER_API_KEY`.
-The production gateway gets the key from the repository's `OPENROUTER_API_KEY`
-Actions secret, which `deploy-ai-gateway.yml` uploads with each deploy. Set the
-staging key with `wrangler secret put OPENROUTER_API_KEY --env staging` from
-`apps/ai-gateway`. Use a dedicated OpenRouter key with account-wide zero data
-retention and a daily credit limit.
-
-Ctrl-C stops the local services. Local D1 state is kept under
-`.wrangler/cloud-dev`.
-
-To test a source bb against the deployed staging Cloud instead, start it with
-`pnpm dev --staging`. bb account and Connect then sign in, redeem codes, open
-tunnels, and call the AI gateway at `https://vibecodethis.site`; no
-`pnpm cloud:dev` is needed. The flag only changes the default origin, so a
-dev data dir already signed in elsewhere keeps its account until
-`bb account logout`.
-
 ## Record Provider Bridge Traffic
 
 Export `BB_PROVIDER_BRIDGE_RECORD_DIR` before you start the dev app and every

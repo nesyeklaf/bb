@@ -35,7 +35,7 @@ function move(overrides: Partial<ServerMoveStatus> = {}): ServerMoveStatus {
     state: "preparing",
     targetHostId: "host_desk",
     targetHostName: "desk",
-    serverUrl: "https://michael.getbb.app",
+    serverUrl: "https://michael.example.test",
     destinationStatusUrl: null,
     startedAt: now - 90_000,
     finishedAt: null,

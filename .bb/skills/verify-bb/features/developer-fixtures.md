@@ -11,7 +11,6 @@ typechecks and package tests use Turbo with the applicable package filter.
 ## Source
 
 - `packages/scripts/src/commands/run-dev.ts`
-- `scripts/bb-cloud-dev.mjs`
 - `plugins/plugin-api-docs/src/surfaces.ts`
 
 ## Feature recipes
@@ -32,4 +31,3 @@ preferences, and remove only synthetic resources after evidence is preserved.
 
 ## Maintenance notes
 
-- Cloud preflight also requires its checkout-derived gateway/worker/web ports to be free and `.wrangler/cloud-dev` absent or owned. Preserve local R2/D1 fixtures outside the checkout after stopping only the owned invocation. Source: `scripts/bb-cloud-dev.mjs:163`.

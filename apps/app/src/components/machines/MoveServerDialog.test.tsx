@@ -53,7 +53,7 @@ function startedMove(): ServerMoveStatus {
     state: "preparing",
     targetHostId: TARGET.id,
     targetHostName: TARGET.name,
-    serverUrl: "https://sawyer.getbb.app",
+    serverUrl: "https://sawyer.example.test",
     destinationStatusUrl: null,
     startedAt: 1,
     finishedAt: null,

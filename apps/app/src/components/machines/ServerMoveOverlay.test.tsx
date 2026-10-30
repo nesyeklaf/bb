@@ -84,7 +84,7 @@ function move(overrides: Partial<ServerMoveStatus> = {}): ServerMoveStatus {
     state: "preparing",
     targetHostId: "host_desk",
     targetHostName: "desk",
-    serverUrl: "https://sawyer.getbb.app",
+    serverUrl: "https://sawyer.example.test",
     destinationStatusUrl: null,
     startedAt: 1_000,
     finishedAt: null,

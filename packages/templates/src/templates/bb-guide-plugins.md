@@ -194,7 +194,6 @@ with its own package.json. An optional `.bb/plugins.json` collection manifest
 indexes them:
 
   {
-    "$schema": "https://getbb.app/schemas/plugins.schema.json",
     "schemaVersion": 1,
     "name": "acme-plugins",
     "plugins": [

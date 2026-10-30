@@ -121,7 +121,6 @@ def collect(repo):
     ]:
         add(f'app:{app}', under(f'apps/{app}/'), [owner], True)
     add('server-and-daemon', under('apps/server/src/', 'apps/host-daemon/src/'), CORE_PAGES)
-    add('dev-harness', [name for name in under('scripts/') if 'cloud-dev' in name], ['developer-fixtures'])
     return {'schemaVersion': 1, 'groups': dict(sorted(groups.items()))}
 
 

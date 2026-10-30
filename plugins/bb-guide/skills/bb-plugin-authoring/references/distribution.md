@@ -96,7 +96,6 @@ root:
 
 ```json
 {
-  "$schema": "https://getbb.app/schemas/plugins.schema.json",
   "schemaVersion": 1,
   "name": "acme-plugins",
   "plugins": [
@@ -128,7 +127,6 @@ installing an entry runs the same install pipeline a direct install runs.
 
 ```json
 {
-  "$schema": "https://getbb.app/schemas/marketplace.schema.json",
   "schemaVersion": 1,
   "name": "acme-plugins",
   "displayName": "Acme Plugins",
@@ -202,7 +200,7 @@ State the outcome the user gets.
 
 `PLUGIN_OVERVIEW.md` beside package.json holds the long-form description. The
 detail page shows it in an Overview section under the lead paragraph, in the
-app and on the public getbb.app marketplace. `bb plugin new` scaffolds one, the
+app and on the marketplace. `bb plugin new` scaffolds one, the
 BB Community marketplace requires one, and a plugin that is only installed from
 a local path or a private source still reads better with one.
 

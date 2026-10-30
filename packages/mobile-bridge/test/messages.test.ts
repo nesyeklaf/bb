@@ -50,7 +50,7 @@ describe("parsePageToShellMessage", () => {
         id: "r1-2",
         request: {
           kind: "share",
-          payload: { url: "https://bee.getbb.app/threads/thr_1" },
+          payload: { url: "https://bee.example.test/threads/thr_1" },
         },
       },
     ];
@@ -196,7 +196,7 @@ describe("server lists", () => {
   const server = {
     id: "profile-1",
     name: "Studio",
-    origin: "https://studio.getbb.app",
+    origin: "https://studio.example.test",
     kind: "account",
     active: true,
   };
@@ -207,7 +207,7 @@ describe("server lists", () => {
     expect(parseBridgeServers([{ ...server, kind: "teleport" }])).toBeNull();
     expect(
       parseBridgeServers([
-        { ...server, url: "https://user:password@studio.getbb.app" },
+        { ...server, url: "https://user:password@studio.example.test" },
       ]),
     ).toBeNull();
   });

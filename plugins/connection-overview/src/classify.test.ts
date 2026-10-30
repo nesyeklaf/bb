@@ -118,7 +118,7 @@ describe("classify, first match wins", () => {
   it("names the unlisted host a red address resolves to", () => {
     const seen = {
       "2606:4700:20::681a:384": [
-        { name: "getbb.app", ip: "2606:4700:20::681a:384", at: NOW - 1_000 },
+        { name: "example.test", ip: "2606:4700:20::681a:384", at: NOW - 1_000 },
       ],
     };
     expect(
@@ -127,7 +127,10 @@ describe("classify, first match wins", () => {
         null,
         context(seen),
       ),
-    ).toMatchObject({ state: "red", reason: "resolves to unlisted getbb.app" });
+    ).toMatchObject({
+      state: "red",
+      reason: "resolves to unlisted example.test",
+    });
   });
 
   it("turns shared and stale resolutions yellow", () => {
