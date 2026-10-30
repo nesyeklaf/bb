@@ -819,6 +819,25 @@ describe("ThreadTableOfContents", () => {
     }
   });
 
+  it("jumps to the message nearest the pointer when the rail is clicked", () => {
+    const onNavigateToRow = vi.fn();
+    render(
+      <TocHost
+        onNavigateToRow={onNavigateToRow}
+        timelineRows={Array.from({ length: 6 }, (_, index) => userConversationRow(index + 1))}
+      />,
+    );
+    const toc = document.querySelector<HTMLElement>("[data-thread-toc]");
+    if (!toc) throw new Error("Expected the thread table of contents.");
+    const trigger = screen.getByRole("button", { name: "Thread table of contents" });
+    const ticks = Array.from(toc.querySelectorAll<HTMLElement>("[data-toc-tick]"));
+    ticks.forEach((tick, index) => {
+      tick.getBoundingClientRect = () => rect({ top: index * 10, bottom: index * 10 + 3 });
+    });
+    fireEvent.pointerUp(trigger, { button: 0, clientX: 5, clientY: 21, pointerId: 1 });
+    expect(onNavigateToRow).toHaveBeenCalledWith(ticks[2]?.dataset.tocTickId);
+  });
+
   it("scrolls the message list when the wheel turns over the popover padding", () => {
     render(<TocHost timelineRows={Array.from({ length: 30 }, (_, index) => userConversationRow(index + 1))} />);
     const toc = document.querySelector<HTMLElement>("[data-thread-toc]");

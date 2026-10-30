@@ -1105,18 +1105,29 @@ export function ThreadTableOfContents({
             const wasDrag = dragRef.current?.moved === true;
             if (wasDrag) updateDragSelection(event.clientY);
             dragRef.current = null;
-            const picked = pickedBandRef.current;
             if (
-              !wasDrag &&
-              picked &&
-              event.button === 0 &&
-              railHalfAt(
-                event.clientX,
-                event.currentTarget.getBoundingClientRect(),
-              ) === "topics"
+              wasDrag ||
+              event.button !== 0 ||
+              (event.target instanceof Element &&
+                event.target.closest("[data-toc-band]"))
             ) {
-              notifyThreadTocBandClick(picked, extensionInput);
+              return;
             }
+            const half = canSelect
+              ? railHalfAt(
+                  event.clientX,
+                  event.currentTarget.getBoundingClientRect(),
+                )
+              : "messages";
+            const picked = pickedBandRef.current;
+            if (half === "topics") {
+              if (!picked) return;
+              notifyThreadTocBandClick(picked, extensionInput);
+              jumpToSeq(picked.band.fromSeq);
+              return;
+            }
+            const tickId = nearestTickId(rootElement, event.clientY);
+            if (tickId) void handleSelect(tickId);
           }}
           onPointerCancel={() => {
             dragRef.current = null;
@@ -1193,6 +1204,7 @@ export function ThreadTableOfContents({
                     onClick={(event) => {
                       event.stopPropagation();
                       notifyThreadTocBandClick(entry, extensionInput);
+                      jumpToSeq(entry.band.fromSeq);
                     }}
                     className="pointer-events-auto relative cursor-pointer rounded-full transition-all duration-150 motion-reduce:transition-none"
                     style={{
