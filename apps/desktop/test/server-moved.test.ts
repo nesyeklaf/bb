@@ -16,7 +16,6 @@ import {
   ensureServerMovedRuntime,
   hasLiveBbAppLauncher,
   probeLocalServerMove,
-  readServerMovedConnectCredential,
   readServerMovedLock,
   waitForCommittedServerMove,
   waitForServerMoveDestination,
@@ -959,105 +958,6 @@ describe("hasLiveBbAppLauncher", () => {
     await expect(
       hasLiveBbAppLauncher({ dataDir, isRunning: () => false }),
     ).resolves.toBe(false);
-  });
-});
-
-describe("readServerMovedConnectCredential", () => {
-  async function writeConfig(dataDir: string, config: unknown): Promise<void> {
-    await writeFile(join(dataDir, "config.json"), JSON.stringify(config));
-  }
-
-  it("reads the machine credential the move wrote for this computer", async () => {
-    const dataDir = await createTempDir();
-    await writeConfig(dataDir, {
-      serverHeaders: { "x-bb-machine-access": "bbcm_laptop" },
-      serverUrl: "https://laptop.example.test/",
-    });
-
-    await expect(
-      readServerMovedConnectCredential({
-        dataDir,
-        logWarning: vi.fn(),
-        move: MOVE,
-        remoteServerUrl: "https://laptop.example.test",
-      }),
-    ).resolves.toEqual({
-      credential: "bbcm_laptop",
-      handle: "laptop",
-      serverUrl: "https://laptop.example.test",
-    });
-  });
-
-  it("does not use the credential for a different server", async () => {
-    const dataDir = await createTempDir();
-    await writeConfig(dataDir, {
-      serverHeaders: { "x-bb-machine-access": "bbcm_laptop" },
-      serverUrl: "https://laptop.example.test",
-    });
-
-    await expect(
-      readServerMovedConnectCredential({
-        dataDir,
-        logWarning: vi.fn(),
-        move: MOVE,
-        remoteServerUrl: "https://work.example.test",
-      }),
-    ).resolves.toBeNull();
-  });
-
-  it("does not use a credential that config.json pins to another address", async () => {
-    const dataDir = await createTempDir();
-    await writeConfig(dataDir, {
-      serverHeaders: { "x-bb-machine-access": "bbcm_old" },
-      serverUrl: "http://127.0.0.1:38886",
-    });
-
-    await expect(
-      readServerMovedConnectCredential({
-        dataDir,
-        logWarning: vi.fn(),
-        move: MOVE,
-        remoteServerUrl: "https://laptop.example.test",
-      }),
-    ).resolves.toBeNull();
-  });
-
-  it("returns null for direct moves and missing headers", async () => {
-    const dataDir = await createTempDir();
-    await writeConfig(dataDir, { serverUrl: "https://laptop.example.test" });
-
-    await expect(
-      readServerMovedConnectCredential({
-        dataDir,
-        logWarning: vi.fn(),
-        move: MOVE,
-        remoteServerUrl: "https://laptop.example.test",
-      }),
-    ).resolves.toBeNull();
-    await expect(
-      readServerMovedConnectCredential({
-        dataDir,
-        logWarning: vi.fn(),
-        move: DIRECT_MOVE,
-        remoteServerUrl: "https://studio.tailnet.ts.net:38886",
-      }),
-    ).resolves.toBeNull();
-  });
-
-  it("logs and returns null for a missing or invalid config.json", async () => {
-    const dataDir = await createTempDir();
-    const logWarning = vi.fn();
-    const args = {
-      dataDir,
-      logWarning,
-      move: MOVE,
-      remoteServerUrl: "https://laptop.example.test",
-    };
-
-    await expect(readServerMovedConnectCredential(args)).resolves.toBeNull();
-    await writeFile(join(dataDir, "config.json"), "{broken");
-    await expect(readServerMovedConnectCredential(args)).resolves.toBeNull();
-    expect(logWarning).toHaveBeenCalledTimes(2);
   });
 });
 

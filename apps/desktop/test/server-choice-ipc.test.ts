@@ -1,11 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { registerServerChoiceIpc } from "../src/server-choice-ipc.js";
 import { buildDesktopServerChoices } from "../src/server-list.js";
-import {
-  createServerTargetStore,
-  type ConnectServerRef,
-} from "../src/server-target.js";
-import { createConnectServerSync } from "../src/connect-server-sync.js";
+import { createServerTargetStore } from "../src/server-target.js";
 import {
   BB_DESKTOP_GET_SERVER_CHOICES_CHANNEL,
   BB_DESKTOP_SELECT_SERVER_CHANNEL,
@@ -20,9 +16,7 @@ const event = { sender: { id: 7, mainFrame: frame }, senderFrame: frame };
 beforeEach(() => vi.clearAllMocks());
 
 describe("server choice IPC", () => {
-  it("uses the native discovery policy for list requests and keeps custom URLs private", async () => {
-    let now = 100_000;
-    let servers: ConnectServerRef[] = [];
+  it("lists the native server choices and keeps custom URLs private", async () => {
     const store = createServerTargetStore({
       storagePath: "/test/server-target.json",
       fs: {
@@ -34,42 +28,9 @@ describe("server choice IPC", () => {
     await store.setCustomServerUrl(
       "https://user:password@custom.example/private",
     );
-    const fetchImpl = vi.fn(async () => ({
-      ok: true,
-      status: 200,
-      text: async () => "",
-      json: async () => ({
-        ok: true,
-        result: {
-          selfHandle: "self",
-          servers: [
-            {
-              handle: "remote",
-              name: "Remote",
-              live: true,
-              url: "https://remote.example",
-            },
-          ],
-        },
-      }),
-    }));
-    const sync = createConnectServerSync({
-      getAccountSession: async () => null,
-      getCredential: () => null,
-      getLocalServerUrl: () => "http://127.0.0.1:1234",
-      onServers: (next) => {
-        servers = next;
-      },
-      onSkipped: () => undefined,
-      onUnauthorized: () => undefined,
-      fetchImpl,
-      now: () => now,
-    });
     registerServerChoiceIpc({
       applicationWindowWebContentsIds: new Set([7]),
-      onListRequested: sync.onListRequested,
-      list: () =>
-        buildDesktopServerChoices(store, servers, "http://127.0.0.1:1234/app"),
+      list: () => buildDesktopServerChoices(store, "http://127.0.0.1:1234/app"),
       select: async () => undefined,
       onError: () => undefined,
     });
@@ -78,7 +39,6 @@ describe("server choice IPC", () => {
     )?.[1];
     if (!list) throw new Error("Missing list handler");
     const initial = list(event);
-    expect(fetchImpl).toHaveBeenCalledTimes(1);
     expect(initial).toEqual([
       {
         id: "builtin",
@@ -97,26 +57,12 @@ describe("server choice IPC", () => {
     ]);
     expect(JSON.stringify(initial)).not.toContain("password");
     expect(JSON.stringify(initial)).not.toContain("/private");
-    await sync.syncNow();
-    expect(list(event)).toContainEqual({
-      id: "connect:remote",
-      name: "remote.example",
-      origin: "https://remote.example",
-      kind: "account",
-      active: false,
-    });
-    expect(fetchImpl).toHaveBeenCalledTimes(1);
-    now += 60_000;
-    list(event);
-    expect(fetchImpl).toHaveBeenCalledTimes(2);
-    await sync.syncNow();
     expect(() => list({ ...event, senderFrame: {} })).toThrow(
       "limited to bb windows",
     );
     expect(() =>
       list({ ...event, sender: { id: 99, mainFrame: frame } }),
     ).toThrow("limited to bb windows");
-    expect(fetchImpl).toHaveBeenCalledTimes(2);
     await store.setCustomServerName(
       "https://user:password@custom.example/private",
       "Office",
@@ -134,7 +80,6 @@ describe("server choice IPC", () => {
     const onError = vi.fn();
     registerServerChoiceIpc({
       applicationWindowWebContentsIds: new Set([7]),
-      onListRequested: () => undefined,
       list: () => [
         {
           id: "builtin",

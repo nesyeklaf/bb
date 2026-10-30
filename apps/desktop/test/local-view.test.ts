@@ -86,7 +86,7 @@ describe("local desktop views", () => {
           { id: "retry", label: "Try again" },
           { id: "choose-server", label: "Choose server…" },
         ],
-        details: "bb Connect did not accept this app.",
+        details: "The server did not accept this app.",
         kind: "error",
         logText: "",
         title: "Could not open Studio desktop",

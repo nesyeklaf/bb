@@ -8,7 +8,6 @@ import {
 import type { BbDesktopZoomCommand } from "@bb/desktop-contract";
 import type { ApplicationMenuAccelerators } from "./desktop-menu-shortcuts.js";
 import { builtinServerName } from "./server-target.js";
-import type { ConnectServerSyncSkipReason } from "./connect-server-sync.js";
 
 const LOCAL_LOGS_MENU_LABEL = "Local Logs";
 const OPEN_NEW_TAB_MENU_LABEL = "New Tab";
@@ -32,12 +31,6 @@ const SERVER_MENU_ITEM_IDS = [
   WINDOW_SERVER_MENU_ITEM_ID,
 ];
 export const SET_SERVER_URL_MENU_LABEL = "Edit Server…";
-const CONNECT_SIGN_IN_MENU_LABELS: Partial<
-  Record<ConnectServerSyncSkipReason, string>
-> = {
-  "no-credential": "Sign in to bb Connect…",
-  unauthorized: "Sign in to bb Connect again…",
-};
 
 interface ApplicationMenuServerItem {
   checked: boolean;
@@ -65,11 +58,9 @@ export interface InstallApplicationMenuArgs {
   openLocalLogs(): void;
   selectServer(serverId: string): void;
   setServerUrl(): void;
-  signInToConnect(): void;
   addServer(): void;
   onServerMenuWillShow?: () => void;
   servers: ApplicationMenuServerItem[];
-  connectServersSkipReason: ConnectServerSyncSkipReason | null;
 }
 
 function createLocalLogsMenuItems(
@@ -92,11 +83,9 @@ export type ServerMenuArgs = Pick<
   | "showBuiltinServer"
   | "toggleBuiltinServer"
   | "addServer"
-  | "connectServersSkipReason"
   | "selectServer"
   | "servers"
   | "setServerUrl"
-  | "signInToConnect"
 >;
 
 export function createServerMenuItems(
@@ -112,23 +101,9 @@ export function createServerMenuItems(
       type: "radio" as const,
     }),
   );
-  const signInLabel =
-    args.connectServersSkipReason === null
-      ? undefined
-      : CONNECT_SIGN_IN_MENU_LABELS[args.connectServersSkipReason];
   return [
     ...serverItems,
     { type: "separator" },
-    ...(signInLabel === undefined
-      ? []
-      : [
-          {
-            label: signInLabel,
-            click() {
-              args.signInToConnect();
-            },
-          },
-        ]),
     {
       label: "Add Server…",
       click() {
@@ -139,7 +114,7 @@ export function createServerMenuItems(
       enabled: args.servers.some(
         (server) =>
           server.checked &&
-          (server.id.startsWith("custom:") || server.id.startsWith("connect:")),
+          server.id.startsWith("custom:"),
       ),
       label: SET_SERVER_URL_MENU_LABEL,
       click() {

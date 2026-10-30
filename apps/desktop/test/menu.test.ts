@@ -33,7 +33,6 @@ function menuArgs(
       reopenClosedTab: undefined,
     },
     closeWindowOrSideTab: () => {},
-    connectServersSkipReason: null,
     createNewWindow: () => {},
     isMac: true,
     showBuiltinServer: true,
@@ -49,7 +48,6 @@ function menuArgs(
     selectServer: () => {},
     servers: [{ checked: true, id: "builtin", name: BUILTIN_SERVER_NAME }],
     setServerUrl: () => {},
-    signInToConnect: () => {},
     addServer: () => {},
     ...overrides,
   };
@@ -196,10 +194,9 @@ describe("application menu", () => {
 
   it.each([
     { selectedId: "builtin", enabled: false },
-    { selectedId: "connect:office", enabled: true },
     { selectedId: "custom:office", enabled: true },
   ])(
-    "enables editing only a selected saved or Connect server ($selectedId)",
+    "enables editing only a selected saved server ($selectedId)",
     ({ selectedId, enabled }) => {
       const template = buildApplicationMenuTemplate(
         menuArgs(() => {}, {
@@ -208,11 +205,6 @@ describe("application menu", () => {
               checked: selectedId === "builtin",
               id: "builtin",
               name: BUILTIN_SERVER_NAME,
-            },
-            {
-              checked: selectedId === "connect:office",
-              id: "connect:office",
-              name: "Connect Office",
             },
             {
               checked: selectedId === "custom:office",
@@ -335,74 +327,6 @@ describe("application menu", () => {
     expect(addServer).toHaveBeenCalledTimes(1);
   });
 
-  it.each([
-    { reason: "no-credential", label: "Sign in to bb Connect…" },
-    { reason: "unauthorized", label: "Sign in to bb Connect again…" },
-  ] as const)(
-    "offers sign-in with the server actions when the sync needs it ($reason)",
-    ({ reason, label }) => {
-      const signInToConnect = vi.fn();
-      const template = buildApplicationMenuTemplate(
-        menuArgs(() => {}, {
-          connectServersSkipReason: reason,
-          servers: [
-            { checked: false, id: "builtin", name: BUILTIN_SERVER_NAME },
-            { checked: true, id: "connect:brsbl", name: "brsbl" },
-          ],
-          signInToConnect,
-        }),
-      );
-      const serverSubmenu = findServerSubmenu(template);
-
-      expect(
-        serverSubmenu.map((item) => item.label ?? `<${item.type}>`),
-      ).toEqual([
-        BUILTIN_SERVER_NAME,
-        "brsbl",
-        "<separator>",
-        label,
-        "Add Server…",
-        SET_SERVER_URL_MENU_LABEL,
-        "<separator>",
-        "Show This Mac",
-      ]);
-      const signIn = serverSubmenu[3];
-      expect(signIn?.enabled).toBeUndefined();
-      expect(signIn?.type).toBeUndefined();
-      signIn?.click?.({} as never, undefined, {} as never);
-      expect(signInToConnect).toHaveBeenCalledTimes(1);
-    },
-  );
-
-  it.each(["unavailable", "not-paired", "plugin-disabled"] as const)(
-    "adds no Connect row when sign-in cannot fix the sync ($0)",
-    (reason) => {
-      const template = buildApplicationMenuTemplate(
-        menuArgs(() => {}, {
-          connectServersSkipReason: reason,
-          servers: [
-            { checked: false, id: "builtin", name: BUILTIN_SERVER_NAME },
-            { checked: true, id: "connect:brsbl", name: "brsbl" },
-          ],
-        }),
-      );
-
-      expect(
-        findServerSubmenu(template).map(
-          (item) => item.label ?? `<${item.type}>`,
-        ),
-      ).toEqual([
-        BUILTIN_SERVER_NAME,
-        "brsbl",
-        "<separator>",
-        "Add Server…",
-        SET_SERVER_URL_MENU_LABEL,
-        "<separator>",
-        "Show This Mac",
-      ]);
-    },
-  );
-
   it("builds a native Linux menu with the Linux DevTools accelerator", () => {
     vi.mocked(Menu.sendActionToFirstResponder).mockClear();
     const template = buildApplicationMenuTemplate(
@@ -467,20 +391,13 @@ it.each([true, false])(
 );
 
 it.each([
-  { active: true, alternatives: 1, show: false, custom: false, visible: true },
-  { active: true, alternatives: 0, show: false, custom: false, visible: true },
-  {
-    active: false,
-    alternatives: 1,
-    show: false,
-    custom: false,
-    visible: false,
-  },
-  { active: false, alternatives: 1, show: true, custom: false, visible: true },
-  { active: false, alternatives: 1, show: false, custom: true, visible: false },
+  { active: true, alternatives: 1, show: false, visible: true },
+  { active: true, alternatives: 0, show: false, visible: true },
+  { active: false, alternatives: 1, show: false, visible: false },
+  { active: false, alternatives: 1, show: true, visible: true },
 ])(
   "shares native and palette visibility: %j",
-  async ({ active, alternatives, show, custom, visible }) => {
+  async ({ active, alternatives, show, visible }) => {
     const store = createServerTargetStore({
       storagePath: "/test/server-target.json",
       fs: {
@@ -489,22 +406,10 @@ it.each([
         writeFile: async () => undefined,
       },
     });
-    const connect = {
-      handle: "laptop",
-      name: "Laptop",
-      url: "https://laptop.getbb.app",
-    };
-    if (alternatives) {
-      if (custom) await store.setCustomServerUrl("https://custom.example");
-      else await store.setConnectServer(connect);
-    }
+    if (alternatives) await store.setCustomServerUrl("https://custom.example");
     if (active) await store.setTarget("builtin");
     await store.setShowBuiltinServer(show);
-    const choices = buildDesktopServerChoices(
-      store,
-      alternatives && !custom ? [connect] : [],
-      "http://127.0.0.1:38886",
-    );
+    const choices = buildDesktopServerChoices(store, "http://127.0.0.1:38886");
     expect(choices.some((choice) => choice.id === "builtin")).toBe(visible);
     expect(choices.filter((choice) => choice.active)).toHaveLength(1);
     const template = buildApplicationMenuTemplate(
