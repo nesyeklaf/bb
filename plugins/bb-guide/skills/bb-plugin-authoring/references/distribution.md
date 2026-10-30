@@ -45,12 +45,11 @@ source files remain the contract.
 
 ## Distributing a plugin
 
-Users can install third-party plugins directly from a local path, npm package,
-or Git repository:
+Users can install third-party plugins directly from a local path or a Git
+repository:
 
 ```sh
 bb plugin install ./bb-plugin-notes
-bb plugin install npm:bb-plugin-notes@^1.0.0
 bb plugin install https://github.com/acme/bb-plugin-notes
 bb plugin install git:https://github.com/acme/bb-plugin-notes.git@main
 bb plugin install git:https://github.com/acme/bb-plugin-notes.git@^1.2.0
@@ -61,7 +60,7 @@ with an explicit branch, tag, or commit when that tracking intent matters.
 Install and update run third-party code with full trust. Interactive commands
 show the resolved source and ask for confirmation. Pass `--yes` only after the
 user confirms that exact source and version. quickstart.md covers what each
-install builds and which files an npm package must publish.
+install builds.
 
 ### Updates
 

@@ -329,8 +329,8 @@ the lease length suits throttled background tabs.
 ## Plugin cache pruning
 
 `bb.sdk.plugins.experimental_pruneCache({ dryRun? })`
-(`POST /plugins/cache/prune`) deletes cached git and npm plugin versions
-under `<data>/plugins/cache` that no installed plugin uses and returns
+(`POST /plugins/cache/prune`) deletes cached git plugin versions and
+leftover npm-era cache entries under `<data>/plugins/cache` that no installed plugin uses and returns
 `{ dryRun, removed, bytes }`; each removed entry has `pluginId` (null for an
 unrecorded directory), `version`, `path`, and `bytes`, counting a shared
 monorepo checkout once. It removes every non-active version regardless of

@@ -15,7 +15,7 @@ describe("formatHomePathForDisplay", () => {
   it.each([
     "/managed/plugins/github",
     "/Volumes/work/plugins/github",
-    "skills.sh/example/writing-voice",
+    "skills/example/writing-voice",
     "SKILL.md",
   ])("preserves a path outside a conventional home %s", (path) => {
     expect(formatHomePathForDisplay(path)).toBe(path);

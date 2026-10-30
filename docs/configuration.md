@@ -922,7 +922,7 @@ Plugin state lives under the data dir:
 <dataDir>/plugins/<id>/secrets/    Secret settings and the plugin HTTP token
 <dataDir>/plugins/<id>/logs/       bb.log output (plugin.log, JSONL, rotated
                                    at 5MB; read with `bb plugin logs <id>`)
-<dataDir>/plugins/git/, npm/       Managed installs for git:/npm: sources
+<dataDir>/plugins/git/            Managed installs for git: sources
 <dataDir>/marketplaces/staging/    Throwaway checkouts for git: marketplace
                                    refreshes
 <dataDir>/skills-generated/        Server-generated skills (the
