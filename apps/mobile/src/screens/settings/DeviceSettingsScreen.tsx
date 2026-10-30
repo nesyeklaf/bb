@@ -58,12 +58,6 @@ export function DeviceSettingsScreen() {
             href="/settings/servers"
             testID="device-servers"
           />
-          <LinkRow
-            title="Notifications"
-            badge={{ icon: "Bell", symbol: "bell.badge", color: colors.red }}
-            href={settingsSectionHref("notifications")}
-            testID="device-notifications"
-          />
         </SettingsSection>
 
         <SettingsSection

@@ -23,8 +23,7 @@
         "ITSAppUsesNonExemptEncryption": false,
         "NSAppTransportSecurity": {
           "NSAllowsLocalNetworking": true
-        },
-        "UIBackgroundModes": ["remote-notification"]
+        }
       },
       "associatedDomains": ["applinks:getbb.app", "applinks:*.getbb.app"]
     },
@@ -68,7 +67,6 @@
     },
     "plugins": [
       "./plugins/with-selection-accent",
-      "./plugins/with-push-consent",
       "expo-router",
       "expo-secure-store",
       "expo-image",
@@ -87,14 +85,6 @@
               "backgroundColor": "#151515"
             }
           }
-        }
-      ],
-      [
-        "expo-notifications",
-        {
-          "icon": "./assets/android-notification-icon.png",
-          "color": "#000000",
-          "defaultChannel": "threads"
         }
       ],
       "expo-quick-actions",

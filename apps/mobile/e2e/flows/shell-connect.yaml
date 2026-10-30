@@ -82,16 +82,9 @@ env:
     direction: DOWN
 - tapOn:
     id: "connect-submit"
-# The first successful connection may raise the one-time push-notification
-# prompt over the enrolled screen; decline it.
 - extendedWaitUntil:
-    visible: ".*(Paired with bb connect|Not now).*"
+    visible: ".*Paired with bb connect.*"
     timeout: 30000
-- runFlow:
-    when:
-      visible: "Not now"
-    commands:
-      - tapOn: "Not now"
 - extendedWaitUntil:
     visible:
       id: "connect-enrolled-screen"
@@ -122,11 +115,6 @@ env:
     visible:
       id: "home-thread-list"
     timeout: 30000
-- runFlow:
-    when:
-      visible: "Not now"
-    commands:
-      - tapOn: "Not now"
 - extendedWaitUntil:
     notVisible:
       id: "connection-banner"
@@ -201,13 +189,8 @@ env:
 - tapOn:
     id: "connect-submit"
 - extendedWaitUntil:
-    visible: ".*(Paired again|Not now).*"
+    visible: ".*Paired again.*"
     timeout: 30000
-- runFlow:
-    when:
-      visible: "Not now"
-    commands:
-      - tapOn: "Not now"
 - extendedWaitUntil:
     visible:
       id: "connect-enrolled-screen"

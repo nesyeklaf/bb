@@ -12,24 +12,6 @@ caches the system config the palette sync reads.
   code, map wire errors to copy), `accountServerProfile`, and
   `useAccountServers` (the other servers the credential's account owns).
   Pure modules are vitest-tested.
-- `notifications/` is the push layer's policy, pure and vitest-tested; the RN
-  glue (expo-notifications, MMKV, navigation) lives in `src/notifications`.
-  `push-registration.ts`: `decidePushSync` (toggle × EAS project id × OS
-  permission × existing record → skip / unregister / fetch-token),
-  `shouldReregister` (token / platform / server change, daily refresh),
-  `syncPushRegistration` (never throws; removes the stale row before a
-  re-register), `unregisterPushRegistration` (by profile id: the record keeps
-  the server URL, so a removed profile can still be cleaned up),
-  `enablePushForProfile` (asks the OS once), `describePushStatus`.
-  `push-registration-controller.ts` coalesces concurrent syncs per profile
-  and reconciles removed profiles / token rolls. `push-store.ts` is the
-  injected-storage store (MMKV `bb.preferences` in the app, a Map in tests).
-  `push-subscriptions-api.ts` calls the `push-notifications` plugin RPC
-  through `sdk.plugins.callRpc`. It keys clients by server URL, not by a
-  profile client that the app can dispose. Its list reads local validated
-  records with `tokenSuffix`.
-  `push-notification-target.ts` parses a payload's `data` and picks the
-  profile (matching server hint → probe active first).
 - `shared/use-realtime-subscription.ts`: `useSystemRealtimeSubscription`
   holds the active profile's `system` realtime subscription while a system
   query is mounted (refcounted per target by the realtime manager).

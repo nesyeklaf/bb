@@ -5,13 +5,12 @@ Router, NativeWind v5).
 
 Status: a native shell around the web interface (#2515). `app/webview.tsx`
 loads the active server's web app in `react-native-webview` and talks to it
-over `@bb/mobile-bridge` (handshake, haptics, app-icon badge, share, open
+over `@bb/mobile-bridge` (handshake, haptics, share, open
 external links, open native screens, save files on iOS). Threads, projects, plugins and server
 settings run in the page. The native screens cover what the page cannot
 own: first-run pairing (Direct URL and bb connect QR / code enrollment),
-saved servers, This device settings (appearance, haptics, notifications,
-reload the page, clear website data), push registration and notification
-taps, deep links, quick actions, share intents and the connection banner.
+saved servers, This device settings (appearance, haptics,
+reload the page, clear website data), deep links, quick actions, share intents and the connection banner.
 External links use the web app's `shellOpenExternal` helper and the native
 bridge to open through the OS URL handler. Application links use the version-3
 `open-application` request: the shared web UI handles confirmation and saved
@@ -29,12 +28,12 @@ app/                     Expo Router routes (thin: each file re-exports a screen
                          ProfilesProvider (QueryClientProvider per profile) ›
                          SheetProvider › RootNavigator + ThreadOpenSignalHandler,
                          ShareIntentHandler, QuickActionsHandler,
-                         PushNotificationsHost, Toaster
+                         Toaster
   index.tsx              redirects to Add server (no profiles) or the shell
   webview.tsx            the WebView shell (`?profileId=&path=`)
   connect/index.tsx      bb connect enrollment (QR / code) — also the re-pair
                          target (`?profileId=`) and the `bb://connect?code=…` link
-  settings/              device (This device), appearance, notifications,
+  settings/              device (This device), appearance,
                          servers/index (saved servers), servers/add (bb connect
                          entry + Direct URL form)
   dev/webview-spike.tsx  Phase 0 WebView diagnostics (dev / EXPO_PUBLIC_BB_E2E=1
@@ -54,8 +53,6 @@ src/
                          `thread-open` → shell route), ShareIntentHandler,
                          QuickActionsHandler
   data/                  connect (pairing payload, enrollment, account servers),
-                         notifications (push registration policy, push store,
-                         plugin RPC wrapper, notification payload → profile),
                          shared (system realtime subscription), system (system
                          config query); see src/data/README.md
   lib/                   pure TypeScript, vitest-tested
@@ -79,16 +76,10 @@ src/
     shell/               shell URL and navigation rules, screen state, last-path
                          preferences, share payloads, link resolution, shell
                          commands
-  notifications/         push (RN glue): expo-notifications behind the data
-                         layer's PushNotificationsModule, MMKV push store,
-                         app-wide registration controller, PushNotificationsHost
-                         (registration sync, taps → thread, foreground toast
-                         with Open, app-icon badge, first-run prompt),
-                         and usePushRegistration (Settings)
   screens/               connect/ (ConnectEnrollScreen, ConnectScanner —
                          expo-camera QR, AccountServersList), dev/
                          (WebViewSpikeScreen + probes), settings/ (This device,
-                         Appearance, Notifications, Servers, Add server, the
+                         Appearance, Servers, Add server, the
                          grouped-list rows), shell/ (RootNavigator, connection
                          banner, header glass, route error boundary, hrefs.ts —
                          typed-route boundary), webview/ (ProfileWebViewScreen,
@@ -140,10 +131,9 @@ adb install -r apps/mobile/build-output/bb-dev.apk
 The APK is `apps/mobile/build-output/bb-dev.apk`. It has an orange bb launcher
 icon, favicon, and splash logo, the name **bb dev**, and package `app.getbb.mobile.dev`, so it
 installs alongside the regular app with separate saved servers and data. It
-embeds the Release JS bundle and runs without Metro, EAS, Firebase, or production
+embeds the Release JS bundle and runs without Metro, EAS, or production
 signing credentials. Pair it with the development server through Add server or
-a pairing code. It does not claim production HTTPS app links or use the
-production Firebase configuration; Android themed icons use the system tint.
+a pairing code. It does not claim production HTTPS app links; Android themed icons use the system tint.
 Dev launcher assets tint the existing shaded mobile artwork using the orange
 palette and tinting method from `apps/app/scripts/generate-pwa-icons.mjs`,
 preserving the original dimensions, alpha, and launcher padding. The transparent
@@ -177,7 +167,7 @@ adb install -r apps/mobile/build-output/bb-android-local.apk
 ```
 
 This builds an ARM64 APK with an embedded Release JS bundle and the generated
-Android debug signing key. It runs without Metro, Firebase, EAS, or production
+Android debug signing key. It runs without Metro, EAS, or production
 signing credentials. It is for local testing, not Play distribution. Uninstall
 it before installing an app signed with another key (which removes local app
 data). For an Intel emulator, append `-- x86_64` to the Turbo command.
@@ -243,13 +233,6 @@ through `pnpm exec eas credentials -p android` in `apps/mobile`. Submission is
 opt-in and uploads a draft to the internal Play track; it does not release to
 the public. The first Play upload must be completed manually.
 
-Firebase is optional for builds. Place the Android Firebase config in the
-gitignored `apps/mobile/google-services.json`, or set `GOOGLE_SERVICES_JSON`
-to its absolute path. For EAS, create a file environment variable with that
-name in each build environment used (preview/production). `app.config.js`
-loads the file when present. Upload the FCM V1 service-account credential to
-EAS separately, then rebuild to test push on a device.
-
 For Play uploads, add the GitHub secret `GOOGLE_PLAY_SERVICE_ACCOUNT_JSON`.
 Local EAS Submit reads the gitignored `google-play-service-account.json` in
 `apps/mobile`. Register the **Play app-signing certificate**, not only the
@@ -257,8 +240,8 @@ upload certificate, in `ASSETLINKS_SHA256_FINGERPRINTS` on the apex and connect
 gate. Verify real HTTPS app links after installing the Play-signed build.
 The native `bb://` scheme works without those certificates.
 
-Pending credentials do not establish push delivery or verified HTTPS app-link
-coverage. Test those separately once Firebase/signing are configured.
+Pending credentials do not establish verified HTTPS app-link coverage. Test
+that separately once signing is configured.
 
 ### iOS prerequisites
 
@@ -302,8 +285,7 @@ so Android and iOS shell flows start with the thread list available.
 `shell-launch.yaml` pairs a Direct server from first run and lands in the
 shell with the page rendered; the other shell flows assume it works.
 `shell-deep-link.yaml` opens a `bb://` scheme link and a web link for the
-saved server: both resolve to the shell route carrying a page path, and
-`bb://settings/notifications` still opens the native screen.
+saved server: both resolve to the shell route carrying a page path.
 `shell-send.yaml` sends a message through the page and reaches the native
 device settings from it.
 `shell-unreachable-server.yaml` checks that the add-server probe refuses a
@@ -357,9 +339,9 @@ as the first argument drives a dev client through Metro instead.
   Release APK for an Android 16 x86_64 emulator and runs the existing smoke
   flow: direct pairing, send/provider reply, Android Back, saved connection
   after relaunch, and native settings. It uses the isolated backend and needs
-  no Firebase, EAS, or Play credentials. The `mobile-e2e-android` artifact
+  no EAS or Play credentials. The `mobile-e2e-android` artifact
   contains screenshots, JUnit results, Maestro output, logcat, and backend logs.
-  Keyboard animation, push delivery, and bb connect are outside this basic job.
+  Keyboard animation and bb connect are outside this basic job.
 
 - Typecheck, lint, and unit tests run on Linux in the regular `CI` workflow
   (`pnpm exec turbo run build typecheck lint` in `Checks`, the `packages`
@@ -484,51 +466,8 @@ add-root-cert`). Env: `BB_MOBILE_E2E_GATE_PORT` (42998),
   response because their URL stays the same. Concurrent 410 responses update
   the profile once.
 
-## Push notifications and deep links
+## Deep links
 
-Android disables Firebase Messaging auto-initialization and Analytics collection
-in the generated manifest. The app requests a push token only for a server with
-notifications enabled and OS permission granted. It refreshes registration on
-foreground/sync and token-change events. Turning notifications off for every
-server, removing the last enabled server, or revoking OS permission deletes the
-Android FCM token. Disabling one server preserves the shared token for other
-enabled servers. Failed server-subscription removal is retained for retry;
-local token deletion does not require that server to be reachable. This does not
-delete the Firebase installation ID or previously processed provider data.
-iOS keeps its existing APNs registration behavior.
-
-- Registration: `PushNotificationsHost` (mounted once in `app/_layout.tsx`)
-  registers the phone's Expo push token with each enabled server through
-  Settings → This device → Notifications. It calls the `push-notifications`
-  plugin RPC methods `pushSubscriptions.add`, `pushSubscriptions.list`, and
-  `pushSubscriptions.remove` through `sdk.plugins.callRpc`. It syncs on
-  connect, on
-  AppState active, when the OS rolls the token (re-register), and when the
-  toggle flips; profiles removed from the app get their server row deleted
-  by the stored server URL. A direct profile must use HTTPS, unless it uses
-  `127.0.0.1`, `localhost`, or `::1`. Tailscale Serve and bb connect profiles
-  work normally. Other HTTP profiles show "Push needs HTTPS or bb connect"
-  and do not register. The server also needs outbound access to `exp.host`.
-  The server must enable the `push-notifications` plugin.
-  The one-time "Get notified…" sheet appears only after the first successful
-  connection. The sheet never appears on launch. The OS prompt starts only
-  after the user selects "Turn on notifications".
-- Privacy: the registration request contains the full Expo token. The list
-  RPC method and `bb push-notifications list` return only the last six token
-  characters in `tokenSuffix`. A token can receive pushes but cannot read
-  server data.
-- Handling: a foreground arrival becomes a toast with "Open" (no system
-  banner); a tap on a background / cold-start notification opens the thread
-  in the shell on the profile that owns it. The phone first matches
-  the optional `serverUrl` hint. It probes saved profiles for the thread only
-  when no hint matches. The shell accepts a bridge `badge` message
-  (`useShellBridge` → `updateAppBadgeCount`), and `AppBadgeSync` writes that
-  count on background; the web app does not send it yet.
-- Simulator check without APNs: `xcrun simctl push <udid> app.getbb.mobile
-payload.apns` with `{"aps":{"alert":{…}},"body":{"kind":"turn-finished",
-"threadId":"…","projectId":"…","serverUrl":"https://…"}}`
-  (expo-notifications reads remote `data` from the `body` key) after the user
-  grants permission.
 - Deep links: `bb://<path>` (`bb://threads/<id>`, `bb://settings/servers`,
   `bb://projects/<p>/threads/<t>`, …) and universal / app links
   `https://<handle>.getbb.app/{threads,projects,settings}/*` (iOS
@@ -537,8 +476,7 @@ payload.apns` with `{"aps":{"alert":{…}},"body":{"kind":"turn-finished",
   URL with `src/lib/shell` (`resolveShellIncomingLink` over `src/lib/links`):
   a web link whose origin matches a saved profile switches to that profile
   (waiting for its connection) and opens the shell route carrying the page
-  path; native-only paths (connect, servers, device and notification
-  settings) stay native; an unknown server opens Add server prefilled with
+  path; native-only paths (connect, servers and device settings) stay native; an unknown server opens Add server prefilled with
   the origin and the follow-up path. Universal links only resolve once
   `https://<handle>.getbb.app/.well-known/apple-app-site-association` /
   `assetlinks.json` are served (the connect gate and the apex do, before the
@@ -632,21 +570,14 @@ The app lives in the EAS project `@bb-team/bb-app` (id in
 `app.json` → `extra.eas.projectId`; the Expo slug `bb-app` also names the
 dev-client scheme `exp+bb-app://`). Apple team `9QCU24SXK5`, bundle id
 `app.getbb.mobile`, App Store Connect app `6803559210`. EAS holds the iOS
-credentials (distribution certificate, App Store provisioning profile, APNs
-push key); nobody needs a local Xcode signing setup to ship.
+credentials (distribution certificate, App Store provisioning profile); nobody needs a local Xcode signing setup to ship.
 
 - **Log in once**: `pnpm exec eas login` (or `EXPO_TOKEN`). `eas-cli` is a
   pinned devDependency, so use `pnpm exec eas …` from `apps/mobile`.
 - **Build profiles** (`eas.json`): `development` (simulator dev client),
-  `development-device` (dev client for a physical iPhone; needed for push
-  acceptance), `preview` (internal ad-hoc), `production` (App Store /
+  `development-device` (dev client for a physical iPhone), `preview` (internal ad-hoc), `production` (App Store /
   TestFlight; `autoIncrement` + `appVersionSource: remote` keep the build
   number on EAS, `version` in `app.json` is the marketing version).
-- **Push release check**: confirm the APNs key with `pnpm exec eas credentials
--p ios`. Use `development-device` for a physical iPhone. Keep the server
-  `push-notifications` plugin enabled, and use an HTTPS or bb connect profile.
-  Run `bb push-notifications list`. Confirm that it shows a token suffix, not
-  a full token.
 - **TestFlight by hand**: `pnpm exec eas build -p ios --profile production`,
   then `pnpm exec eas submit -p ios --latest`. The submit profile reads the
   App Store Connect API key from the gitignored `apps/mobile/asc-api-key.p8`
@@ -683,7 +614,7 @@ push key); nobody needs a local Xcode signing setup to ship.
 - Universal links need the signed app's team id in the AASA the connect gate
   serves (`packages/connect-db/src/app-links.ts`) and a physical-device
   check against `https://<handle>.getbb.app/threads/…`. Android signing
-  (`eas credentials -p android`, FCM V1, `ASSETLINKS_SHA256_FINGERPRINTS`)
+  (`eas credentials -p android`, `ASSETLINKS_SHA256_FINGERPRINTS`)
   is still open.
 - `eas update` (JS-only fixes over the air) is deferred: `expo-updates` is
   not installed, so the profiles define no update channels.
@@ -760,11 +691,7 @@ Beta App Review and another build of the same version usually does not.
   cookie and its server URL.
 - Preferences (theme mode `bb.theme`, haptics `bb.haptics.enabled`): MMKV
   store `bb.preferences`, one shared instance from
-  `src/lib/native/preferences-storage.ts`. Push state shares it:
-  `bb.push.enabled.<profileId>` (+ `bb.push.enabledProfiles` index),
-  `bb.push.registration.<profileId>` (+ `bb.push.registrations` index: the
-  token / server row the phone registered, so a removed profile can still be
-  unregistered), `bb.push.prompted`.
+  `src/lib/native/preferences-storage.ts`.
 - Each profile owns one SDK client, one realtime socket, and one TanStack
   QueryClient (`src/lib/sdk/client-registry.ts`, instantiated once by
   `src/app-shell/client-registry.ts`); the active profile's socket/session

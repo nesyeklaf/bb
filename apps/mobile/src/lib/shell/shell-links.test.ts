@@ -20,7 +20,6 @@ describe("resolveShellIncomingLink", () => {
     ["bb://connect?code=ABCD-EFGH", "/connect?code=ABCD-EFGH"],
     ["bb://settings/servers/add", "/settings/servers/add"],
     ["bb://settings/device", "/settings/device"],
-    ["bb://settings/notifications", "/settings/notifications"],
     ["bb://settings", "/webview?path=%2Fsettings"],
     ["bb://settings/general", "/webview?path=%2Fsettings%2Fgeneral"],
     ["bb://connections", "/webview?path=%2Fconnections"],
