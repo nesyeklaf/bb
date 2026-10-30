@@ -1950,6 +1950,12 @@ export interface ExperimentalThreadTocTabProps extends ExperimentalThreadTocInpu
    * clears it when the panel closes or the thread changes.
    */
   setHoveredRange(range: ExperimentalThreadTocRange | null): void;
+  /**
+   * Switches the panel to the tab of another registration of the same plugin,
+   * by that registration's `id`. Does nothing when no registration with that
+   * id has a tab.
+   */
+  openTab(id: string): void;
 }
 
 /**

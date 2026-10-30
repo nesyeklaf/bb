@@ -1835,6 +1835,75 @@ describe("ThreadTableOfContents plugin extension", () => {
     expect(screen.queryByTestId("second-tab")).toBeNull();
   });
 
+  function registerTopicsAndManage() {
+    function ManageTab(props: ExperimentalThreadTocTabProps) {
+      useEffect(() => {
+        tabProps = props;
+      });
+      return <div data-testid="manage-tab">Manage content</div>;
+    }
+    setPluginSlotRegistrations(
+      PLUGIN_ID,
+      makePluginRegistrationSet({
+        threadTocExtensions: [
+          {
+            id: "topics",
+            title: "Topics",
+            useBands: () => bands,
+            tab: {
+              label: "Topics",
+              component: TabComponent,
+              experimental_default: true,
+            },
+          },
+          {
+            id: "topics-manage",
+            title: "Manage",
+            useBands: () => [],
+            tab: { label: "Manage", component: ManageTab },
+          },
+        ],
+      }),
+    );
+  }
+
+  it("shows one tab per registration in order and draws every registration's brackets", () => {
+    bands = [{ fromSeq: 2, toSeq: 3, hue: 120 }];
+    registerTopicsAndManage();
+    render(<TocHost timelineRows={rows([1, 2, 3, 4])} />);
+    openTocPanel();
+
+    const tabButtons = Array.from(
+      document.querySelectorAll<HTMLElement>("button[aria-pressed]"),
+    ).map((button) => button.textContent);
+    expect(tabButtons).toEqual(["Your messages", "Topics", "Manage"]);
+    expect(screen.getByTestId("topics-tab")).not.toBeNull();
+    expect(bandElements()).toHaveLength(1);
+  });
+
+  it("opens another registration's tab of the same plugin with openTab", () => {
+    registerTopicsAndManage();
+    render(<TocHost timelineRows={rows([1, 2, 3, 4])} />);
+    openTocPanel();
+    expect(screen.queryByTestId("manage-tab")).toBeNull();
+
+    act(() => tabProps?.openTab("topics-manage"));
+    expect(screen.getByTestId("manage-tab")).not.toBeNull();
+    expect(screen.queryByTestId("topics-tab")).toBeNull();
+
+    act(() => tabProps?.openTab("topics"));
+    expect(screen.getByTestId("topics-tab")).not.toBeNull();
+  });
+
+  it("ignores openTab for an id without a tab", () => {
+    registerTopicsAndManage();
+    render(<TocHost timelineRows={rows([1, 2, 3, 4])} />);
+    openTocPanel();
+
+    act(() => tabProps?.openTab("missing"));
+    expect(screen.getByTestId("topics-tab")).not.toBeNull();
+  });
+
   it("passes the seq of the active user message as activeSeq", async () => {
     vi.useFakeTimers();
     register({ isDefault: true });

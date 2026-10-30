@@ -692,6 +692,15 @@ export function ThreadTableOfContents({
     },
     [],
   );
+  const openExtensionTab = useCallback(
+    (pluginId: string, id: string) => {
+      const target = extensionTabs.find(
+        (entry) => entry.slot.pluginId === pluginId && entry.slot.id === id,
+      );
+      if (target) setTab(`ext:${target.key}`);
+    },
+    [extensionTabs],
+  );
   const outlineMaxSeq = userOutlineQuery.data?.maxSeq ?? 0;
 
   const hasOlderRef = useRef(hasOlderTimelineRows);
@@ -1079,6 +1088,9 @@ export function ThreadTableOfContents({
                     activeSeq={activeSeq}
                     hoveredBand={pointerBand}
                     setHoveredRange={setHoveredRange}
+                    openTab={(id) =>
+                      openExtensionTab(extensionTab.slot.pluginId, id)
+                    }
                   />
                 </div>
               ) : (

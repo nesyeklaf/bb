@@ -11,7 +11,7 @@ whose seq lies in the range; a range without a tick takes the next tick.
 three lanes. `tab: { label, component }` adds a tab to the rail popover next
 to Your messages and Agent messages; the component gets `threadId`,
 `projectId`, `jumpToSeq(seq)`, `railSelection`, `clearRailSelection()`,
-`activeSeq`, `hoveredBand` and `setHoveredRange(range)`.
+`activeSeq`, `hoveredBand`, `setHoveredRange(range)` and `openTab(id)`.
 Dragging along the rail marks a range: `railSelection` is
 `{ fromSeq, toSeq }` (first marked message to just before the next user
 message) or null. The rail and popover stay open while it is set; Escape,
@@ -26,7 +26,12 @@ when the pointer enters or leaves one of your brackets, and `hoveredBand`
 (`{ fromSeq, toSeq } | null`) tells every tab which bracket is under the
 pointer. `setHoveredRange(range | null)` highlights the bracket whose
 `fromSeq`/`toSeq` equal `range` (thicker, glowing, wider ticks); the host
-clears it when the panel closes or the thread changes. The tab scrolls inside
+clears it when the panel closes or the thread changes. A plugin can register
+several extensions (for example a compact `topics` list with the brackets and a
+`topics-manage` panel whose `useBands` returns `[]`): each tab shows in
+registration order and every registration's brackets are drawn. `openTab(id)`
+switches to the tab of another registration of the same plugin by its `id`; an
+id without a tab does nothing. The tab scrolls inside
 the popover's own maximum height.
 
 ```ts
