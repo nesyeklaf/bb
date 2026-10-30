@@ -74,3 +74,7 @@ ssh AI 'bash ~/bb-fork-remote.sh serve'   # sudo tailscale serve --bg --https=38
 - bb connect (`<name>.getbb.app`) keeps running alongside as a fallback until every client uses the tailnet URL.
 
 Clients: the desktop app points at the tailnet URL through its custom server URL. The phone needs Tailscale running. A machine daemon is re-enrolled from the tailnet URL under Settings, Machines, Add machine.
+
+## Fork changes
+
+- `BbNavigate.toThread(threadId, { experimental_messageSeq })` jumps to a message (`#msg=SEQ`) from plugins, with `split` too. Dropped when upstream ships an equivalent.

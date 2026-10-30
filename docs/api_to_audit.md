@@ -3790,6 +3790,19 @@ Stabilize once message links have shipped and the seq has stayed stable across
 edit-and-rerun, forks and context clears, and decide whether `sourceSeqEnd`
 should remain alongside it.
 
+## `BbNavigate.toThread` option `experimental_messageSeq`
+
+`toThread(threadId, { experimental_messageSeq })` navigates to the message link
+(`getMessageLinkPath`, `#msg=SEQ`) instead of the plain thread route. The
+timeline's existing message-link handling (`useScrollToSearchedMessage`) then
+loads older rows, scrolls to the message and flashes it, also when the thread
+is already open. `split: true` passes the seq through `openThreadInSplit`,
+which uses the same path. Core callers: message links in markdown and mentions
+resolve through the same hash route; the plugin option adds no second path.
+Stabilize once the seq stays stable across edit-and-rerun, forks and context
+clears (see `ThreadChatMessageReference.experimental_messageSeq`) and decide
+whether a missing seq should reject instead of toasting.
+
 ## `PluginBbSdk.plugins.experimental_startUpdate` and `experimental_updateJobs`
 
 Starts a server-owned plugin update and returns its job at once;

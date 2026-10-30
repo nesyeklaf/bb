@@ -1,3 +1,4 @@
+import { getMessageLinkPath } from "@bb/client-core";
 import { getThreadRoutePath } from "@/lib/route-paths";
 import { decideThreadDrop } from "@/lib/split-drag";
 import { splitLayoutAtom } from "./atoms";
@@ -27,6 +28,7 @@ interface OpenThreadInSplitArgs {
   threadId: string;
   isCompact: boolean;
   state?: Record<string, unknown>;
+  messageSeq?: number;
 }
 
 export function openThreadInSplit({
@@ -36,8 +38,12 @@ export function openThreadInSplit({
   threadId,
   isCompact,
   state,
+  messageSeq,
 }: OpenThreadInSplitArgs): void {
-  const route = getThreadRoutePath({ projectId, threadId });
+  const route =
+    messageSeq === undefined
+      ? getThreadRoutePath({ projectId, threadId })
+      : getMessageLinkPath({ projectId, threadId, seq: messageSeq });
   const layout = store.get(splitLayoutAtom);
   if (isCompact || layout === null) {
     navigate(route, state === undefined ? undefined : { state });

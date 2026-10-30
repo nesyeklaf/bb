@@ -28,6 +28,8 @@ import { pluginSdkAppImplementation } from "./plugin-sdk-app-impl";
 import { AppNavigationHostProvider } from "./app-navigation-host";
 import { RouteNavigationProvider } from "@/components/ui/app-route-anchor";
 import { ThreadTitleMentionResourcesProvider } from "@/components/thread/ThreadTitleMentions";
+import { threadQueryKey } from "@/hooks/queries/query-keys";
+import { makeThreadResponse } from "@/test/fixtures/thread-responses";
 
 beforeAll(() =>
   Promise.all([LazyMarkdownHtml.preload(), LazyPluginMarkdown.preload()]),
@@ -294,6 +296,60 @@ describe("plugin SDK navigation components", () => {
     fireEvent.click(screen.getByRole("button", { name: "Open" }));
     expect(results).toEqual([true]);
     expect(openUrl).toHaveBeenCalledWith({ url: "https://example.com/a" });
+  });
+
+  it("navigates toThread to the message link and re-targets an open thread", () => {
+    const queryClient = new QueryClient();
+    queryClient.setQueryData(
+      threadQueryKey("thr_main"),
+      makeThreadResponse({ id: "thr_main", projectId: "proj_demo" }),
+    );
+    function Probe() {
+      const navigate = pluginSdkAppImplementation.useBbNavigate();
+      const location = useLocation();
+      return (
+        <>
+          <output data-testid="location">
+            {location.pathname + location.search + location.hash}
+          </output>
+          <button
+            type="button"
+            onClick={() =>
+              navigate.toThread("thr_main", { experimental_messageSeq: 42 })
+            }
+          >
+            Jump 42
+          </button>
+          <button
+            type="button"
+            onClick={() =>
+              navigate.toThread("thr_main", { experimental_messageSeq: 7 })
+            }
+          >
+            Jump 7
+          </button>
+          <button type="button" onClick={() => navigate.toThread("thr_main")}>
+            Plain
+          </button>
+        </>
+      );
+    }
+    render(
+      <QueryClientProvider client={queryClient}>
+        <MemoryRouter>
+          <PluginSlotMount pluginId="demo" slotKind="test" slotId="probe">
+            <Probe />
+          </PluginSlotMount>
+        </MemoryRouter>
+      </QueryClientProvider>,
+    );
+    const location = () => screen.getByTestId("location").textContent;
+    fireEvent.click(screen.getByRole("button", { name: "Jump 42" }));
+    expect(location()).toBe("/projects/proj_demo/threads/thr_main#msg=42");
+    fireEvent.click(screen.getByRole("button", { name: "Jump 7" }));
+    expect(location()).toBe("/projects/proj_demo/threads/thr_main#msg=7");
+    fireEvent.click(screen.getByRole("button", { name: "Plain" }));
+    expect(location()).toBe("/projects/proj_demo/threads/thr_main");
   });
 
   it("exposes the file link through the real runtime", () => {

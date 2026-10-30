@@ -6,6 +6,8 @@ import type {
   ExperimentalLiveFileTarget,
   PluginBrowserBbSdk,
 } from "@get-bb/plugin-sdk";
+import { getMessageLinkPath } from "@bb/client-core";
+import { PERSONAL_PROJECT_ID } from "@bb/domain";
 import { usePluginId } from "@/components/plugin/plugin-context";
 import { BbHttpError, sdk } from "@/lib/sdk";
 import { getPluginBoundSdk } from "@/lib/plugin-bound-sdk";
@@ -67,6 +69,7 @@ export function useBbNavigate(): BbNavigate {
   const toThread = useCallback<BbNavigate["toThread"]>(
     (threadId, options) => {
       onNavigate?.();
+      const messageSeq = options?.experimental_messageSeq;
       const open = (projectId: string) => {
         store.set(getThreadConversationCollapsedAtom(threadId), false);
         if (options?.split) {
@@ -76,10 +79,15 @@ export function useBbNavigate(): BbNavigate {
             projectId,
             threadId,
             isCompact,
+            ...(messageSeq === undefined ? {} : { messageSeq }),
           });
           return;
         }
-        void navigate(getThreadRoutePath({ projectId, threadId }));
+        void navigate(
+          messageSeq === undefined
+            ? getThreadRoutePath({ projectId, threadId })
+            : getMessageLinkPath({ projectId, threadId, seq: messageSeq }),
+        );
       };
       const cached = lookupCachedThread(queryClient, threadId);
       if (cached !== null) {
@@ -89,7 +97,17 @@ export function useBbNavigate(): BbNavigate {
       void sdk.threads
         .get({ threadId })
         .then((thread) => open(thread.projectId))
-        .catch(() => navigate(`/threads/${threadId}`));
+        .catch(() =>
+          navigate(
+            messageSeq === undefined
+              ? `/threads/${threadId}`
+              : getMessageLinkPath({
+                  projectId: PERSONAL_PROJECT_ID,
+                  threadId,
+                  seq: messageSeq,
+                }),
+          ),
+        );
     },
     [isCompact, navigate, onNavigate, queryClient, store],
   );

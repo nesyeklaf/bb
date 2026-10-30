@@ -108,6 +108,46 @@ describe("openThreadInSplit", () => {
     );
   });
 
+  it("navigates to the message link when a message seq is given", () => {
+    let current = layout();
+    const navigate = vi.fn();
+    openThreadInSplit({
+      store: {
+        get: () => current,
+        set: (_atom, value) => {
+          current = value;
+        },
+      },
+      navigate,
+      projectId: "project-1",
+      threadId: "thread-2",
+      isCompact: false,
+      messageSeq: 42,
+    });
+
+    expect(navigate).toHaveBeenCalledWith(
+      "/projects/project-1/threads/thread-2#msg=42",
+      undefined,
+    );
+  });
+
+  it("keeps the message link when the result is already open", () => {
+    const navigate = vi.fn();
+    openThreadInSplit({
+      store: { get: () => layout("thread-2"), set: vi.fn() },
+      navigate,
+      projectId: "project-1",
+      threadId: "thread-2",
+      isCompact: false,
+      messageSeq: 0,
+    });
+
+    expect(navigate).toHaveBeenCalledWith(
+      "/projects/project-1/threads/thread-2#msg=0",
+      { replace: true },
+    );
+  });
+
   it("plain-navigates without touching the layout on compact viewports", () => {
     const set = vi.fn();
     const navigate = vi.fn();

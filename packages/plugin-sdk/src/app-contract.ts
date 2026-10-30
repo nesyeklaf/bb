@@ -5150,8 +5150,19 @@ export interface BbNavigate {
    * split by default, focus when already open, replace at the pane cap) and
    * falls back to plain navigation where splits are off. Opening also expands
    * the thread's conversation if the side panel had collapsed it.
+   *
+   * `experimental_messageSeq` jumps to a message: the event sequence that
+   * recorded it, the `msg` value of a message link (`@thread:thr_x#msg=42`),
+   * as in {@link ThreadChatMessageReference.experimental_messageSeq}. It
+   * navigates to that message link, so the timeline loads older history when
+   * needed, scrolls to the message and briefly highlights it, also when the
+   * thread is already open or the call repeats. A seq that no longer resolves
+   * shows a "Message not found" toast. Combines with `split`.
    */
-  toThread(threadId: string, options?: { split?: boolean }): void;
+  toThread(
+    threadId: string,
+    options?: { split?: boolean; experimental_messageSeq?: number },
+  ): void;
   toProject(projectId: string): void;
   /**
    * Navigate to one of this plugin's own nav panels by its `path`.
