@@ -401,6 +401,10 @@ const FRONTEND_SLOT_PROP_FIELDS = {
     "jumpToSeq",
     "railSelection",
     "clearRailSelection",
+    "activeSeq",
+    "hoveredBand",
+    "openTab",
+    "setHoveredRange",
   ],
   experimental_threadRowMetadata: ["thread", "data"],
   experimental_threadAction: [
