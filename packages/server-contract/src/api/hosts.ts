@@ -6,13 +6,9 @@ import {
 } from "@bb/domain";
 import {
   pathsExistRequestSchema,
-  providerCliInstallEventSchema,
-  providerCliInstallRequestSchema,
   type PathsExistRequest,
   type PathsExistResponse,
   type PickFolderResponse,
-  type ProviderCliInstallEvent,
-  type ProviderCliInstallRequest,
   type ProviderCliStatusResponse,
 } from "@bb/host-daemon-contract/local";
 
@@ -151,13 +147,6 @@ export type HostPickFolderRequest = z.infer<typeof hostPickFolderRequestSchema>;
 export type HostPickFolderResponse = PickFolderResponse;
 
 export type HostProviderCliStatusResponse = ProviderCliStatusResponse;
-
-export const hostProviderCliInstallRequestSchema =
-  providerCliInstallRequestSchema;
-export type HostProviderCliInstallRequest = ProviderCliInstallRequest;
-
-export const hostProviderCliInstallEventSchema = providerCliInstallEventSchema;
-export type HostProviderCliInstallEvent = ProviderCliInstallEvent;
 
 export const hostListQuerySchema = z.object({
   includeCreating: z.enum(["true", "false"]).optional(),

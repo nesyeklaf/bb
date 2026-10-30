@@ -45,31 +45,6 @@ function writeNotFound(response) {
   response.end(JSON.stringify({ message: "not found" }));
 }
 
-function createDesktopVersionFeed(platform, version) {
-  return {
-    schemaVersion: 1,
-    // The app rejects a feed whose channel is not its own, so a nightly
-    // packaged build must be smoked against a nightly feed.
-    channel: releaseChannel,
-    platform,
-    version,
-    releaseDate: new Date(0).toISOString(),
-    releaseName: `bb desktop ${version}`,
-    releaseNotes: null,
-    minimumSystemVersion: null,
-    files: [
-      {
-        url: "https://example.invalid/bb.zip",
-        sha512: "smoke",
-        size: 0,
-      },
-    ],
-    path: "bb.zip",
-    sha512: "smoke",
-    stagingPercentage: null,
-  };
-}
-
 function renderSmokePage(expectedDesktopPlatform, expectedDesktopVersion) {
   return `<!doctype html>
 <meta charset="utf-8">
@@ -156,17 +131,6 @@ async function startSmokeServer({
         primaryHostPlatform: null,
         voiceTranscriptionEnabled: false,
       });
-      return;
-    }
-
-    if (request.url === "/desktop-version.json") {
-      writeJson(
-        response,
-        createDesktopVersionFeed(
-          expectedDesktopPlatform,
-          expectedDesktopVersion,
-        ),
-      );
       return;
     }
 
@@ -333,7 +297,6 @@ async function smokePackagedApp() {
     // and keep exercising the real attach path.
     BB_DESKTOP_ATTACH_WITHOUT_PROMPT: "1",
     BB_DESKTOP_OPEN_DEVTOOLS: "0",
-    BB_DESKTOP_VERSION_FEED_URL: `${serverUrl}/desktop-version.json`,
     BB_SERVER_PORT: String(smokeServer.port),
   };
   delete childEnv.BB_DESKTOP_APP_URL;

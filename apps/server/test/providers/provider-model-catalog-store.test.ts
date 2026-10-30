@@ -71,21 +71,6 @@ function setupCatalogHost(
             return healthAnswer("not_installed");
           case "provider.list_models":
             return answer(request.command);
-          case "provider.installation.run":
-            return {
-              ok: true,
-              result: {
-                events: [
-                  {
-                    type: "completed",
-                    provider: request.command.providerId,
-                    exitCode: 0,
-                    signal: null,
-                    success: true,
-                  },
-                ],
-              },
-            };
           default:
             throw new Error(`Unexpected RPC command ${request.command.type}`);
         }
@@ -682,9 +667,9 @@ describe("provider model catalog store", () => {
                 ? {
                     type: "host-rpc.response",
                     requestId: args.message.requestId,
-                    commandType: "provider.installation.run",
+                    commandType: "provider.usage",
                     ok: true,
-                    result: { events: [] },
+                    result: { supported: false },
                   }
                 : request(args),
           );
@@ -1042,38 +1027,6 @@ describe("provider model catalog store", () => {
           scopeKey: "",
         })?.modelsJson,
       ).toContain("model-two");
-    });
-  });
-
-  it("clears a provider's recorded failure in every workspace scope after a successful install", async () => {
-    await withTestHarness(async (harness) => {
-      const host = setupCatalogHost(harness, { id: "host-catalog-install" });
-      const environmentId = seedEnvironmentPath(
-        harness,
-        host.hostId,
-        "/tmp/catalog-install",
-      );
-      host.setAnswer(() => errorAnswer("missing_executable"));
-      await host.read("pi", environmentId);
-      await host.read("pi", environmentId);
-      expect(host.listRequests("pi")).toHaveLength(1);
-
-      const install = await harness.app.request(
-        `/api/v1/hosts/${host.hostId}/provider-clis/install`,
-        {
-          method: "POST",
-          headers: { "content-type": "application/json" },
-          body: JSON.stringify({ provider: "pi", actionKind: "install" }),
-        },
-      );
-      expect(install.status).toBe(200);
-      expect(await install.text()).toContain('"success":true');
-      host.setAnswer(() => catalogAnswer(modelList("pi-installed")));
-
-      expect(modelIds(await host.read("pi", environmentId))).toEqual([
-        "pi-installed",
-      ]);
-      expect(host.listRequests("pi")).toHaveLength(2);
     });
   });
 

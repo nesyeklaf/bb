@@ -2,8 +2,6 @@ import ReconnectingWebSocket from "partysocket/ws";
 import {
   type HostDaemonActiveThread,
   type HostDaemonLoadedEnvironment,
-  type HostDaemonConnectNextReplaceMessage,
-  type HostDaemonConnectSharesReplaceMessage,
   type HostDaemonOnlineRpcCancelMessage,
   type HostDaemonOnlineRpcRequestMessage,
   type HostDaemonServerWsMessage,
@@ -53,8 +51,6 @@ export type HostDaemonServerTerminalMessage = Exclude<
   | HostDaemonOnlineRpcRequestMessage
   | HostDaemonOnlineRpcCancelMessage
   | HostDaemonWatchSetReplaceMessage
-  | HostDaemonConnectSharesReplaceMessage
-  | HostDaemonConnectNextReplaceMessage
 >;
 
 export type ServerMovedNotice =
@@ -102,10 +98,6 @@ export interface ServerConnectionOptions {
   onWatchSetReplace?: (
     message: HostDaemonWatchSetReplaceMessage,
   ) => void | Promise<void>;
-  onConnectSharesReplace?: (
-    message: HostDaemonConnectSharesReplaceMessage,
-  ) => void | Promise<void>;
-  onConnectNextReplace?: (message: HostDaemonConnectNextReplaceMessage) => void;
   onSessionOpened?: (
     session: HostDaemonSessionOpenResponse,
   ) => void | Promise<void>;

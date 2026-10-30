@@ -21,12 +21,7 @@ vi.mock("./sidebarNavigationProvider", () => ({
 }));
 
 const macosDesktopInfo: BbDesktopInfo = {
-  lastCheckedAt: null,
-  latestVersion: null,
-  pendingVersion: null,
   platform: "macos",
-  updateAvailable: false,
-  updateDownloaded: false,
   version: "0.0.0-test",
 };
 

@@ -11,7 +11,6 @@ import {
   ensurePersonalProject,
   getAppSettings,
   getDisabledProviderIds,
-  listRunningThreads,
   setAppSettings,
   type DbConnection,
 } from "@bb/db";
@@ -31,19 +30,10 @@ import { createProviderNativeRootsCache } from "../../src/services/providers/nat
 import { createProviderLiveCommandsCache } from "../../src/services/providers/provider-live-commands.js";
 import { createAiServiceRegistry } from "../../src/services/ai/ai-service-registry.js";
 import {
-  createAppUpdateService,
-  type AppUpdateService,
-} from "../../src/services/system/app-update.js";
-import {
   createCliCommandService,
   type CliCommandService,
 } from "../../src/services/system/cli-command.js";
-import {
-  createAppVersionService,
-  type AppVersionService,
-} from "../../src/services/system/app-version.js";
 import { createBbAppManagedConfigReloader } from "../../src/services/system/bb-app-managed-config.js";
-import { createNoopTelemetryService } from "../../src/services/system/telemetry.js";
 import { TerminalSessionLifecycle } from "../../src/services/terminals/terminal-session-lifecycle.js";
 import { createLifecycleDedupers } from "../../src/lifecycle-dedupers.js";
 import type { ServerAppDeps, ServerRuntimeConfig } from "../../src/types.js";
@@ -52,7 +42,6 @@ import {
   NotificationHub as NotificationHubImpl,
 } from "../../src/ws/hub.js";
 import { WatchInterestCoordinator } from "../../src/ws/watch-interests.js";
-import { HostSharedPortCoordinator } from "../../src/ws/host-shared-ports.js";
 import {
   PluginToolCallRegistry,
   setPluginToolCallRegistry,
@@ -94,8 +83,6 @@ export async function installTestBuiltinPlugin(
 }
 
 export type TestAppHarnessConfigOverrides = Partial<ServerRuntimeConfig> & {
-  appUpdateService?: AppUpdateService;
-  appVersionService?: AppVersionService;
   cliCommandService?: CliCommandService;
   terminalAttachTimeoutMs?: number;
   terminalCloseTimeoutMs?: number;
@@ -103,7 +90,6 @@ export type TestAppHarnessConfigOverrides = Partial<ServerRuntimeConfig> & {
   nativeRootsClock?: () => number;
   liveCommandsClock?: () => number;
   seedFirstPartyProviders?: boolean;
-  tunnelIngressNow?: () => number;
   extraProviders?: readonly {
     declaration: PluginProviderDeclaration;
     pluginId: string;
@@ -161,8 +147,6 @@ export async function createTestAppHarness(
   overrides: TestAppHarnessConfigOverrides = {},
 ): Promise<TestAppHarness> {
   const {
-    appUpdateService,
-    appVersionService,
     cliCommandService,
     terminalAttachTimeoutMs = TEST_TERMINAL_RPC_TIMEOUT_MS,
     terminalCloseTimeoutMs,
@@ -170,7 +154,6 @@ export async function createTestAppHarness(
     nativeRootsClock,
     liveCommandsClock,
     seedFirstPartyProviders = true,
-    tunnelIngressNow: _tunnelIngressNow,
     ...configOverrides
   } = overrides;
   const logger = createTestLogger();
@@ -182,7 +165,6 @@ export async function createTestAppHarness(
   });
   const hub = new NotificationHubImpl();
   const watchInterests = new WatchInterestCoordinator({ db, hub });
-  const sharedPorts = new HostSharedPortCoordinator({ db, hub });
   const providerRegistry = createProviderRegistryService({
     readUserProviderPreferences: () => {
       const settings = getAppSettings(db);
@@ -243,8 +225,6 @@ export async function createTestAppHarness(
     featureFlags: defaultFeatureFlags,
     performanceDiagnosticsAvailable: false,
     hostDaemonPort: 3001,
-    marketplaceUrl: "https://marketplace.invalid/marketplace.json",
-    connectGateKeysUrl: "https://gate-keys.invalid/bb-connect-gate-keys.json",
     inheritedSkillsRootPaths: [],
     isDevelopment: true,
     serverPort: 3334,
@@ -268,7 +248,6 @@ export async function createTestAppHarness(
     hub,
     logger,
   });
-  const telemetry = createNoopTelemetryService();
   const skillTreeRegistry = new SkillTreeRegistry();
   const aiServices = createAiServiceRegistry();
   const pendingInteractions = new PendingInteractionLifecycle({
@@ -282,35 +261,11 @@ export async function createTestAppHarness(
     pluginHostArtifacts,
     aiServices,
     skillTreeRegistry,
-    telemetry,
     terminalSessions,
   });
   pendingInteractions.start();
   setPluginToolCallRegistry(new PluginToolCallRegistry({ logger }));
-  const appVersion =
-    appVersionService ??
-    createAppVersionService({
-      sourceCommit: null,
-      installKind: null,
-      config,
-      logger,
-    });
-  const appUpdate =
-    appUpdateService ??
-    createAppUpdateService({
-      currentCommit: null,
-      appSurface: "web",
-      appVersion,
-      config,
-      countRunningThreads: () => listRunningThreads(db).length,
-      launcher: null,
-      logger,
-      mode: null,
-      notifyChanged: () => hub.notifySystem(["app-update-changed"]),
-    });
   const deps: ServerAppDeps = {
-    appUpdate,
-    appVersion,
     bbAppManagedConfig,
     cliCommand:
       cliCommandService ??
@@ -339,10 +294,8 @@ export async function createTestAppHarness(
     ),
     aiServices,
     skillTreeRegistry,
-    telemetry,
     terminalSessions,
     watchInterests,
-    sharedPorts,
   };
   const { app, pluginCatalogService, pluginService, serverMove } =
     createApp(deps);
@@ -411,13 +364,7 @@ export async function startTestServer(
     injectWebSocket,
     pluginService,
     serverMove,
-    tunnelIngress,
-  } = createApp(
-    harness.deps,
-    overrides.tunnelIngressNow === undefined
-      ? undefined
-      : { tunnelIngressNow: overrides.tunnelIngressNow },
-  );
+  } = createApp(harness.deps);
   const server = serve(
     {
       hostname: TEST_SERVER_HOST,
@@ -452,7 +399,6 @@ export async function startTestServer(
           resolve();
         });
       });
-      await tunnelIngress.closeAll();
       await closeWebSockets();
       await closeServer;
       await harness.cleanup();

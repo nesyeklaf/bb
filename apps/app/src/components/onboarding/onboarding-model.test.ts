@@ -1,12 +1,9 @@
-import type { ProviderCliStatus } from "@bb/host-daemon-contract";
 import type {
   HostDiscoveredRepo,
-  ServerAccessStatus,
   SystemProviderState,
 } from "@bb/server-contract";
 import { describe, expect, it } from "vitest";
 import {
-  connectAccessUrl,
   defaultSelectedRepoPaths,
   hasReadyAgent,
   parseSignInOutput,
@@ -27,45 +24,15 @@ function health(
     planLabel: null,
     installedVersion: "2.1.0",
     minimumSupportedVersion: null,
-    canInstall: true,
-    canUpdate: true,
     loginCommand: "claude auth login",
     localLoginCommand: null,
     ...overrides,
   };
 }
 
-function cliStatus(
-  overrides: Partial<ProviderCliStatus> = {},
-): ProviderCliStatus {
-  return {
-    displayName: "Claude Code",
-    executableName: "claude",
-    executablePath: null,
-    installed: false,
-    installSource: "notInstalled",
-    currentVersion: null,
-    latestVersion: "2.1.0",
-    minimumSupportedVersion: null,
-    npmPackageName: "@anthropic-ai/claude-code",
-    npmGlobalPackageVersion: null,
-    installAction: {
-      kind: "install",
-      label: "Install",
-      command: "npm install -g @anthropic-ai/claude-code",
-    },
-    needsUpdate: false,
-    versionUnsupported: false,
-    ...overrides,
-  };
-}
-
 const idle = {
-  installing: false,
-  installFailure: null,
   signingIn: false,
   signInFailed: false,
-  installInfoPending: false,
 };
 
 describe("resolveAgentSetupState", () => {
@@ -73,113 +40,43 @@ describe("resolveAgentSetupState", () => {
     expect(
       resolveAgentSetupState({
         health: health({ accountEmail: "a@b.dev", planLabel: "Max (20x)" }),
-        cliStatus: cliStatus(),
-        installing: true,
-        installFailure: "old failure",
         signingIn: true,
         signInFailed: true,
-        installInfoPending: true,
       }),
     ).toEqual({ status: "ready", detail: "a@b.dev · Max (20x)" });
     expect(
       resolveAgentSetupState({
         health: health(),
-        cliStatus: undefined,
         ...idle,
       }),
     ).toEqual({ status: "ready", detail: null });
   });
 
-  it("offers install only when the machine reports an install action", () => {
+  it("reports a missing agent as not installed", () => {
     expect(
       resolveAgentSetupState({
         health: health({ status: "not_installed" }),
-        cliStatus: cliStatus(),
         ...idle,
       }),
-    ).toEqual({ status: "install", canInstall: true });
-    expect(
-      resolveAgentSetupState({
-        health: health({ status: "not_installed" }),
-        cliStatus: cliStatus({ installAction: null }),
-        ...idle,
-      }),
-    ).toEqual({ status: "install", canInstall: false });
-    expect(
-      resolveAgentSetupState({
-        health: health({ status: "not_installed" }),
-        cliStatus: undefined,
-        ...idle,
-      }),
-    ).toEqual({ status: "install", canInstall: false });
-  });
-
-  it("keeps a missing agent in checking until install info has loaded", () => {
-    expect(
-      resolveAgentSetupState({
-        health: health({ status: "not_installed" }),
-        cliStatus: undefined,
-        ...idle,
-        installInfoPending: true,
-      }),
-    ).toEqual({ status: "checking" });
-    expect(
-      resolveAgentSetupState({
-        health: health({ status: "unauthenticated" }),
-        cliStatus: undefined,
-        ...idle,
-        installInfoPending: true,
-      }),
-    ).toEqual({ status: "signIn", reason: "signedOut", canSignIn: true });
-  });
-
-  it("reports a running install before a previous failure, and a failure before the health state", () => {
-    const base = {
-      health: health({ status: "not_installed" }),
-      cliStatus: cliStatus(),
-      signingIn: false,
-      signInFailed: false,
-      installInfoPending: false,
-    };
-    expect(
-      resolveAgentSetupState({
-        ...base,
-        installing: true,
-        installFailure: "Install failed.",
-      }),
-    ).toEqual({ status: "installing" });
-    expect(
-      resolveAgentSetupState({
-        ...base,
-        installing: false,
-        installFailure: "Install failed.",
-      }),
-    ).toEqual({
-      status: "installFailed",
-      message: "Install failed.",
-      canInstall: true,
-    });
+    ).toEqual({ status: "install" });
   });
 
   it("distinguishes signed out from expired and hides sign-in without a login command", () => {
     expect(
       resolveAgentSetupState({
         health: health({ status: "unauthenticated" }),
-        cliStatus: undefined,
         ...idle,
       }),
     ).toEqual({ status: "signIn", reason: "signedOut", canSignIn: true });
     expect(
       resolveAgentSetupState({
         health: health({ status: "expired", loginCommand: null }),
-        cliStatus: undefined,
         ...idle,
       }),
     ).toEqual({ status: "signIn", reason: "expired", canSignIn: false });
     expect(
       resolveAgentSetupState({
         health: health({ status: "unauthenticated" }),
-        cliStatus: undefined,
         ...idle,
         signingIn: true,
       }),
@@ -187,7 +84,6 @@ describe("resolveAgentSetupState", () => {
     expect(
       resolveAgentSetupState({
         health: health({ status: "unauthenticated" }),
-        cliStatus: undefined,
         ...idle,
         signInFailed: true,
       }),
@@ -201,20 +97,11 @@ describe("resolveAgentSetupState", () => {
           status: "unsupported_version",
           minimumSupportedVersion: "0.84.0",
         }),
-        cliStatus: cliStatus({
-          installed: true,
-          installAction: {
-            kind: "update",
-            label: "Update",
-            command: "npm install -g pi",
-          },
-        }),
         ...idle,
       }),
     ).toEqual({
       status: "update",
       detail: "Needs version 0.84.0 or newer",
-      canInstall: true,
     });
     expect(
       resolveAgentSetupState({
@@ -222,7 +109,6 @@ describe("resolveAgentSetupState", () => {
           status: "unknown",
           statusMessage: "Machine is paused.",
         }),
-        cliStatus: undefined,
         ...idle,
       }),
     ).toEqual({ status: "unknown", message: "Machine is paused." });
@@ -348,76 +234,6 @@ describe("shortRemoteName", () => {
     expect(shortRemoteName(null)).toBeNull();
     expect(shortRemoteName("/srv/git/repo.git")).toBeNull();
     expect(shortRemoteName("localhost:repo.git")).toBeNull();
-  });
-});
-
-describe("connectAccessUrl", () => {
-  function access(
-    providers: ServerAccessStatus["providers"],
-  ): ServerAccessStatus {
-    return {
-      providers,
-      defaultProviderId: "connect",
-      effectiveUrl: null,
-      urlSource: null,
-    };
-  }
-  const connect = {
-    id: "connect",
-    displayName: "bb connect",
-    description: "",
-    pluginId: "connect",
-  };
-
-  it("is on only when bb connect is available with an address", () => {
-    expect(
-      connectAccessUrl(
-        access([
-          {
-            ...connect,
-            availability: {
-              status: "available",
-              serverUrl: "https://sawyer.getbb.app",
-            },
-          },
-        ]),
-      ),
-    ).toEqual({ status: "on", url: "https://sawyer.getbb.app" });
-    expect(
-      connectAccessUrl(
-        access([{ ...connect, availability: { status: "available" } }]),
-      ),
-    ).toEqual({ status: "off" });
-    expect(
-      connectAccessUrl(
-        access([
-          {
-            ...connect,
-            availability: { status: "setup-required", message: "Sign in" },
-          },
-        ]),
-      ),
-    ).toEqual({ status: "off" });
-  });
-
-  it("is unavailable when the connect plugin provides no access method", () => {
-    expect(
-      connectAccessUrl(
-        access([
-          {
-            id: "direct",
-            displayName: "Direct",
-            description: "",
-            pluginId: null,
-            availability: {
-              status: "available",
-              serverUrl: "https://bb.example.com",
-            },
-          },
-        ]),
-      ),
-    ).toEqual({ status: "unavailable" });
-    expect(connectAccessUrl(undefined)).toEqual({ status: "unavailable" });
   });
 });
 

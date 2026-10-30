@@ -1,7 +1,6 @@
 import { useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import {
-  CURATED_PLUGIN_MARKETPLACE_NAME,
   type PluginCatalogInstallPlan,
   type PluginCatalogResolvedSource,
   type PluginInstallJob,
@@ -37,19 +36,6 @@ export type AddPluginInitial = {
   iconTinted: boolean;
   source: string;
 };
-
-function catalogInstallDescription(
-  source: string,
-  publisherLabel: string,
-): string {
-  if (source.startsWith("builtin:")) {
-    return "Install this plugin, bundled with BB.";
-  }
-  if (source.startsWith("npm:")) {
-    return `Install this ${publisherLabel} plugin from its listed npm package.`;
-  }
-  return `Install this ${publisherLabel} plugin from its listed source repository.`;
-}
 
 interface AddPluginDialogProps {
   open: boolean;
@@ -100,17 +86,6 @@ function buildRequest(
 function resolvedSourceRows(
   source: PluginCatalogResolvedSource,
 ): { label: string; value: string; href?: string }[] {
-  if (source.kind === "npm") {
-    return [
-      {
-        label: "npm package",
-        value: `${source.package}@${source.range ?? source.tag ?? "latest"}`,
-      },
-      ...(source.registry === undefined
-        ? []
-        : [{ label: "registry", value: source.registry }]),
-    ];
-  }
   return [
     { label: "repository", value: source.url, href: source.url },
     ...(source.subdir === undefined
@@ -270,10 +245,7 @@ function AddPluginDialogContent({
   const queryClient = useQueryClient();
   const [sourceText, setSourceText] = useState("");
   const request = buildRequest(initial, sourceText);
-  const thirdParty =
-    initial !== null &&
-    initial.marketplace !== CURATED_PLUGIN_MARKETPLACE_NAME &&
-    !initial.source.startsWith("builtin:");
+  const thirdParty = initial !== null && !initial.source.startsWith("builtin:");
   const planQuery = useCatalogInstallPlan(
     thirdParty && initial !== null
       ? { entryId: initial.entryId, marketplace: initial.marketplace }
@@ -308,13 +280,10 @@ function AddPluginDialogContent({
         </DialogTitle>
         <DialogDescription>
           {initial === null
-            ? "Install from npm, a Git repository, or a local path."
+            ? "Install from a Git repository or a local path."
             : thirdParty
               ? "Install this plugin from the source its marketplace lists."
-              : catalogInstallDescription(
-                  initial.source,
-                  initial.publisherLabel,
-                )}
+              : "Install this plugin, bundled with BB."}
         </DialogDescription>
       </DialogHeader>
       <div className="space-y-3">
@@ -344,7 +313,7 @@ function AddPluginDialogContent({
               onChange={(event) => setSourceText(event.target.value)}
             />
             <p className="mt-1.5 text-2xs text-subtle-foreground">
-              GitHub repository URL · npm:package[@version] · ./local/path
+              GitHub repository URL · ./local/path
             </p>
           </div>
         )}

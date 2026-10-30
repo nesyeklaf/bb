@@ -33,8 +33,7 @@ const DAEMON_DISCONNECTED_ENVIRONMENT_PROVISIONING_REASON =
   "The connection to the host was lost while preparing the workspace. Retry provisioning to continue.";
 
 type HostSessionOpenedDeps = LoggedPendingInteractionWorkSessionDeps;
-type DaemonSocketClosedDeps = LoggedPendingInteractionWorkSessionDeps &
-  Pick<AppDeps, "sharedPorts">;
+type DaemonSocketClosedDeps = LoggedPendingInteractionWorkSessionDeps;
 type LostHostWorkDeps = LoggedPendingInteractionWorkSessionDeps;
 
 interface HandleHostSessionOpenedArgs {
@@ -158,7 +157,6 @@ function handleDaemonSessionLost(
   args: HandleDaemonSessionLostArgs,
 ): void {
   deps.hub.unregisterDaemon(args.sessionId);
-  deps.sharedPorts.clearHostConnectCapability(args.sessionId);
 
   const session = deps.db
     .select()
@@ -192,7 +190,7 @@ function handleDaemonSessionLost(
 }
 
 export function handleHostRemoved(
-  deps: Omit<DaemonSocketClosedDeps, "sharedPorts">,
+  deps: DaemonSocketClosedDeps,
   args: HandleHostRemovedArgs,
 ): void {
   const session = deps.db
@@ -217,7 +215,7 @@ export function handleHostRemoved(
 }
 
 export function settleRemovedHostWork(
-  deps: Omit<DaemonSocketClosedDeps, "sharedPorts">,
+  deps: DaemonSocketClosedDeps,
   args: { hostId: string },
 ): void {
   interruptPendingInteractionsForHostThreads(deps, {

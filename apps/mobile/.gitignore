@@ -41,5 +41,4 @@ yarn-error.*
 /android
 # `expo run:ios --output` product (CI installs it with simctl).
 /build-output
-/google-services.json
 /google-play-service-account.json

@@ -213,7 +213,6 @@ describe("server skeleton", () => {
           hostId: "host-1",
           instanceId: "instance-1",
           hostName: "Host",
-          hasMachineCredential: false,
           platform: "darwin",
           dataDir: "/tmp/host-data",
           localApiPort: null,

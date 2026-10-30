@@ -4,7 +4,6 @@ import type {
   HostDaemonOnlineRpcRequestMessage,
   ProviderCliStatusResponse,
 } from "@bb/host-daemon-contract";
-import { systemProviderInfoSchema } from "@bb/server-contract";
 import { DEFAULT_BB_REQUEST_TIMEOUT_MS } from "@bb/sdk";
 import {
   validatePluginProviderDeclaration,
@@ -84,18 +83,8 @@ function installationStatus(providerId: string) {
     executableName,
     executablePath: `/usr/local/bin/${executableName}`,
     installed: true,
-    installSource: "external" as const,
     currentVersion: "1.0.0",
-    latestVersion: "1.1.0",
     minimumSupportedVersion: null,
-    npmPackageName: null,
-    npmGlobalPackageVersion: null,
-    installAction: {
-      kind: "update" as const,
-      label: "Update" as const,
-      command: `${executableName} update`,
-    },
-    needsUpdate: true,
     versionUnsupported: false,
   };
 }
@@ -117,8 +106,6 @@ function handleProviderInstallationRpc(
           planLabel: null,
           installedVersion: null,
           minimumSupportedVersion: null,
-          canInstall: false,
-          canUpdate: false,
           loginCommand: null,
         },
       },
@@ -130,27 +117,11 @@ function handleProviderInstallationRpc(
       result: installationStatus(command.providerId),
     };
   }
-  if (command.type === "provider.installation.run") {
-    return {
-      ok: true as const,
-      result: {
-        events: [
-          {
-            type: "completed" as const,
-            provider: command.providerId,
-            exitCode: 0,
-            signal: null,
-            success: true,
-          },
-        ],
-      },
-    };
-  }
   throw new Error(`Unexpected host RPC ${command.type}`);
 }
 
 describe("public provider installation routes", () => {
-  it("shares concurrent status probes and invalidates after installation, reconnect and TTL expiry", async () => {
+  it("shares concurrent status probes and invalidates after reconnect and TTL expiry", async () => {
     await withTestHarness(async (harness) => {
       const { host, session } = seedHostSession(harness.deps, {
         id: "cached-installations",
@@ -177,25 +148,14 @@ describe("public provider installation routes", () => {
       expect(count()).toBe(4);
       await read();
       expect(count()).toBe(4);
-      const installed = await harness.app.request(
-        `${API}/hosts/${host.id}/provider-clis/install`,
-        {
-          method: "POST",
-          headers: { "content-type": "application/json" },
-          body: JSON.stringify({ provider: "codex", actionKind: "update" }),
-        },
-      );
-      expect(installed.status).toBe(200);
-      await read();
-      expect(count()).toBe(8);
       harness.hub.notifyHost(host.id, ["host-connected"]);
       await read();
-      expect(count()).toBe(12);
+      expect(count()).toBe(8);
       const realNow = Date.now();
       const clock = vi.spyOn(Date, "now").mockReturnValue(realNow + 30_001);
       try {
         await read();
-        expect(count()).toBe(16);
+        expect(count()).toBe(12);
       } finally {
         clock.mockRestore();
         responder.unregister();
@@ -452,112 +412,5 @@ describe("public provider installation routes", () => {
       "stalled-installation-11",
     ]);
     expect(pendingStatusRequests).toEqual([]);
-  });
-
-  it("dispatches install/update by registered provider id", async () => {
-    await withTestHarness(async (harness) => {
-      const { host, session } = seedHostSession(harness.deps, {
-        id: "provider-installation-run-host",
-      });
-      const responder = registerHostRpcResponder(harness, {
-        hostId: host.id,
-        sessionId: session.id,
-        handle: handleProviderInstallationRpc,
-      });
-
-      const response = await harness.app.request(
-        `${API}/hosts/${host.id}/provider-clis/install`,
-        {
-          method: "POST",
-          headers: { "content-type": "application/json" },
-          body: JSON.stringify({
-            provider: "claude-code",
-            actionKind: "update",
-          }),
-        },
-      );
-
-      expect(response.status).toBe(200);
-      expect(await response.text()).toContain(
-        '"type":"completed","provider":"claude-code"',
-      );
-      expect(responder.requests.at(-1)?.command).toMatchObject({
-        type: "provider.installation.run",
-        providerId: "claude-code",
-        action: "update",
-      });
-
-      const unsupported = await harness.app.request(
-        `${API}/hosts/${host.id}/provider-clis/install`,
-        {
-          method: "POST",
-          headers: { "content-type": "application/json" },
-          body: JSON.stringify({
-            provider: "no-such-provider",
-            actionKind: "install",
-          }),
-        },
-      );
-      expect(unsupported.status).toBe(404);
-      expect(await readJson(unsupported)).toMatchObject({
-        code: "provider_installation_unavailable",
-      });
-    });
-  });
-
-  it("refreshes an installed-only provider after a successful install", async () => {
-    await withTestHarness(async (harness) => {
-      registerInstallationProviders(
-        harness,
-        ["installable-agent"],
-        "installed",
-      );
-      const { host, session } = seedHostSession(harness.deps, {
-        id: "provider-installation-refresh-host",
-      });
-      let installed = false;
-      const responder = registerHostRpcResponder(harness, {
-        hostId: host.id,
-        sessionId: session.id,
-        handle: (request) => {
-          if (request.command.type === "provider.installation.run") {
-            installed = true;
-          }
-          return handleProviderInstallationRpc(request, installed);
-        },
-      });
-      const listProviderIds = async (): Promise<string[]> => {
-        const response = await harness.app.request(
-          `${API}/system/providers?hostId=${host.id}`,
-        );
-        expect(response.status).toBe(200);
-        return systemProviderInfoSchema
-          .array()
-          .parse(await readJson(response))
-          .map((provider) => provider.id);
-      };
-      const installProvider = () =>
-        harness.app.request(`${API}/hosts/${host.id}/provider-clis/install`, {
-          method: "POST",
-          headers: { "content-type": "application/json" },
-          body: JSON.stringify({
-            provider: "installable-agent",
-            actionKind: "install",
-          }),
-        });
-      const providerHealthRequests = () =>
-        responder.requests.filter(
-          (request) =>
-            request.command.type === "provider.health" &&
-            request.command.providerId === "installable-agent",
-        );
-
-      expect(await listProviderIds()).not.toContain("installable-agent");
-      const installResponse = await installProvider();
-      expect(installResponse.status).toBe(200);
-      expect(await installResponse.text()).toContain('"success":true');
-      expect(await listProviderIds()).toContain("installable-agent");
-      expect(providerHealthRequests()).toHaveLength(2);
-    });
   });
 });

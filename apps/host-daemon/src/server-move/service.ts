@@ -27,7 +27,6 @@ import {
   readServerImportJournalStatus,
   readServerMovedFile,
   removeImportedServerFiles,
-  removeServerConnectHoldFile,
   removeServerImportJournalFile,
   rollBackServerImport,
   SERVER_IMPORT_BACKUP_DIR_NAME,
@@ -672,7 +671,6 @@ export class ServerMoveService {
       serverUrl: `http://127.0.0.1:${state.serverPort}`,
     });
     await discardImportBackups(dataDir);
-    await removeServerConnectHoldFile(dataDir);
     await rm(join(dataDir, SERVER_IMPORT_FILE_NAME), { force: true });
     this.options.logger.info(
       { moveId: state.moveId, plan: plan.kind },
@@ -747,7 +745,6 @@ export class ServerMoveService {
             dataDir,
             serverPort: state.serverPort,
             hostDaemonPort,
-            bindHost: state.bindHost,
           },
         );
         formatServiceDefinitionContent(definition, programArguments);
@@ -789,9 +786,6 @@ export class ServerMoveService {
         String(state.serverPort),
         "--host-daemon-port",
         String(this.options.hostDaemonPort),
-        ...(state.bindHost === null
-          ? []
-          : ["--server-bind-host", state.bindHost]),
       ],
     };
   }
@@ -1155,13 +1149,6 @@ export class ServerMoveService {
         "Rolled back an interrupted server import before preparing a new move",
       );
     }
-    await this.removeStaleConnectHold();
-  }
-
-  private async removeStaleConnectHold(): Promise<void> {
-    if (!(await this.dataDirHasDatabase())) {
-      await removeServerConnectHoldFile(this.options.dataDir);
-    }
   }
 
   private async readPreparedResult(
@@ -1209,7 +1196,6 @@ export class ServerMoveService {
       moveId: command.moveId,
       activationToken: command.activationToken,
       serverPort: command.serverPort,
-      bindHost: command.bindHost,
       importedEntries: null,
       archivedServerData: null,
       pendingServer: null,
@@ -1319,7 +1305,6 @@ export class ServerMoveService {
         bbServerEntry: serverEntry,
         dataDir,
         serverPort: command.serverPort,
-        bindHost: command.bindHost,
         hostDaemonPort: this.options.hostDaemonPort,
         env: createPendingServerEnv(
           this.options.env,
@@ -1516,7 +1501,6 @@ export class ServerMoveService {
         importedEntries: state.importedEntries,
       });
     }
-    await this.removeStaleConnectHold();
     const importFile = await readServerImportFile(dataDir).catch(() => null);
     if (importFile?.kind === "move" && importFile.moveId === state.moveId) {
       await rm(join(dataDir, SERVER_IMPORT_FILE_NAME), { force: true });

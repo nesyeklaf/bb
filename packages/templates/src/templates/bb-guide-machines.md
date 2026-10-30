@@ -22,9 +22,9 @@ off, nothing can reach bb and running threads may stop. The server machine
 cannot be removed.
 
 The server listens on loopback by default. Remote execution machines need
-a server access provider: paired bb Connect, or a configured direct URL reachable
-from the target, such as a private Tailscale Serve URL. A configured URL alone
-does not prove reachability.
+a server access provider or a configured direct URL reachable from the target,
+such as a private Tailscale Serve URL or a `BB_SERVER_BIND_HOST` address. A
+configured URL alone does not prove reachability.
 
   bb machine list                         List persistent machines with role, ID, type,
                                           connection status, and relative last-seen time
@@ -51,8 +51,6 @@ does not prove reachability.
                                           environment cleanup failed; the provider's
                                           removal still runs
   bb machine provider-cli status <machine>
-  bb machine provider-cli install <machine> <provider-id>
-    --action <install|update>
 
 `bb machine show` includes `threadStorageRootPath` from the latest daemon
 session without waking the machine (null before the first session).
@@ -115,45 +113,7 @@ that bypasses the logger are appended to `logs/server-stdio.log` and
 `logs/host-daemon-stdio.log`; a file over 10 MB is renamed to `-stdio.1.log`
 when its service starts. Follow them with `tail -F`.
 
-Updates commands
-
-One consolidated view of bb and provider CLI updates across machines — the
-CLI counterpart of Settings → Updates.
-
-  bb updates [status]                     Show bb-app and provider CLI update status for
-                                          every persistent machine
-    --machine <id-or-name>                Limit to one machine (including a sandbox)
-    --json                                Print the aggregate as JSON
-  bb updates apply                        Run every available provider CLI install/update,
-                                          one at a time
-    --machine <id-or-name>                Limit to one machine
-    --json                                Print per-target results as JSON
-  bb updates app [status]                 Show whether bb can update itself, the available
-                                          version, and the last result
-    --json                                Print the status as JSON
-  bb updates app apply                    Download the update and restart bb into it
-    --yes                                 Interrupt running threads without asking
-    --no-wait                             Return once the update starts
-    --json                                Print the final status as JSON
-  bb updates app dismiss                  Mark the last update result as seen
-
-`bb updates app apply` also updates a server hosted by the desktop app, restarting
-that hosting app through its native updater. It never updates the desktop you
-are viewing from unless that desktop hosts this server.
-
-`bb updates apply` covers provider CLIs only. `bb updates app apply` updates
-bb itself when it was started from `npx bb-app` (or a global `bb-app`) without
-`--no-in-app-updates`: it installs the new version next to the running one and
-restarts into it. It does not roll back if the new version fails to start.
-Desktop users update through the desktop app's relaunch, and `bb-server` cannot
-update itself. Connected daemons follow the server version automatically.
-
 Targeting machines
-
-For source installs, `bb updates` shows the checkout commit and explains manual
-Git updates when no update shim is running. It does not compare that checkout
-with npm releases. Failed or unavailable release checks show “Latest unknown”;
-“Up to date” requires a successful check.
 
 Machine selectors accept either an exact machine ID or an unambiguous machine
 name. `--host` is an alias for `--machine`.
@@ -174,12 +134,11 @@ Use `--environment-inputs <json>` for workspace configuration, separately from
 plugins; never put secrets there. Store credentials in plugin settings and pass
 only non-secret configuration or references.
 
-An environment provider that composes its own machine, such as
-`modal-sandbox`, chooses that machine:
-`bb thread spawn --project <id> --environment-provider modal-sandbox --prompt "..."`
+An environment provider that composes its own machine chooses that machine:
+`bb thread spawn --project <id> --environment-provider <provider-id> --prompt "..."`
 creates the machine, prepares the project checkout, and runs environment setup.
 Machine selectors are refused, and `--machine-inputs <json>` configures the
-machine (for example `{"preset":"Large","image":"Node 22"}`). Progress and
+machine. Progress and
 failures appear in the thread's provisioning details; if cloning fails, the
 machine remains available for retry or explicit removal.
 
@@ -206,24 +165,12 @@ instead of `--path` to clone the project's Git remote there; `--remote-url` and
 Set Machines → Server URL reachable by machines, or run `bb settings general
 machineServerUrl https://bb.example.com`. An unset value uses BB_EXTERNAL_URL.
 Set Default machine access with
-`bb settings general defaultMachineAccess direct` or `connect`; `null` uses
-the first registered access provider, or direct when none is registered. An
-unpaired provider reports setup required. `bb settings show --json` includes
-fresh provider availability and the effective selection; failed or timed-out
-checks report unavailable. Machines use this access for ongoing runtime
-requests, including account-pool endpoints. A machine on bb connect access holds
-a getbb.app machine credential that `bb machine remove` revokes; if that
-revocation fails, revoke the machine in the getbb.app dashboard.
-
-Remote access through getbb.app comes from the bundled bb account and Connect
-plugins: `bb account login|status|logout` signs this server in (bb-account
-skill), and `bb connect status|on|off|expose|unexpose|unexpose-all|shares`
-serves it at `<handle>.getbb.app` and shares HTTP ports from any enrolled host
-(share-server-links skill). `bb connect servers` lists every bb on the account.
-`bb connect machine-code` mints a one-time, 10-minute code that pairs the bb
-mobile app (also shown under Settings → Mobile → Add mobile device); `--json`
-prints `{code, serverUrl, apex, expiresAt}`. Without an installed bb, pair a
-dashboard code with `npx -p bb-app@latest bb connect --code <code>`.
+`bb settings general defaultMachineAccess direct` or a plugin provider id;
+`null` uses the first registered access provider, or direct when none is
+registered. An unpaired provider reports setup required. `bb settings show
+--json` includes fresh provider availability and the effective selection;
+failed or timed-out checks report unavailable. Machines use this access for
+ongoing runtime requests, including account-pool endpoints.
 
 ## Move the server
 
@@ -257,13 +204,11 @@ checkouts stay on the machines that own them.
     --data-dir <dir>                      Target data directory
   bb server unlock                        Let this computer's old copy start again
     --force                               Skip the new-server health check
-  bb server allow-connect                 Turn bb connect and bb account on for an imported copy
   bb server delete-old-copy               Delete the old copy a move left here
   bb server install-machine-service       Keep this computer connected after a move
 
-`--check` exits nonzero while a blocker remains. With bb connect, machines and
-apps keep the same URL. A direct-address server needs `--address`: the URL every
-machine and app will use to reach the new server. Existing bb server data on the
+`--check` exits nonzero while a blocker remains. Every move needs `--address`:
+the URL every machine and app will use to reach the new server. Existing bb server data on the
 target is archived to `<dir>.before-move-<date>` only with
 `--archive-existing-data`; it is never merged. SIGINT stops following while the
 move continues. Failure or cancellation before the switch leaves the server
@@ -284,10 +229,8 @@ encrypted and holds the server's credentials and plugin secrets, so keep it
 private. `bb server import` works offline: it refuses a data directory that has
 `bb.db` or a running bb and an export made by a newer bb or with the
 `serverMove` experiment off. Rerunning an interrupted import rolls it back
-first (`--json` reports `rolledBackInterruptedImport: true`). An imported
-server starts with bb connect and bb account off so it can't take the original
-server's tunnel or account; stop the original server, then run
-`bb server allow-connect` to turn them on at the next start.
+first (`--json` reports `rolledBackInterruptedImport: true`). Stop the original
+server before you start the imported copy.
 
 After a move, bb on the old computer refuses to start the old server and runs as
 a regular machine. `bb server delete-old-copy` deletes the server files left
@@ -297,7 +240,7 @@ service itself; after a move from `bb-app`, or to retry, run
 newer on the PATH). `bb server unlock` is a last resort: everything since the
 move is lost on that copy, it refuses while the new server still answers unless
 `--force` is passed, and it refuses while the machine service is installed.
-`unlock`, `delete-old-copy`, `allow-connect`, and `install-machine-service`
+`unlock`, `delete-old-copy`, and `install-machine-service`
 act on `BB_DATA_DIR` or `~/.bb` unless `--data-dir <dir>` is passed.
 
 ## Local daemon lifecycle

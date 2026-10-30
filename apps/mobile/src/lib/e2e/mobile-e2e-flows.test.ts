@@ -39,9 +39,8 @@ describe("Mobile E2E flow boundaries", () => {
     }
 
     const pairing = flowSource("subflows/pair-direct-server.yaml");
-    expect(pairing).toContain('visible: ".*(Not now|Ask anything).*"');
-    expect(pairing).toContain('- tapOn: "Not now"');
-    expect(pairing).toContain('- assertNotVisible: "Not now"');
+    expect(pairing).toContain('visible: ".*Ask anything.*"');
+    expect(pairing).not.toContain("Not now");
     expect(pairing).toContain('id: "shell-webview"');
   });
 });

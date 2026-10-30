@@ -118,11 +118,14 @@ export function registerFakeDaemon(
       args.events.push(`${args.hostId}:${message.command.type}`);
       void Promise.resolve()
         .then(() => args.handle(message))
-        .catch((error: unknown): FakeDaemonReply => ({
-          ok: false,
-          errorCode: "test_rpc_error",
-          errorMessage: error instanceof Error ? error.message : String(error),
-        }))
+        .catch(
+          (error: unknown): FakeDaemonReply => ({
+            ok: false,
+            errorCode: "test_rpc_error",
+            errorMessage:
+              error instanceof Error ? error.message : String(error),
+          }),
+        )
         .then((reply) => {
           harness.hub.recordHostOnlineRpcResponse({
             message: toResponse(message, reply),
@@ -162,7 +165,6 @@ export function createTestServerMoveEnvironment(
   };
   const environment: ServerMoveEnvironment = {
     allowLoopbackServerUrl: false,
-    bindHost: null,
     deps: harness.deps,
     exportArchive: (args) => {
       events.push("export");
@@ -200,16 +202,12 @@ export function createTestServerMoveEnvironment(
         plugins.stops += 1;
         events.push("plugins:stop");
       },
-      async suspendAllButConnect() {
+      async suspendAll() {
         plugins.suspends += 1;
         events.push("plugins:suspend");
       },
     },
     readServerDiskFreeBytes: async () => null,
-    resolveMode: async () => ({ mode: "direct" }),
-    resolveServerHostGrant: async () => {
-      throw new Error("Direct moves don't resolve a server access grant");
-    },
     resumeDeferredWork() {
       events.push("deferred-work:resumed");
     },

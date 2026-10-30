@@ -29,16 +29,6 @@ import {
 import { BUNDLED_MARKETPLACE_NAME } from "./bundled-marketplace-paths.js";
 export { BUNDLED_MARKETPLACE_NAME } from "./bundled-marketplace-paths.js";
 
-export const MARKETPLACE_V1_SCHEMA_URL =
-  "https://getbb.app/schemas/marketplace.schema.json";
-export const MARKETPLACE_V2_SCHEMA_URL =
-  "https://getbb.app/schemas/marketplace-v2.schema.json";
-
-export const CURATED_MARKETPLACE_V1_URL =
-  "https://getbb.app/marketplace/v1/marketplace.json";
-export const CURATED_MARKETPLACE_V2_URL =
-  "https://getbb.app/marketplace/v2/marketplace.json";
-
 export const BUILTIN_PUBLISHER_LABEL = "BB Official";
 
 const NAME_PATTERN = /^[a-z0-9][a-z0-9-]*$/u;
@@ -105,45 +95,6 @@ const authorSchema = z
     name: z.string().min(1),
     github: z.string().regex(GITHUB_LOGIN_PATTERN).optional(),
     url: httpsUrl.optional(),
-  })
-  .strict();
-
-const npmSourceSchema = z
-  .object({
-    npm: z
-      .object({
-        package: z
-          .string()
-          .min(1)
-          .superRefine((value, ctx) => {
-            try {
-              const parsed = parsePluginSource(`npm:${value}`);
-              if (
-                parsed.kind !== "npm" ||
-                parsed.name !== value ||
-                parsed.spec.length !== 0
-              ) {
-                throw new Error("package name is ambiguous");
-              }
-            } catch (error) {
-              ctx.addIssue({
-                code: "custom",
-                message: error instanceof Error ? error.message : String(error),
-              });
-            }
-          }),
-        range: semverRange.optional(),
-        tag: z
-          .string()
-          .min(1)
-          .regex(/^[A-Za-z][A-Za-z0-9._-]*$/u)
-          .optional(),
-        registry: httpsUrl.optional(),
-      })
-      .strict()
-      .refine((npm) => npm.range === undefined || npm.tag === undefined, {
-        message: "range and tag are mutually exclusive",
-      }),
   })
   .strict();
 
@@ -232,13 +183,13 @@ const marketplaceEntryV1Schema = z
     icon: iconSchema,
     tags: z.array(z.string().max(32).regex(TAG_PATTERN)).max(10).optional(),
     author: authorSchema,
-    source: z.union([npmSourceSchema, gitSourceSchema]),
+    source: gitSourceSchema,
   })
   .strict();
 
 const marketplaceManifestV1Schema = z
   .object({
-    $schema: z.literal(MARKETPLACE_V1_SCHEMA_URL).optional(),
+    $schema: z.string().optional(),
     schemaVersion: z.literal(1),
     name: pluginMarketplaceNameSchema,
     displayName: z.string().min(1),
@@ -260,7 +211,7 @@ const marketplaceManifestV1Schema = z
   .strict();
 
 const marketplaceManifestV2Schema = z.object({
-  $schema: z.literal(MARKETPLACE_V2_SCHEMA_URL).optional(),
+  $schema: z.string().optional(),
   schemaVersion: z.literal(2),
   name: z.string().regex(NAME_PATTERN),
   displayName: z.string().min(1),
@@ -336,26 +287,6 @@ function marketplaceManifestIndex(
   const index = { categories, collections, resolvedCollections };
   marketplaceManifestIndexes.set(manifest, index);
   return index;
-}
-
-export function curatedMarketplaceManifestUrls(configuredUrl: string): {
-  primary: string;
-  fallback: string | null;
-} {
-  const url = new URL(configuredUrl);
-  if (url.toString() === CURATED_MARKETPLACE_V1_URL) {
-    return {
-      primary: CURATED_MARKETPLACE_V2_URL,
-      fallback: CURATED_MARKETPLACE_V1_URL,
-    };
-  }
-  if (url.toString() === CURATED_MARKETPLACE_V2_URL) {
-    return {
-      primary: CURATED_MARKETPLACE_V2_URL,
-      fallback: CURATED_MARKETPLACE_V1_URL,
-    };
-  }
-  return { primary: url.toString(), fallback: null };
 }
 
 export function parseMarketplaceManifest(
@@ -437,11 +368,7 @@ function parseMarketplaceManifestWithBundledPolicy(
   const plugins = parsed.data.plugins.filter((entry) => {
     if ("bundled" in entry.source) return true;
     const range =
-      "npm" in entry.source
-        ? entry.source.npm.range
-        : "range" in entry.source.git
-          ? entry.source.git.range
-          : undefined;
+      "range" in entry.source.git ? entry.source.git.range : undefined;
     if (range === undefined || semver.validRange(range) !== null) return true;
     warn?.(
       `marketplace entry "${entry.id}" was skipped because source range ${JSON.stringify(range)} is not valid semver`,
@@ -523,33 +450,6 @@ export function entryIconName(entry: MarketplaceEntry): string | null {
   return typeof entry.icon === "string" ? entry.icon : null;
 }
 
-export function entryScreenshotUrls(
-  entry: MarketplaceEntry,
-  base: MarketplaceIconBase,
-  warn?: (message: string) => void,
-): string[] {
-  if (!("screenshots" in entry) || entry.screenshots === undefined) return [];
-  return entry.screenshots.flatMap((declared) => {
-    const absolute = /^[A-Za-z][A-Za-z0-9+.-]*:/u.test(declared);
-    if (!absolute && base.kind !== "url") {
-      warn?.(
-        `marketplace entry "${entry.id}" screenshot ${JSON.stringify(declared)} was skipped because relative screenshots require an https marketplace manifest`,
-      );
-      return [];
-    }
-    const resolved = new URL(
-      declared,
-      base.kind === "url" ? base.manifestUrl : "https://marketplace.invalid/",
-    );
-    if (resolved.protocol !== "https:") {
-      throw new Error(
-        `screenshot URL ${JSON.stringify(declared)} resolves to a non-https URL`,
-      );
-    }
-    return [resolved.toString()];
-  });
-}
-
 export function entryOverview(
   entry: MarketplaceEntry,
   warn?: (message: string) => void,
@@ -596,7 +496,7 @@ export function catalogEntryMetadata(args: {
       : category === undefined
         ? {}
         : { categoryId: category.id, category: category.displayName }),
-    screenshots: entryScreenshotUrls(entry, args.base, args.warn),
+    screenshots: [],
     ...("publishedAt" in entry && typeof entry.publishedAt === "string"
       ? { publishedAt: entry.publishedAt }
       : {}),
@@ -610,22 +510,21 @@ export function entryIconTinted(contentType: string): boolean {
   return contentType === "image/svg+xml";
 }
 
-export type MarketplaceIconBase =
-  | { kind: "url"; manifestUrl: string }
-  | { kind: "dir"; root: string };
-
-export function marketplaceRowIconBase(row: {
-  sourceKind: string;
-  manifestUrl: string;
-}): MarketplaceIconBase {
-  return row.sourceKind === "https"
-    ? { kind: "url", manifestUrl: row.manifestUrl }
-    : { kind: "dir", root: row.manifestUrl };
+export interface MarketplaceIconBase {
+  kind: "dir";
+  root: string;
 }
 
-export type MarketplaceIconLocation =
-  | { kind: "remote"; url: string }
-  | { kind: "local"; path: string; relativePath: string };
+export function marketplaceRowIconBase(row: {
+  manifestUrl: string;
+}): MarketplaceIconBase {
+  return { kind: "dir", root: row.manifestUrl };
+}
+
+export interface MarketplaceIconLocation {
+  path: string;
+  relativePath: string;
+}
 
 export function resolveEntryIcon(
   entry: MarketplaceEntry,
@@ -633,25 +532,16 @@ export function resolveEntryIcon(
 ): MarketplaceIconLocation | null {
   if (typeof entry.icon === "string") return null;
   const declared = entry.icon.url;
-  const absolute = /^[A-Za-z][A-Za-z0-9+.-]*:/u.test(declared);
-  if (base.kind === "url" || absolute) {
-    const resolved = new URL(
-      declared,
-      base.kind === "url" ? base.manifestUrl : "https://marketplace.invalid/",
+  if (/^[A-Za-z][A-Za-z0-9+.-]*:/u.test(declared)) {
+    throw new Error(
+      `icon URL ${JSON.stringify(declared)} must be a path inside the marketplace`,
     );
-    if (resolved.protocol !== "https:") {
-      throw new Error(
-        `icon URL ${JSON.stringify(declared)} resolves to a non-https URL`,
-      );
-    }
-    return { kind: "remote", url: resolved.toString() };
   }
   const resolved = new URL(declared, "https://marketplace.invalid/");
   const relativePath = normalizePluginSubdirectory(
     decodeURIComponent(resolved.pathname).replace(/^\/+/u, ""),
   );
   return {
-    kind: "local",
     path: join(base.root, ...relativePath.split("/")),
     relativePath,
   };
@@ -659,11 +549,6 @@ export function resolveEntryIcon(
 
 export function entryRepositoryUrl(entry: MarketplaceEntry): string | null {
   if ("bundled" in entry.source) return null;
-  if ("npm" in entry.source) {
-    return entry.source.npm.registry === undefined
-      ? `https://www.npmjs.com/package/${entry.source.npm.package}`
-      : null;
-  }
   const git = entry.source.git;
   const repository = git.url.replace(/\.git$/u, "");
   if (git.subdir === undefined) return repository;
@@ -677,14 +562,6 @@ export function entrySourceDisplay(entry: MarketplaceEntry): string {
   if ("bundled" in entry.source) {
     return `builtin:${entry.source.bundled.plugin}`;
   }
-  if ("npm" in entry.source) {
-    const spec = entry.source.npm.range ?? entry.source.npm.tag ?? "";
-    const registry =
-      entry.source.npm.registry === undefined
-        ? ""
-        : ` (registry ${entry.source.npm.registry})`;
-    return `npm:${entry.source.npm.package}${spec.length === 0 ? "" : `@${spec}`}${registry}`;
-  }
   const git = entry.source.git;
   const subdir = git.subdir === undefined ? "" : `#${git.subdir}`;
   if ("ref" in git) return `git:${git.url}@${git.ref}${subdir}`;
@@ -695,7 +572,6 @@ export function entrySourceDisplay(entry: MarketplaceEntry): string {
 interface ResolvedEntrySource {
   source: string;
   selection: PluginSourceSelection;
-  npmRegistry?: string;
 }
 
 export function resolvedEntrySource(
@@ -705,16 +581,6 @@ export function resolvedEntrySource(
     return {
       source: `builtin:${entry.source.bundled.plugin}`,
       selection: ROOT_PLUGIN_SOURCE_SELECTION,
-    };
-  }
-  if ("npm" in entry.source) {
-    const spec = entry.source.npm.range ?? entry.source.npm.tag ?? "";
-    return {
-      source: `npm:${entry.source.npm.package}${spec.length === 0 ? "" : `@${spec}`}`,
-      selection: ROOT_PLUGIN_SOURCE_SELECTION,
-      ...(entry.source.npm.registry === undefined
-        ? {}
-        : { npmRegistry: entry.source.npm.registry }),
     };
   }
   const git = entry.source.git;

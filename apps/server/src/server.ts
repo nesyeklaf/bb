@@ -23,11 +23,7 @@ import {
   declineWebSocketCompression,
   WEB_SOCKET_COMPRESSION,
 } from "./ws/compression.js";
-import { createGateKeyStore } from "./services/connect-next/gate-keys.js";
-import {
-  createTunnelIngressManager,
-  type TunnelIngressManager,
-} from "./services/connect-next/tunnel-ingress.js";
+import { createRequestPeerRecorder } from "./services/request-peers.js";
 import { createHash, randomUUID } from "node:crypto";
 import { readFile, stat } from "node:fs/promises";
 import { performance } from "node:perf_hooks";
@@ -54,7 +50,6 @@ import { registerPluginCatalogRoutes } from "./routes/plugin-catalog.js";
 import { registerPluginInstallJobRoutes } from "./routes/plugin-install-jobs.js";
 import { createPluginInstallJobs } from "./services/plugins/plugin-install-jobs.js";
 import { registerPromptHistoryRoutes } from "./routes/prompt-history.js";
-import { registerSkillsRegistryRoutes } from "./routes/skills-registry.js";
 import {
   createPluginService,
   type PluginService,
@@ -86,13 +81,8 @@ import {
   setAuthenticatedDaemon,
   verifyAuthenticatedDaemon,
 } from "./internal/auth.js";
-import {
-  captureTrustedRemoteAddress,
-  resolveRequestAppSurface,
-} from "./request-context.js";
+import { captureTrustedRemoteAddress } from "./request-context.js";
 import { runEventLoopWork } from "./services/system/event-loop-work.js";
-import { setTurnTelemetryDeps } from "./services/system/turn-telemetry.js";
-import { runWithTelemetryAppSurface } from "./services/system/telemetry.js";
 import {
   onClientSocketClose,
   onClientSocketMessage,
@@ -119,7 +109,6 @@ import {
   createPluginCatalogService,
   type PluginCatalogService,
 } from "./services/plugin-catalog/plugin-catalog-service.js";
-import { callHostRetryableOnlineRpcForWork } from "./services/hosts/online-rpc.js";
 import { requestMatchesEntityTag } from "./services/files/entity-tag.js";
 import {
   allowedAppOrigins,
@@ -136,7 +125,6 @@ import { rankAcceptedAssetEncodings } from "./asset-content-encoding.js";
 import { apiJsonCompression } from "./api-response-compression.js";
 import { serverTiming } from "./server-timing.js";
 import { APP_SURFACE_WEB, type AppSurface } from "@bb/config/app-surface";
-import type { ServerBindHost } from "@bb/config/server";
 import { registerServerMoveRoutes } from "./routes/server-move.js";
 import {
   INTERNAL_SERVER_MOVE_PENDING_PATH,
@@ -170,7 +158,6 @@ interface ServerApp {
   pluginService: PluginService;
   pluginCatalogService: PluginCatalogService;
   serverMove: ServerMoveCoordinator;
-  tunnelIngress: TunnelIngressManager;
 }
 
 interface CloseWebSocketServerArgs {
@@ -198,7 +185,6 @@ function normalizeInternalAuthPath(path: string): string {
 
 export interface ServerMoveAppOptions {
   appSurface: AppSurface;
-  bindHost: ServerBindHost | null;
   manualImportPending: boolean;
   pending: PendingServerMove | null;
   restoredRun: RestoredServerMoveRun | null;
@@ -211,7 +197,6 @@ interface CreateAppOptions {
   slowApiRequestLogThresholdMs?: number;
   performanceDiagnosticsEnabled?: () => boolean;
   staticDir?: string;
-  tunnelIngressNow?: () => number;
 }
 
 interface StaticResponseHeadersArgs {
@@ -484,18 +469,7 @@ export function createApp(
     app,
   });
   wss.options.perMessageDeflate = WEB_SOCKET_COMPRESSION;
-  const tunnelIngressNow = options?.tunnelIngressNow ?? Date.now;
-  const tunnelIngress = createTunnelIngressManager({
-    app,
-    injectWebSocket,
-    keys: createGateKeyStore({
-      url: () => deps.config.connectGateKeysUrl,
-      logger: deps.logger,
-      now: tunnelIngressNow,
-    }),
-    loopbackOrigin: () => `http://127.0.0.1:${deps.config.serverPort}`,
-    logger: deps.logger,
-  });
+  const requestPeers = createRequestPeerRecorder();
   const slowApiRequestLogThresholdMs =
     options?.slowApiRequestLogThresholdMs ?? SLOW_API_REQUEST_LOG_THRESHOLD_MS;
   const bbAppArtifactService =
@@ -506,7 +480,6 @@ export function createApp(
     });
   const serverMoveOptions: ServerMoveAppOptions = options?.serverMove ?? {
     appSurface: APP_SURFACE_WEB,
-    bindHost: null,
     manualImportPending: false,
     pending: null,
     restoredRun: null,
@@ -519,6 +492,7 @@ export function createApp(
   };
   const pendingServerMove = serverMoveOptions.pending;
 
+  app.use("*", requestPeers.middleware);
   app.use("*", serverTiming());
   app.use("*", async (context, next) => {
     const signal = context.req.raw.signal;
@@ -534,7 +508,7 @@ export function createApp(
   });
   app.use("*", async (context, next) => {
     captureTrustedRemoteAddress(context);
-    return runWithTelemetryAppSurface(resolveRequestAppSurface(context), next);
+    return next();
   });
   app.use("*", async (context, next) => {
     const path = context.req.path;
@@ -791,25 +765,15 @@ export function createApp(
     db: deps.db,
     hub: deps.hub,
     logger: deps.logger,
-    telemetry: deps.telemetry,
     pendingInteractions: deps.pendingInteractions,
     dataDir: deps.config.dataDir,
     appVersion: deps.config.appVersion,
     getAppUrl: () => deps.config.appUrl ?? null,
-    sharedPorts: deps.sharedPorts,
     providerRegistry: deps.providerRegistry,
     pluginHostArtifacts: deps.pluginHostArtifacts,
     aiServices: deps.aiServices,
-    ensureSharedPortTunnel: (hostId) =>
-      deps.sharedPorts.ensureTunnelIdentity(hostId, () =>
-        callHostRetryableOnlineRpcForWork(deps, {
-          command: { type: "connect-tunnel.ensure-identity" },
-          hostId,
-          timeoutMs: 30_000,
-        }),
-      ),
     callPluginHost: (args) => callPluginHostRpc(deps, args),
-    openTunnelIngress: (audience) => tunnelIngress.open(audience),
+    requestPeers: (after) => requestPeers.snapshot(after),
     disposePluginHost: (args) => disposePluginHostWorkers(deps, args),
     onSettingsChanged: (pluginId) => {
       deps.providerNativeRoots.invalidate(pluginId);
@@ -839,7 +803,6 @@ export function createApp(
       threadId,
     });
   });
-  setTurnTelemetryDeps(deps);
   setPluginThreadEventEmitter(pluginService.events);
   // Bridge the dispatch pipeline to this service's hooks. Until this runs
   // there are no hooks, which is exactly the zero-overhead path.
@@ -868,7 +831,6 @@ export function createApp(
   const serverMove = createServerMoveCoordinator(
     createDefaultServerMoveEnvironment({
       appSurface: serverMoveOptions.appSurface,
-      bindHost: serverMoveOptions.bindHost,
       deps,
       env: process.env,
       pluginService,
@@ -912,7 +874,6 @@ export function createApp(
   const pluginCatalogService = createPluginCatalogService({
     db: deps.db,
     appVersion: deps.config.appVersion,
-    marketplaceUrl: deps.config.marketplaceUrl,
     dataDir: deps.config.dataDir,
     plugins: pluginService,
     notifyCatalogChanged: () => deps.hub.notifySystem(["plugins-changed"]),
@@ -922,7 +883,7 @@ export function createApp(
   registerPromptHistoryRoutes(publicApi, deps);
   registerThreadSectionRoutes(publicApi, deps);
   registerFileRoutes(publicApi, deps);
-  registerHostRoutes(publicApi, deps, pluginService);
+  registerHostRoutes(publicApi, deps);
   registerDesktopBrowserRoutes(publicApi, deps);
   registerTerminalRoutes(publicApi, deps);
   registerEnvironmentRoutes(publicApi, deps, pluginService);
@@ -957,7 +918,6 @@ export function createApp(
     pluginUpdateJobs,
     upgradeWebSocket,
   );
-  registerSkillsRegistryRoutes(publicApi, deps);
   registerServerMoveRoutes(publicApi, deps, serverMove);
   app.route("/api/v1", publicApi);
   app.use("/api/v1/*", () => {
@@ -1105,6 +1065,5 @@ export function createApp(
     pluginService,
     pluginCatalogService,
     serverMove,
-    tunnelIngress,
   };
 }

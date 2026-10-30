@@ -4,16 +4,12 @@ import type {
   ExperimentalPluginRpcCaller,
   PluginThreadEventPayloads,
 } from "@get-bb/plugin-sdk";
-import { EnvHttpProxyAgent, fetch as undiciFetch } from "undici";
-import type { Dispatcher } from "undici";
-import { z } from "zod";
 import {
   CLIENT_NOTIFICATION_CHANNEL,
   NOTIFICATION_BODY_MAX_LENGTH,
   NOTIFICATION_TITLE_MAX_LENGTH,
   type ClientNotification,
   type DeliveryChannel,
-  type PushSubscription,
   type SendNotificationInput,
 } from "./contract.js";
 import { notificationPreviewText, truncate } from "./notification-text.js";
@@ -22,16 +18,12 @@ import {
   type NotificationLevel,
   type PushNotificationKind,
 } from "./preferences.js";
-import type { PushSubscriptionStore } from "./subscriptions.js";
 
 type ThreadResponse = PluginThreadEventPayloads["thread.idle"]["thread"];
 type PendingInteraction =
   PluginThreadEventPayloads["interaction.pending"]["interaction"];
 
-const EXPO_PUSH_BATCH_SIZE = 100;
 const DEFAULT_COALESCE_MS = 2_000;
-const NETWORK_WARNING_INTERVAL_MS = 60 * 60 * 1_000;
-const LAST_OUTCOME_KEY = "last-send-outcome";
 const FALLBACK_BODIES: Record<PushNotificationKind, string> = {
   "pending-interaction": "Waiting for your input",
   "thread-error": "The thread hit an error",
@@ -42,56 +34,6 @@ const PUSH_KIND_PRIORITY: readonly PushNotificationKind[] = [
   "thread-error",
   "turn-finished",
 ];
-
-const expoPushTicketSchema = z.union([
-  z.object({ status: z.literal("ok"), id: z.string().optional() }),
-  z.object({
-    status: z.literal("error"),
-    message: z.string().optional(),
-    details: z
-      .object({ error: z.string().optional() })
-      .passthrough()
-      .optional(),
-  }),
-]);
-const expoPushResponseSchema = z.object({
-  data: z.array(expoPushTicketSchema).optional(),
-  errors: z
-    .array(
-      z.object({ code: z.string().optional(), message: z.string().optional() }),
-    )
-    .optional(),
-});
-
-export const lastSendOutcomeSchema = z.discriminatedUnion("status", [
-  z.object({ status: z.literal("never") }).strict(),
-  z
-    .object({
-      status: z.literal("sent"),
-      at: z.number().int().nonnegative(),
-      sentCount: z.number().int().nonnegative(),
-    })
-    .strict(),
-  z
-    .object({
-      status: z.literal("failed"),
-      at: z.number().int().nonnegative(),
-      reason: z.string().min(1),
-    })
-    .strict(),
-]);
-
-export type LastSendOutcome = z.infer<typeof lastSendOutcomeSchema>;
-
-export const SENT_NOTIFICATION_KIND = "message";
-
-interface PushNotificationData {
-  kind: PushNotificationKind | typeof SENT_NOTIFICATION_KIND;
-  projectId?: string;
-  serverUrl?: string;
-  subscriptionId: string;
-  threadId?: string;
-}
 
 export class SendNotificationError extends Error {
   readonly code: "thread_not_found" | "sender_stopped";
@@ -106,29 +48,8 @@ export class SendNotificationError extends Error {
 interface OutgoingNotification {
   title: string;
   body: string;
-  kind: PushNotificationData["kind"];
-  thread: { id: string; projectId: string } | null;
+  thread: { id: string } | null;
 }
-
-export interface ExpoPushMessage {
-  to: string;
-  title: string;
-  body: string;
-  data: PushNotificationData;
-  sound: "default";
-  channelId: "threads";
-  priority: "high";
-}
-
-export type PushSenderFetch = (
-  url: string,
-  init: {
-    method: "POST";
-    headers: Record<string, string>;
-    body: string;
-    dispatcher: Dispatcher;
-  },
-) => Promise<{ ok: boolean; status: number; text(): Promise<string> }>;
 
 interface PendingThreadPush {
   bodies: Map<PushNotificationKind, string>;
@@ -137,18 +58,7 @@ interface PendingThreadPush {
   timer: ReturnType<typeof setTimeout>;
 }
 
-interface Delivery {
-  message: ExpoPushMessage;
-  subscription: PushSubscription;
-}
-
-interface BatchResult {
-  sentCount: number;
-  failure: string | null;
-}
-
 export interface PushSender {
-  getLastOutcome(): LastSendOutcome;
   onInteractionPending(
     payload: PluginThreadEventPayloads["interaction.pending"],
   ): void;
@@ -159,24 +69,20 @@ export interface PushSender {
     caller: ExperimentalPluginRpcCaller,
   ): Promise<DeliveryChannel[]>;
   settle(): Promise<void>;
-  start(): Promise<void>;
+  start(): void;
   stop(): Promise<void>;
 }
 
 export interface CreatePushSenderArgs {
   bb: BbPluginApi;
-  subscriptions: PushSubscriptionStore;
-  getExpoPushUrl(): Promise<string>;
   getNotificationLevel(thread: {
     id: string;
     parentThreadId: string | null;
   }): Promise<NotificationLevel>;
   getDeliverySettings(): Promise<{
-    mobileEnabled: boolean;
     webEnabled: boolean;
     desktopEnabled: boolean;
   }>;
-  fetch?: PushSenderFetch;
   coalesceMs?: number;
   now?: () => number;
 }
@@ -233,33 +139,15 @@ function describeCaller(caller: ExperimentalPluginRpcCaller): string {
   return caller.kind === "plugin" ? `plugin ${caller.pluginId}` : "a client";
 }
 
-function chunks<T>(items: readonly T[], size: number): T[][] {
-  const result: T[][] = [];
-  for (let index = 0; index < items.length; index += size) {
-    result.push(items.slice(index, index + size));
-  }
-  return result;
-}
-
 export function createPushSender(args: CreatePushSenderArgs): PushSender {
   const {
     bb,
-    subscriptions,
     coalesceMs = DEFAULT_COALESCE_MS,
     now = Date.now,
   } = args;
-  const fetchImpl = args.fetch ?? undiciFetch;
   const pending = new Map<string, PendingThreadPush>();
   const inFlight = new Set<Promise<void>>();
-  let dispatcher: EnvHttpProxyAgent | null = null;
-  let lastNetworkWarningAt = Number.NEGATIVE_INFINITY;
-  let lastOutcome: LastSendOutcome = { status: "never" };
   let running = false;
-
-  async function setLastOutcome(outcome: LastSendOutcome): Promise<void> {
-    lastOutcome = outcome;
-    await bb.storage.kv.set(LAST_OUTCOME_KEY, outcome);
-  }
 
   function cancel(threadId: string): void {
     const entry = pending.get(threadId);
@@ -384,7 +272,6 @@ export function createPushSender(args: CreatePushSenderArgs): PushSender {
     await deliver({
       title: threadDisplayTitle(thread),
       body: preview || FALLBACK_BODIES[resolved.kind],
-      kind: resolved.kind,
       thread,
     });
   }
@@ -395,7 +282,7 @@ export function createPushSender(args: CreatePushSenderArgs): PushSender {
     const title = truncate(notification.title, NOTIFICATION_TITLE_MAX_LENGTH);
     const body = truncate(notification.body, NOTIFICATION_BODY_MAX_LENGTH);
     const config = await args.getDeliverySettings();
-    const channels: ClientNotification["channels"] = [];
+    const channels: DeliveryChannel[] = [];
     if (config.webEnabled) channels.push("web");
     if (config.desktopEnabled) channels.push("desktop");
     if (channels.length > 0) {
@@ -407,45 +294,7 @@ export function createPushSender(args: CreatePushSenderArgs): PushSender {
         channels,
       } satisfies ClientNotification);
     }
-    if (!config.mobileEnabled) return channels;
-    const rows = await subscriptions.list();
-    if (rows.length === 0) return channels;
-    const serverUrl = bb.server.experimental_appUrl;
-    const data = {
-      kind: notification.kind,
-      ...(notification.thread === null
-        ? {}
-        : {
-            projectId: notification.thread.projectId,
-            threadId: notification.thread.id,
-          }),
-      ...(serverUrl === null ? {} : { serverUrl }),
-    };
-    const deliveries: Delivery[] = rows.map((subscription) => ({
-      subscription,
-      message: {
-        to: subscription.expoPushToken,
-        title,
-        body,
-        data: { ...data, subscriptionId: subscription.id },
-        sound: "default",
-        channelId: "threads",
-        priority: "high",
-      },
-    }));
-    let sentCount = 0;
-    let failure: string | null = null;
-    for (const batch of chunks(deliveries, EXPO_PUSH_BATCH_SIZE)) {
-      const result = await sendBatch(batch);
-      sentCount += result.sentCount;
-      failure ??= result.failure;
-    }
-    await setLastOutcome(
-      failure === null
-        ? { status: "sent", at: now(), sentCount }
-        : { status: "failed", at: now(), reason: failure },
-    );
-    return sentCount > 0 ? [...channels, "mobile"] : channels;
+    return channels;
   }
 
   async function send(
@@ -468,12 +317,11 @@ export function createPushSender(args: CreatePushSenderArgs): PushSender {
           `Thread not found: ${threadId}`,
         );
       }
-      thread = { id: found.id, projectId: found.projectId };
+      thread = { id: found.id };
     }
     const delivery = deliver({
       title: input.title,
       body: input.body,
-      kind: SENT_NOTIFICATION_KIND,
       thread,
     });
     const tracked = delivery.then(
@@ -489,91 +337,6 @@ export function createPushSender(args: CreatePushSenderArgs): PushSender {
     return channels;
   }
 
-  async function sendBatch(batch: readonly Delivery[]): Promise<BatchResult> {
-    const activeDispatcher = dispatcher;
-    if (activeDispatcher === null) {
-      return { sentCount: 0, failure: "sender is stopped" };
-    }
-    let responseText: string;
-    let status: number;
-    try {
-      const response = await fetchImpl(await args.getExpoPushUrl(), {
-        method: "POST",
-        headers: {
-          accept: "application/json",
-          "content-type": "application/json",
-        },
-        body: JSON.stringify(batch.map((delivery) => delivery.message)),
-        dispatcher: activeDispatcher,
-      });
-      status = response.status;
-      responseText = await response.text();
-    } catch {
-      const warningAt = now();
-      if (warningAt - lastNetworkWarningAt >= NETWORK_WARNING_INTERVAL_MS) {
-        lastNetworkWarningAt = warningAt;
-        bb.log.warn(
-          `Expo push request failed for subscription rows ${batch.map((delivery) => delivery.subscription.id).join(", ")}`,
-        );
-      }
-      return { sentCount: 0, failure: "network request failed" };
-    }
-    const parsed = expoPushResponseSchema.safeParse(
-      (() => {
-        try {
-          return JSON.parse(responseText) as unknown;
-        } catch {
-          return null;
-        }
-      })(),
-    );
-    if (!parsed.success) {
-      bb.log.warn(
-        `Expo push response was not understood for ${batch.length} subscription rows with status ${status}`,
-      );
-      return { sentCount: 0, failure: "relay returned an invalid response" };
-    }
-    if (parsed.data.errors && parsed.data.errors.length > 0) {
-      const codes = parsed.data.errors.map((error) => error.code ?? "unknown");
-      bb.log.warn(
-        `Expo push request was rejected with codes ${codes.join(", ")}`,
-      );
-      return { sentCount: 0, failure: "relay rejected the request" };
-    }
-    if (parsed.data.data === undefined) {
-      bb.log.warn(
-        `Expo push response returned no tickets with status ${status}`,
-      );
-      return { sentCount: 0, failure: "relay returned no tickets" };
-    }
-    let sentCount = 0;
-    let ticketFailure = false;
-    for (const [index, ticket] of parsed.data.data.entries()) {
-      const delivery = batch[index];
-      if (!delivery) continue;
-      if (ticket.status === "ok") {
-        sentCount += 1;
-        continue;
-      }
-      const errorCode = ticket.details?.error ?? "unknown";
-      if (errorCode === "DeviceNotRegistered") {
-        await subscriptions.remove(delivery.subscription.id);
-        bb.log.info(
-          `Removed push subscription row ${delivery.subscription.id}: device is not registered`,
-        );
-        continue;
-      }
-      ticketFailure = true;
-      bb.log.warn(
-        `Expo push ticket reported ${errorCode} for subscription row ${delivery.subscription.id}`,
-      );
-    }
-    return {
-      sentCount,
-      failure: ticketFailure ? "relay rejected one or more tickets" : null,
-    };
-  }
-
   async function settle(): Promise<void> {
     while (inFlight.size > 0) {
       await Promise.allSettled([...inFlight]);
@@ -581,7 +344,6 @@ export function createPushSender(args: CreatePushSenderArgs): PushSender {
   }
 
   return {
-    getLastOutcome: () => lastOutcome,
     onInteractionPending(payload) {
       schedule(
         payload.thread.id,
@@ -598,13 +360,7 @@ export function createPushSender(args: CreatePushSenderArgs): PushSender {
     },
     send,
     settle,
-    async start() {
-      if (running) return;
-      const stored = lastSendOutcomeSchema.safeParse(
-        await bb.storage.kv.get<unknown>(LAST_OUTCOME_KEY),
-      );
-      if (stored.success) lastOutcome = stored.data;
-      dispatcher = new EnvHttpProxyAgent();
+    start() {
       running = true;
     },
     async stop() {
@@ -612,9 +368,6 @@ export function createPushSender(args: CreatePushSenderArgs): PushSender {
       running = false;
       for (const threadId of [...pending.keys()]) cancel(threadId);
       await settle();
-      const activeDispatcher = dispatcher;
-      dispatcher = null;
-      await activeDispatcher?.close();
     },
   };
 }

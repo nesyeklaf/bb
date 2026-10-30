@@ -58,7 +58,7 @@ it("previews occupied ports without creating data or starting services", async (
         dataDir: z.string(),
         serverPort: z.number(),
         daemonPort: z.number(),
-        serverBindHost: z.string(),
+        serverBindAddresses: z.array(z.string()),
       })
       .parse(JSON.parse(output));
     expect(preview).toEqual({
@@ -66,7 +66,7 @@ it("previews occupied ports without creating data or starting services", async (
       dataDir,
       serverPort: address.port,
       daemonPort: address.port,
-      serverBindHost: "127.0.0.1",
+      serverBindAddresses: ["127.0.0.1"],
     });
     expect(existsSync(dataDir)).toBe(false);
   } finally {

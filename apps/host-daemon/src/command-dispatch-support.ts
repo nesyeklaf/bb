@@ -15,14 +15,11 @@ import {
   type HostDaemonBridgeLaunch,
   type HostDaemonInjectedSkillSource,
   type HostDaemonOnlineRpcCommand,
-  type HostDaemonConnectTunnelIdentity,
   type WorkspaceContext,
 } from "@bb/host-daemon-contract";
 import { BRIDGE_JSON_RPC_ERRORS } from "@bb/provider-bridge-protocol";
 import type {
   CommandListResult,
-  ProviderInstallationCommand,
-  ProviderInstallationRunResult,
   ProviderInstallationStatus,
 } from "@bb/provider-bridge-protocol";
 import { ensurePluginProcessDataDir } from "@bb/process-utils";
@@ -86,24 +83,11 @@ export interface CommandDispatchOptions {
     bridgeLaunch: AgentRuntimeBridgeLaunch;
     cwd?: string;
     requirement?: "thread_rewind";
-    checkUpdates?: boolean;
   }) => Promise<ProviderInstallationStatus>;
-  providerInstallationRun: (args: {
-    providerId: string;
-    action: "install" | "update";
-    bridgeLaunch: AgentRuntimeBridgeLaunch;
-    cwd?: string;
-  }) => Promise<ProviderInstallationRunResult>;
-  streamProviderInstallation?: (args: {
-    providerId: string;
-    plan: ProviderInstallationCommand;
-    env?: NodeJS.ProcessEnv;
-  }) => ReadableStream<Uint8Array>;
   refreshShellEnv: (args: { allowStale: boolean }) => Promise<void>;
   resolveInteractiveRequest?: (
     request: InteractiveResolveCommandInput,
   ) => Promise<void>;
-  ensureConnectTunnelIdentity?: () => Promise<HostDaemonConnectTunnelIdentity>;
   serverMove?: ServerMoveService;
   threadStorageRootPath: string;
 }

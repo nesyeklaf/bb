@@ -19,7 +19,6 @@ const mobileHandshake: NativeShellHandshake = {
 };
 
 const desktopInfo = {
-  lastCheckedAt: null,
   latestVersion: null,
   pendingVersion: null,
   platform: "macos",

@@ -26,7 +26,6 @@ import {
 import type { ProjectCommandWorkspace as CommandWorkspace } from "../projects/project-workspace.js";
 import { resolveServerOwnedSkillCatalogEntries } from "./injected-skills.js";
 import { resolveSkillCatalog } from "./skill-catalog.js";
-import { readRegistrySkillProvenance } from "./registry-skill-provenance.js";
 import { hostPathDirname, resolveSharedSkills } from "./shared-skills.js";
 import {
   DEFAULT_PATH_LIST_EXCLUDE_NAMES,
@@ -152,7 +151,6 @@ export function assembleSkillList(
             : null,
         filePath: skill.filePath,
         manageable: mapped.manageable && !skill.linked,
-        registrySkillId: null,
       });
     }
   }
@@ -186,7 +184,6 @@ async function listServerOwnedSkills(deps: AppDeps): Promise<SkillSummary[]> {
         pluginId: null,
         filePath: path.join(rootPath, runtimeSource.entryPath),
         manageable: true,
-        registrySkillId: readRegistrySkillProvenance(rootPath),
       };
     })
     .filter((skill): skill is SkillSummary => skill !== null)
@@ -214,7 +211,6 @@ async function listBbPluginSkills(deps: AppDeps): Promise<SkillSummary[]> {
         pluginId: provenance.pluginId,
         filePath: path.join(rootPath, runtimeSource.entryPath),
         manageable: false,
-        registrySkillId: null,
       };
     })
     .filter((skill): skill is SkillSummary => skill !== null)

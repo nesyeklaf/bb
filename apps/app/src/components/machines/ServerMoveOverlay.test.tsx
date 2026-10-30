@@ -82,10 +82,9 @@ function move(overrides: Partial<ServerMoveStatus> = {}): ServerMoveStatus {
   return {
     moveId: "move_1",
     state: "preparing",
-    mode: "connect",
     targetHostId: "host_desk",
     targetHostName: "desk",
-    serverUrl: "https://sawyer.getbb.app",
+    serverUrl: "https://sawyer.example.test",
     destinationStatusUrl: null,
     startedAt: 1_000,
     finishedAt: null,
@@ -358,7 +357,6 @@ describe("ServerMoveOverlay", () => {
       .mockResolvedValueOnce({
         move: move({
           state: "completed",
-          mode: "direct",
           serverUrl: "https://desk.example.com/",
           destinationStatusUrl: "https://desk.example.com/health",
           cancellable: false,
@@ -404,40 +402,6 @@ describe("ServerMoveOverlay", () => {
         .getAttribute("href"),
     ).toBe(destination);
     expect(navigateTo).toHaveBeenCalledTimes(1);
-  });
-
-  it("waits for a bb connect move to answer on the same address, then dismisses with a toast", async () => {
-    vi.mocked(sdk.experimental_server.moveStatus)
-      .mockResolvedValueOnce({
-        move: move({
-          state: "completed",
-          cancellable: false,
-          finishedAt: 2_000,
-          steps: ALL_DONE,
-        }),
-        lastMove: null,
-      })
-      .mockRejectedValueOnce(new TypeError("Failed to fetch"))
-      .mockResolvedValueOnce({
-        move: null,
-        lastMove: lastMove({ moveId: "move_0", toHostName: "old-desk" }),
-      })
-      .mockResolvedValue({ move: null, lastMove: lastMove() });
-    realtime.state = "reconnecting";
-    const { navigateTo } = renderOverlay();
-
-    expect(
-      await screen.findByRole("dialog", { name: "Reconnecting to desk…" }),
-    ).toBeDefined();
-
-    await waitFor(() => {
-      expect(vi.mocked(appToast.success)).toHaveBeenCalledWith(
-        "Server moved to desk",
-      );
-    });
-    expect(screen.queryByRole("dialog")).toBeNull();
-    expect(navigateTo).not.toHaveBeenCalled();
-    expect(vi.mocked(appToast.success)).toHaveBeenCalledTimes(1);
   });
 
   it("shows why a followed move failed and stays dismissed after Close", async () => {
@@ -532,7 +496,6 @@ describe("ServerMoveOverlay", () => {
       .mockResolvedValueOnce({
         move: move({
           state: "switching",
-          mode: "direct",
           serverUrl: "https://desk.example.com",
           cancellable: false,
         }),

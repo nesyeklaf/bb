@@ -1,4 +1,4 @@
-import { and, eq, isNotNull, isNull } from "drizzle-orm";
+import { and, eq, isNotNull, isNull, like, or } from "drizzle-orm";
 import type { DbConnection, DbQueryConnection } from "../connection.js";
 import { installedPlugins, pluginArtifacts } from "../schema.js";
 
@@ -245,6 +245,21 @@ export function listInstalledPlugins(db: DbConnection): InstalledPluginRow[] {
           ? artifactPath
           : plugin.rootDir,
     }));
+}
+
+export function listNpmSourcedPluginRegistrations(
+  db: DbConnection,
+): InstalledPluginRow[] {
+  return db
+    .select()
+    .from(installedPlugins)
+    .where(
+      or(
+        eq(installedPlugins.sourceKind, "npm"),
+        like(installedPlugins.source, "npm:%"),
+      ),
+    )
+    .all();
 }
 
 export function getInstalledPlugin(

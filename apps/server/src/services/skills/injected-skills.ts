@@ -14,7 +14,8 @@ import { hashSkillTreeFiles } from "@bb/host-daemon-contract/skill-tree";
 import { z } from "zod";
 import type { ServerLogger } from "../../types.js";
 import { joinHostPathSegments } from "../lib/host-path.js";
-import { REGISTRY_SKILL_PROVENANCE_FILE_NAME } from "./registry-skill-provenance.js";
+
+const LEGACY_REGISTRY_PROVENANCE_FILE_NAME = ".bb-registry-skill.json";
 
 const SKILL_NAME_PATTERN = /^(?!.*--)[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?$/u;
 
@@ -191,7 +192,7 @@ export class SkillTreeRegistry {
     ).sort(sortDirentsByName)) {
       if (
         currentPath === rootPath &&
-        entry.name === REGISTRY_SKILL_PROVENANCE_FILE_NAME
+        entry.name === LEGACY_REGISTRY_PROVENANCE_FILE_NAME
       ) {
         continue;
       }

@@ -19,7 +19,7 @@ import {
   usePluginMarketplaces,
 } from "@/hooks/queries/plugin-catalog-queries";
 
-const SOURCE_PLACEHOLDER = "https://example.com/marketplace.json";
+const SOURCE_PLACEHOLDER = "git:github.com/acme/bb-marketplace@main";
 const SUBDIRECTORY_PLACEHOLDER = "Subdirectory (optional)";
 
 function formatRefreshedAt(marketplace: PluginMarketplace): string {
@@ -145,7 +145,7 @@ export function MarketplacesSettingsSection() {
           </Button>
         </div>
         <p className="text-2xs text-subtle-foreground">
-          An https manifest URL, <code>git:&lt;url&gt;[@&lt;ref&gt;]</code>, or{" "}
+          <code>git:&lt;url&gt;[@&lt;ref&gt;]</code> or{" "}
           <code>path:&lt;directory&gt;</code> on the bb server&rsquo;s machine.
           {isGitSource
             ? " Set a subdirectory when the repository keeps marketplace.json outside its root."

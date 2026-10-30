@@ -17,27 +17,18 @@ import {
 } from "./install-sources.js";
 import { readPluginManifest } from "./manifest.js";
 import {
-  createNpmResolverRun,
-  type NpmResolverRun,
   resolveGitRef,
   resolveGitUpdate,
-  resolveNpmUpdate,
-  selectNpmCandidate,
   type CompatibilityProblem,
   type GitCandidateProbe,
   type GitCandidateProbeResult,
-  type NpmSourceIntentForResolution,
   type PluginResolvedUpdateVersion,
   type PluginUpdateResolution,
 } from "./update-resolver.js";
 import { PluginActivationRolledBackError } from "./plugin-activation.js";
 import type { SafeModeActivationRefusalArgs } from "./plugin-runtime.js";
 import type { createPluginActivation } from "./plugin-activation.js";
-import {
-  createListedRegistryNpmResolverRun,
-  type createManagedPluginArtifacts,
-} from "./managed-plugin-artifacts.js";
-import { MARKETPLACE_FETCH_TIMEOUT_MS } from "../plugin-catalog/marketplace-http.js";
+import type { createManagedPluginArtifacts } from "./managed-plugin-artifacts.js";
 import { removeUnusedPluginArtifacts } from "./plugin-artifact-gc.js";
 import {
   SERVER_MOVE_FROZEN_RETRY_MS,
@@ -107,19 +98,6 @@ export function parsePersistedUpdateEntry(
 }
 const UPDATE_CHECK_CONCURRENCY = 4;
 
-function npmRunForRow(row: InstalledPluginRow): NpmResolverRun {
-  const registry = row.provenance === "catalog" ? row.sourceNpmRegistry : null;
-  return registry === null
-    ? createNpmResolverRun({
-        fetch: (input, init) =>
-          fetch(input, {
-            ...init,
-            signal: AbortSignal.timeout(MARKETPLACE_FETCH_TIMEOUT_MS),
-          }),
-      })
-    : createListedRegistryNpmResolverRun(registry);
-}
-
 export interface PluginUpdates {
   checkForUpdates(id?: string): Promise<PluginUpdateCheckEntry[]>;
   startPeriodicUpdateChecks(): void;
@@ -138,10 +116,9 @@ interface PluginUpdatesContext {
   installedUpdateVersion: (
     row: InstalledPluginRow,
   ) => PluginResolvedUpdateVersion;
-  npmIntentForRow: (row: InstalledPluginRow) => NpmSourceIntentForResolution;
   managedArtifacts: Pick<
     ReturnType<typeof createManagedPluginArtifacts>,
-    "applyNpmCandidate" | "stageGitCandidate"
+    "stageGitCandidate"
   >;
   runArtifactGc: ReturnType<typeof createPluginActivation>["runArtifactGc"];
   safeModeActivationRefusal: (
@@ -159,8 +136,7 @@ export function createPluginUpdates(
     withPluginOperationLock,
     notifyPluginsChanged,
     installedUpdateVersion,
-    npmIntentForRow,
-    managedArtifacts: { applyNpmCandidate, stageGitCandidate },
+    managedArtifacts: { stageGitCandidate },
     runArtifactGc,
     safeModeActivationRefusal,
   } = context;
@@ -330,29 +306,17 @@ export function createPluginUpdates(
 
   async function resolveUpdateForRow(args: {
     row: InstalledPluginRow;
-    npmRun: NpmResolverRun;
   }): Promise<PluginUpdateResolution> {
     const installed = installedUpdateVersion(args.row);
     if (args.row.sourceKind === "path" || args.row.sourceKind === "builtin") {
       return { outcome: "pinned", current: installed };
     }
-    if (
-      args.row.sourceKind === "npm" &&
-      args.row.sourceNpmRegistry?.includes("bb-source=github-release")
-    ) {
+    if (args.row.sourceKind === "npm") {
       return {
         outcome: "unavailable",
         detail:
-          "installed from the retired remote marketplace — remove it and reinstall from Plugins → Browse plugins to switch to the bundled copy",
+          "npm plugin sources are no longer supported — remove it and reinstall from a git repository or a local path",
       };
-    }
-    if (args.row.sourceKind === "npm") {
-      return resolveNpmUpdate({
-        intent: npmIntentForRow(args.row),
-        current: installed,
-        appVersion: deps.appVersion,
-        run: args.npmRun,
-      });
     }
     if (args.row.gitResolvedCommit === null) {
       throw new Error(
@@ -487,10 +451,7 @@ export function createPluginUpdates(
               `plugin "${row.id}" disappeared during update check`,
             );
           }
-          const resolution = await resolveUpdateForRow({
-            row: current,
-            npmRun: npmRunForRow(current),
-          });
+          const resolution = await resolveUpdateForRow({ row: current });
           const checked = checkEntryFromResolution(
             current.id,
             installedUpdateVersion(current),
@@ -584,10 +545,6 @@ export function createPluginUpdates(
         ...(row.sourceGitResolvedTag === null
           ? {}
           : { resolvedTag: row.sourceGitResolvedTag }),
-        ...(row.npmIntegrity === null ? {} : { integrity: row.npmIntegrity }),
-        ...(row.sourceNpmRegistry === null
-          ? {}
-          : { registry: row.sourceNpmRegistry }),
         engines: {
           ...(manifest?.bbEngineRange === undefined
             ? {}
@@ -598,10 +555,7 @@ export function createPluginUpdates(
         },
         installedAt: row.installedAt,
         history: artifacts.map((artifact) => ({
-          version:
-            artifact.sourceKind === "npm"
-              ? (artifact.npmResolvedVersion ?? "unknown")
-              : (artifact.gitResolvedCommit ?? "unknown"),
+          version: artifact.gitResolvedCommit ?? "unknown",
           activatedAt: artifact.validatedAt ?? artifact.updatedAt,
         })),
       };
@@ -622,13 +576,7 @@ export function createPluginUpdates(
           return { ok: false, error: safeModeRefusal };
         }
         const from = installedUpdateVersion(row);
-        const npmRun = npmRunForRow(row);
-        const selectionNpmIntent =
-          row.sourceKind === "npm" ? npmIntentForRow(row) : undefined;
-        const resolution = await resolveUpdateForRow({
-          row,
-          npmRun,
-        });
+        const resolution = await resolveUpdateForRow({ row });
         const checked = checkEntryFromResolution(id, from, resolution);
         persistUpdateEntry(checked);
 
@@ -638,7 +586,7 @@ export function createPluginUpdates(
             error:
               row.sourceKind === "path"
                 ? `plugin "${id}" is a local path source with no update channel; edit it in place and run \`bb plugin reload ${id}\`, or move it with \`bb plugin install path:<new directory>\` (settings, secrets, and schedules are kept)`
-                : `plugin "${id}" is pinned by its source intent; remove and reinstall it with an npm range, a git branch, or a git semver range to track updates`,
+                : `plugin "${id}" is pinned by its source intent; remove and reinstall it with a git branch or a git semver range to track updates`,
           };
         }
         if (resolution.outcome === "incompatible") {
@@ -666,32 +614,7 @@ export function createPluginUpdates(
         }
 
         try {
-          if (row.sourceKind === "npm" && selectionNpmIntent !== undefined) {
-            const selected = await selectNpmCandidate({
-              intent: selectionNpmIntent,
-              appVersion: deps.appVersion,
-              run: npmRun,
-            });
-            if (selected.outcome !== "selected") {
-              throw new Error(
-                `npm candidate changed during update: ${selected.outcome}`,
-              );
-            }
-            if (selected.candidate.version !== to.version) {
-              throw new Error(
-                `npm candidate changed during update: resolved ${to.version}, selected ${selected.candidate.version}`,
-              );
-            }
-            const activationRow = getInstalledPlugin(deps.db, id);
-            if (activationRow === undefined) {
-              throw new Error(`plugin "${id}" disappeared before activation`);
-            }
-            await applyNpmCandidate({
-              row: activationRow,
-              selectionIntent: selectionNpmIntent,
-              candidate: selected.candidate,
-            });
-          } else if (
+          if (
             row.sourceKind === "git" &&
             resolution.outcome === "update-available"
           ) {

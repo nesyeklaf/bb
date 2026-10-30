@@ -16,7 +16,6 @@ import {
   ensureServerMovedRuntime,
   hasLiveBbAppLauncher,
   probeLocalServerMove,
-  readServerMovedConnectCredential,
   readServerMovedLock,
   waitForCommittedServerMove,
   waitForServerMoveDestination,
@@ -46,13 +45,11 @@ async function createTempDir(): Promise<string> {
 
 function movedFile(overrides: Partial<ServerMovedFile> = {}): ServerMovedFile {
   return {
-    connectHandle: "laptop",
     fromHostId: "host-laptop",
-    mode: "connect",
     moveId: "move-1",
     movedAt: 1_750_000_000_000,
     oldCopyEntries: ["bb.db", "attachments"],
-    serverUrl: "https://laptop.getbb.app/",
+    serverUrl: "https://laptop.example.test/",
     toHostId: "host-desktop",
     toHostName: "Studio desktop",
     version: 1,
@@ -106,17 +103,10 @@ async function createStores() {
   };
 }
 
-const CONNECT_MOVE: DesktopServerMove = {
+const MOVE: DesktopServerMove = {
   moveId: "move-1",
   oldCopyKept: true,
-  target: {
-    kind: "connect",
-    server: {
-      handle: "laptop",
-      name: "Studio desktop",
-      url: "https://laptop.getbb.app",
-    },
-  },
+  target: { kind: "custom", url: "https://laptop.example.test" },
   toHostName: "Studio desktop",
 };
 
@@ -138,34 +128,11 @@ describe("readServerMovedLock", () => {
     expect(logWarning).not.toHaveBeenCalled();
   });
 
-  it("selects the bb Connect handle for a connect move", async () => {
-    const dataDir = await createTempDir();
-    await writeServerMovedFile(dataDir, movedFile());
-
-    await expect(
-      readServerMovedLock({ dataDir, logWarning: vi.fn() }),
-    ).resolves.toEqual({
-      moveId: "move-1",
-      oldCopyKept: true,
-      target: {
-        kind: "connect",
-        server: {
-          handle: "laptop",
-          name: "Studio desktop",
-          url: "https://laptop.getbb.app",
-        },
-      },
-      toHostName: "Studio desktop",
-    });
-  });
-
   it("selects a custom URL for a direct move", async () => {
     const dataDir = await createTempDir();
     await writeServerMovedFile(
       dataDir,
       movedFile({
-        connectHandle: null,
-        mode: "direct",
         moveId: "move-2",
         serverUrl: "https://studio.tailnet.ts.net:38886/#stale",
       }),
@@ -199,24 +166,11 @@ describe("readServerMovedLock", () => {
     );
   });
 
-  it("ignores a connect move without a handle", async () => {
-    const dataDir = await createTempDir();
-    await writeServerMovedFile(dataDir, movedFile({ connectHandle: null }));
-    const logWarning = vi.fn();
-
-    await expect(readServerMovedLock({ dataDir, logWarning })).resolves.toBe(
-      null,
-    );
-    expect(logWarning.mock.calls[0]?.[0]).toContain("no connectHandle");
-  });
-
   it("ignores a direct move whose address is not http(s)", async () => {
     const dataDir = await createTempDir();
     await writeServerMovedFile(
       dataDir,
       movedFile({
-        connectHandle: null,
-        mode: "direct",
         serverUrl: "file:///etc/passwd",
       }),
     );
@@ -230,34 +184,6 @@ describe("readServerMovedLock", () => {
 });
 
 describe("applyServerMove", () => {
-  it("switches a builtin target to the connect server and shows the notice once", async () => {
-    const stores = await createStores();
-
-    await expect(
-      applyServerMove({ move: CONNECT_MOVE, ...stores }),
-    ).resolves.toEqual({ noticeShown: true, switched: true });
-    expect(stores.targetStore.getTarget()).toEqual({
-      kind: "connect",
-      server: {
-        handle: "laptop",
-        name: "Studio desktop",
-        url: "https://laptop.getbb.app",
-      },
-    });
-    expect(stores.notices).toEqual([
-      {
-        detail: "bb now opens there. This computer stays connected.",
-        message: "Your bb server moved to Studio desktop",
-      },
-    ]);
-
-    await stores.targetStore.setTarget("builtin");
-    await expect(
-      applyServerMove({ move: CONNECT_MOVE, ...stores }),
-    ).resolves.toEqual({ noticeShown: false, switched: true });
-    expect(stores.targetStore.getTarget()).toMatchObject({ kind: "connect" });
-    expect(stores.notices).toHaveLength(1);
-  });
 
   it("switches to a custom URL for a direct move", async () => {
     const stores = await createStores();
@@ -272,7 +198,7 @@ describe("applyServerMove", () => {
 
   it("remembers the shown move across app restarts", async () => {
     const stores = await createStores();
-    await applyServerMove({ move: CONNECT_MOVE, ...stores });
+    await applyServerMove({ move: MOVE, ...stores });
 
     const restartedTargetStore = createServerTargetStore({
       fs: stores.fs,
@@ -281,7 +207,7 @@ describe("applyServerMove", () => {
     await restartedTargetStore.load();
     const restartedNotices: ServerMovedNotice[] = [];
     await applyServerMove({
-      move: CONNECT_MOVE,
+      move: MOVE,
       noticeStore: createServerMoveNoticeStore({
         fs: stores.fs,
         storagePath: "/user-data/server-move-notice.json",
@@ -293,16 +219,16 @@ describe("applyServerMove", () => {
     });
 
     expect(restartedNotices).toEqual([]);
-    expect(restartedTargetStore.getTarget().kind).toBe("connect");
+    expect(restartedTargetStore.getTarget().kind).toBe("custom");
   });
 
   it("keeps a target the user chose after the notice", async () => {
     const stores = await createStores();
-    await applyServerMove({ move: CONNECT_MOVE, ...stores });
+    await applyServerMove({ move: MOVE, ...stores });
     await stores.targetStore.setCustomServerUrl("https://work.example.com");
 
     await expect(
-      applyServerMove({ move: CONNECT_MOVE, ...stores }),
+      applyServerMove({ move: MOVE, ...stores }),
     ).resolves.toEqual({ noticeShown: false, switched: false });
     expect(stores.targetStore.getTarget()).toEqual({
       kind: "custom",
@@ -312,7 +238,7 @@ describe("applyServerMove", () => {
 
   it("switches and notifies again for a later move", async () => {
     const stores = await createStores();
-    await applyServerMove({ move: CONNECT_MOVE, ...stores });
+    await applyServerMove({ move: MOVE, ...stores });
     await stores.targetStore.setCustomServerUrl("https://work.example.com");
 
     await expect(
@@ -330,7 +256,7 @@ describe("applyServerMove", () => {
     stores.files.set("/user-data/server-move-notice.json", "{broken");
 
     await expect(
-      applyServerMove({ move: CONNECT_MOVE, ...stores }),
+      applyServerMove({ move: MOVE, ...stores }),
     ).resolves.toEqual({ noticeShown: true, switched: true });
     expect(
       JSON.parse(stores.files.get("/user-data/server-move-notice.json") ?? ""),
@@ -500,7 +426,7 @@ describe("createServerMovedWatcher", () => {
     try {
       await vi.waitFor(() => {
         expect(harness.confirmMove).toHaveBeenCalledOnce();
-        expect(harness.onMove).toHaveBeenCalledExactlyOnceWith(CONNECT_MOVE);
+        expect(harness.onMove).toHaveBeenCalledExactlyOnceWith(MOVE);
       });
     } finally {
       harness.watcher.stop();
@@ -524,10 +450,10 @@ describe("createServerMovedWatcher", () => {
 
       await vi.waitFor(() => {
         expect(harness.confirmMove).toHaveBeenCalledExactlyOnceWith(
-          CONNECT_MOVE,
+          MOVE,
           expect.any(Function),
         );
-        expect(harness.onMove).toHaveBeenCalledExactlyOnceWith(CONNECT_MOVE);
+        expect(harness.onMove).toHaveBeenCalledExactlyOnceWith(MOVE);
       });
 
       harness.fakeWatch.emit(SERVER_MOVED_FILE_NAME);
@@ -559,7 +485,7 @@ describe("createServerMovedWatcher", () => {
       harness.fakeWatch.emit(SERVER_MOVED_FILE_NAME);
       harness.timers.flush();
       await vi.waitFor(() => {
-        expect(harness.onMove).toHaveBeenCalledExactlyOnceWith(CONNECT_MOVE);
+        expect(harness.onMove).toHaveBeenCalledExactlyOnceWith(MOVE);
       });
     } finally {
       harness.watcher.stop();
@@ -595,7 +521,7 @@ describe("createServerMovedWatcher", () => {
 
       await vi.waitFor(() => {
         expect(harness.onMove).toHaveBeenCalledExactlyOnceWith({
-          ...CONNECT_MOVE,
+          ...MOVE,
           moveId: "move-3",
         });
       });
@@ -622,7 +548,7 @@ describe("createServerMovedWatcher", () => {
       harness.fakeWatch.emit(SERVER_MOVED_FILE_NAME);
       harness.timers.flush();
       await vi.waitFor(() => {
-        expect(harness.onMove).toHaveBeenCalledExactlyOnceWith(CONNECT_MOVE);
+        expect(harness.onMove).toHaveBeenCalledExactlyOnceWith(MOVE);
       });
     } finally {
       harness.watcher.stop();
@@ -691,7 +617,7 @@ describe("createServerMovedWatcher", () => {
       await writeServerMovedFile(harness.dataDir, movedFile());
       harness.timers.flush();
       await vi.waitFor(() => {
-        expect(harness.onMove).toHaveBeenCalledExactlyOnceWith(CONNECT_MOVE);
+        expect(harness.onMove).toHaveBeenCalledExactlyOnceWith(MOVE);
       });
     } finally {
       harness.watcher.stop();
@@ -712,7 +638,7 @@ describe("createServerMovedWatcher", () => {
       await writeServerMovedFile(harness.dataDir, movedFile());
       harness.timers.flush();
       await vi.waitFor(() => {
-        expect(harness.onMove).toHaveBeenCalledExactlyOnceWith(CONNECT_MOVE);
+        expect(harness.onMove).toHaveBeenCalledExactlyOnceWith(MOVE);
       });
     } finally {
       harness.watcher.stop();
@@ -736,8 +662,6 @@ describe("createServerMovedWatcher", () => {
     await writeServerMovedFile(
       dataDir,
       movedFile({
-        connectHandle: null,
-        mode: "direct",
         moveId: "move-2",
         serverUrl: "https://studio.tailnet.ts.net:38886",
       }),
@@ -778,7 +702,7 @@ describe("waitForCommittedServerMove", () => {
         intervalMs: 1_000,
         isCancelled: () => false,
         logWarning: vi.fn(),
-        move: CONNECT_MOVE,
+        move: MOVE,
         now: () => nowMs,
         probeLocalServer,
         sleep,
@@ -937,7 +861,7 @@ describe("probeLocalServerMove", () => {
         code: "server_moved",
         details: {
           movedAt: 1,
-          serverUrl: "https://laptop.getbb.app",
+          serverUrl: "https://laptop.example.test",
           toHostName: "Studio desktop",
         },
         message: "This bb server moved",
@@ -1034,105 +958,6 @@ describe("hasLiveBbAppLauncher", () => {
     await expect(
       hasLiveBbAppLauncher({ dataDir, isRunning: () => false }),
     ).resolves.toBe(false);
-  });
-});
-
-describe("readServerMovedConnectCredential", () => {
-  async function writeConfig(dataDir: string, config: unknown): Promise<void> {
-    await writeFile(join(dataDir, "config.json"), JSON.stringify(config));
-  }
-
-  it("reads the machine credential the move wrote for this computer", async () => {
-    const dataDir = await createTempDir();
-    await writeConfig(dataDir, {
-      serverHeaders: { "x-bb-connect-machine": "bbcm_laptop" },
-      serverUrl: "https://laptop.getbb.app/",
-    });
-
-    await expect(
-      readServerMovedConnectCredential({
-        dataDir,
-        logWarning: vi.fn(),
-        move: CONNECT_MOVE,
-        remoteServerUrl: "https://laptop.getbb.app",
-      }),
-    ).resolves.toEqual({
-      credential: "bbcm_laptop",
-      handle: "laptop",
-      serverUrl: "https://laptop.getbb.app",
-    });
-  });
-
-  it("does not use the credential for a different server", async () => {
-    const dataDir = await createTempDir();
-    await writeConfig(dataDir, {
-      serverHeaders: { "x-bb-connect-machine": "bbcm_laptop" },
-      serverUrl: "https://laptop.getbb.app",
-    });
-
-    await expect(
-      readServerMovedConnectCredential({
-        dataDir,
-        logWarning: vi.fn(),
-        move: CONNECT_MOVE,
-        remoteServerUrl: "https://work.getbb.app",
-      }),
-    ).resolves.toBeNull();
-  });
-
-  it("does not use a credential that config.json pins to another address", async () => {
-    const dataDir = await createTempDir();
-    await writeConfig(dataDir, {
-      serverHeaders: { "x-bb-connect-machine": "bbcm_old" },
-      serverUrl: "http://127.0.0.1:38886",
-    });
-
-    await expect(
-      readServerMovedConnectCredential({
-        dataDir,
-        logWarning: vi.fn(),
-        move: CONNECT_MOVE,
-        remoteServerUrl: "https://laptop.getbb.app",
-      }),
-    ).resolves.toBeNull();
-  });
-
-  it("returns null for direct moves and missing headers", async () => {
-    const dataDir = await createTempDir();
-    await writeConfig(dataDir, { serverUrl: "https://laptop.getbb.app" });
-
-    await expect(
-      readServerMovedConnectCredential({
-        dataDir,
-        logWarning: vi.fn(),
-        move: CONNECT_MOVE,
-        remoteServerUrl: "https://laptop.getbb.app",
-      }),
-    ).resolves.toBeNull();
-    await expect(
-      readServerMovedConnectCredential({
-        dataDir,
-        logWarning: vi.fn(),
-        move: DIRECT_MOVE,
-        remoteServerUrl: "https://studio.tailnet.ts.net:38886",
-      }),
-    ).resolves.toBeNull();
-  });
-
-  it("logs and returns null for a missing or invalid config.json", async () => {
-    const dataDir = await createTempDir();
-    const logWarning = vi.fn();
-    const args = {
-      dataDir,
-      logWarning,
-      move: CONNECT_MOVE,
-      remoteServerUrl: "https://laptop.getbb.app",
-    };
-
-    await expect(readServerMovedConnectCredential(args)).resolves.toBeNull();
-    await writeFile(join(dataDir, "config.json"), "{broken");
-    await expect(readServerMovedConnectCredential(args)).resolves.toBeNull();
-    expect(logWarning).toHaveBeenCalledTimes(2);
   });
 });
 

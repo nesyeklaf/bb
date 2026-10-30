@@ -28,11 +28,6 @@
       "cache": false,
       "dependsOn": ["@get-bb/plugin-sdk#build"],
       "passThroughEnv": ["DEV_BROWSER_SMOKE_BINARY", "DEV_BROWSER_SMOKE_CHROME"]
-    },
-    "smoke:install": {
-      "cache": false,
-      "dependsOn": ["@get-bb/plugin-sdk#build"],
-      "passThroughEnv": ["DEV_BROWSER_SMOKE_CHROME"]
     }
   }
 }

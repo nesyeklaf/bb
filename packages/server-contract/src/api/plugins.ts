@@ -125,8 +125,6 @@ export const pluginSourceDetailSchema = z.object({
   range: z.string().optional(),
   tagPrefix: z.string().optional(),
   resolvedTag: z.string().optional(),
-  integrity: z.string().optional(),
-  registry: z.string().optional(),
   engines: z.object({
     bb: z.string().optional(),
     bbPluginSdk: z.string().optional(),
@@ -287,8 +285,6 @@ export const pluginInstallRequestSchema = z
   .strict();
 
 export const PLUGIN_MARKETPLACE_NAME_PATTERN = /^[a-z0-9][a-z0-9-]*$/u;
-
-export const CURATED_PLUGIN_MARKETPLACE_NAME = "bb-community";
 
 export const pluginMarketplaceNameSchema = z
   .string()
@@ -564,33 +560,19 @@ export type PluginCatalogSearchResponse = z.infer<
   typeof pluginCatalogSearchResponseSchema
 >;
 
-export const pluginCatalogResolvedSourceSchema = z.discriminatedUnion("kind", [
-  z
-    .object({
-      kind: z.literal("npm"),
-      package: z.string(),
-      range: z.string().optional(),
-      tag: z.string().optional(),
-      registry: z.string().optional(),
-      resolvedVersion: z.string().optional(),
-      resolvedIntegrity: z.string().optional(),
-      unresolvedReason: z.string().optional(),
-    })
-    .strict(),
-  z
-    .object({
-      kind: z.literal("git"),
-      url: z.string(),
-      subdir: z.string().optional(),
-      ref: z.string().optional(),
-      range: z.string().optional(),
-      tagPrefix: z.string().optional(),
-      resolvedTag: z.string().optional(),
-      resolvedCommit: z.string().optional(),
-      unresolvedReason: z.string().optional(),
-    })
-    .strict(),
-]);
+export const pluginCatalogResolvedSourceSchema = z
+  .object({
+    kind: z.literal("git"),
+    url: z.string(),
+    subdir: z.string().optional(),
+    ref: z.string().optional(),
+    range: z.string().optional(),
+    tagPrefix: z.string().optional(),
+    resolvedTag: z.string().optional(),
+    resolvedCommit: z.string().optional(),
+    unresolvedReason: z.string().optional(),
+  })
+  .strict();
 export type PluginCatalogResolvedSource = z.infer<
   typeof pluginCatalogResolvedSourceSchema
 >;
@@ -628,11 +610,7 @@ export const pluginCatalogInstallPlanResponseSchema = z.object({
   plan: pluginCatalogInstallPlanSchema,
 });
 
-export const pluginMarketplaceSourceKindSchema = z.enum([
-  "https",
-  "git",
-  "path",
-]);
+export const pluginMarketplaceSourceKindSchema = z.enum(["git", "path"]);
 
 export const pluginMarketplaceSchema = z.object({
   name: z.string(),

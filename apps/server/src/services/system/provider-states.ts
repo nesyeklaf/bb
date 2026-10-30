@@ -34,8 +34,6 @@ function unknownProviderState(
     planLabel: null,
     installedVersion: null,
     minimumSupportedVersion: null,
-    canInstall: false,
-    canUpdate: false,
     loginCommand: null,
     localLoginCommand: null,
   };

@@ -5,40 +5,6 @@ import {
   threadNotificationInputsSchema,
 } from "./preferences.js";
 
-export const DEFAULT_EXPO_PUSH_URL = "https://exp.host/--/api/v2/push/send";
-export const EXPO_PUSH_TOKEN_MAX_LENGTH = 512;
-export const DEVICE_LABEL_MAX_LENGTH = 120;
-
-export const pushPlatformSchema = z.enum(["ios", "android"]);
-
-export const pushSubscriptionSchema = z
-  .object({
-    id: z.string().min(1),
-    expoPushToken: z.string().min(1).max(EXPO_PUSH_TOKEN_MAX_LENGTH),
-    platform: pushPlatformSchema,
-    deviceLabel: z.string().min(1).max(DEVICE_LABEL_MAX_LENGTH),
-    createdAt: z.number().int().nonnegative(),
-    lastSeenAt: z.number().int().nonnegative(),
-  })
-  .strict();
-
-export const pushSubscriptionSummarySchema = pushSubscriptionSchema
-  .omit({ expoPushToken: true })
-  .extend({ tokenSuffix: z.string().min(1).max(6) })
-  .strict();
-
-export const addPushSubscriptionInputSchema = z
-  .object({
-    expoPushToken: z.string().trim().min(1).max(EXPO_PUSH_TOKEN_MAX_LENGTH),
-    platform: pushPlatformSchema,
-    deviceLabel: z.string().trim().min(1).max(DEVICE_LABEL_MAX_LENGTH),
-  })
-  .strict();
-
-export const removePushSubscriptionInputSchema = z
-  .object({ id: z.string().min(1) })
-  .strict();
-
 export const clientChannelSchema = z.enum(["web", "desktop"]);
 export const CLIENT_NOTIFICATION_CHANNEL = "notification";
 export const clientNotificationSchema = z
@@ -55,8 +21,7 @@ export type ClientNotification = z.infer<typeof clientNotificationSchema>;
 export const NOTIFICATION_TITLE_MAX_LENGTH = 80;
 export const NOTIFICATION_BODY_MAX_LENGTH = 180;
 export const SEND_TEXT_MAX_LENGTH = 4_000;
-export const deliveryChannelSchema = z.enum(["web", "desktop", "mobile"]);
-export type DeliveryChannel = z.infer<typeof deliveryChannelSchema>;
+export type DeliveryChannel = z.infer<typeof clientChannelSchema>;
 export const sendNotificationInputSchema = z
   .object({
     title: z.string().trim().min(1).max(SEND_TEXT_MAX_LENGTH),
@@ -67,7 +32,7 @@ export const sendNotificationInputSchema = z
 export const sendNotificationOutputSchema = z
   .object({
     ok: z.literal(true),
-    channels: z.array(deliveryChannelSchema),
+    channels: z.array(clientChannelSchema),
   })
   .strict();
 export type SendNotificationInput = z.infer<typeof sendNotificationInputSchema>;
@@ -78,7 +43,7 @@ export type SendNotificationOutput = z.infer<
 export const sendNotificationRpcContract = defineRpcContract({
   "notifications.send": {
     experimental_description:
-      "Send a notification to every enabled channel: connected web and desktop clients and registered mobile devices. Title and body are cut to 80 and 180 characters. With threadId, a click opens that thread. Returns the channels it reached; an empty list means nothing was delivered.",
+      "Send a notification to every enabled channel: connected web and desktop clients. Title and body are cut to 80 and 180 characters. With threadId, a click opens that thread. Returns the channels it reached; an empty list means nothing was delivered.",
     input: sendNotificationInputSchema,
     output: sendNotificationOutputSchema,
   },
@@ -86,26 +51,9 @@ export const sendNotificationRpcContract = defineRpcContract({
 
 export const THREAD_NOTIFICATIONS_LIST_MAX_IDS = 200;
 
-const emptyInputSchema = z.object({}).strict();
-export const listPushSubscriptionsOutputSchema = z
-  .object({ subscriptions: z.array(pushSubscriptionSummarySchema) })
-  .strict();
-
 export const pushNotificationsRpcContract = defineRpcContract({
   "notifications.test": {
     input: z.object({ channel: clientChannelSchema }).strict(),
-    output: z.object({ ok: z.literal(true) }).strict(),
-  },
-  "pushSubscriptions.list": {
-    input: emptyInputSchema,
-    output: listPushSubscriptionsOutputSchema,
-  },
-  "pushSubscriptions.add": {
-    input: addPushSubscriptionInputSchema,
-    output: z.object({ id: z.string().min(1), created: z.boolean() }).strict(),
-  },
-  "pushSubscriptions.remove": {
-    input: removePushSubscriptionInputSchema,
     output: z.object({ ok: z.literal(true) }).strict(),
   },
   "threadNotifications.list": {
@@ -145,11 +93,3 @@ export const pushNotificationsRpcContract = defineRpcContract({
     output: threadNotificationInputsSchema,
   },
 });
-
-export type PushSubscription = z.infer<typeof pushSubscriptionSchema>;
-export type PushSubscriptionSummary = z.infer<
-  typeof pushSubscriptionSummarySchema
->;
-export type AddPushSubscriptionInput = z.infer<
-  typeof addPushSubscriptionInputSchema
->;

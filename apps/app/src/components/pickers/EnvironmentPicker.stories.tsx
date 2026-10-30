@@ -1,6 +1,5 @@
 import type { ProjectSource } from "@bb/domain";
 import type { SystemEnvironmentProvider } from "@bb/server-contract";
-import modalLogoUrl from "../../../../../plugins/environment-modal-sandbox/modal-logo.svg?url";
 import { EnvironmentPickerUI } from "./EnvironmentPicker";
 import { ProjectSelector } from "./ProjectSelector";
 import { StoryCard, StoryRow } from "../../../.ladle/story-card";
@@ -451,7 +450,7 @@ const modalComposition: SystemEnvironmentProvider = {
   displayName: "Modal Sandbox",
   description: "Create a project checkout in a new Modal sandbox.",
   icon: "Box",
-  logoUrl: modalLogoUrl,
+  logoUrl: null,
   pluginId: "environment-modal-sandbox",
   acceptsEmptyInputs: true,
   machineAvailability: {},

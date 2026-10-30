@@ -6,8 +6,6 @@ import {
   hostPlatformSchema,
   pathsExistRequestSchema,
   pathsExistResponseSchema,
-  providerCliInstallEventSchema,
-  providerCliInstallRequestSchema,
   providerCliStatusResponseSchema,
   statusResponseSchema,
 } from "../src/index.js";
@@ -122,18 +120,8 @@ describe("provider CLI schemas", () => {
           executableName: "codex",
           executablePath: null,
           installed: false,
-          installSource: "notInstalled",
           currentVersion: null,
-          latestVersion: "0.133.0",
           minimumSupportedVersion: "0.136.0",
-          npmPackageName: "@openai/codex",
-          npmGlobalPackageVersion: null,
-          installAction: {
-            kind: "install",
-            label: "Install",
-            command: "npm install -g @openai/codex@latest",
-          },
-          needsUpdate: false,
           versionUnsupported: false,
         },
         "claude-code": {
@@ -141,18 +129,8 @@ describe("provider CLI schemas", () => {
           executableName: "claude",
           executablePath: "/opt/homebrew/bin/claude",
           installed: true,
-          installSource: "npmGlobal",
           currentVersion: "2.1.147",
-          latestVersion: "2.1.148",
           minimumSupportedVersion: null,
-          npmPackageName: "@anthropic-ai/claude-code",
-          npmGlobalPackageVersion: "2.1.147",
-          installAction: {
-            kind: "update",
-            label: "Update",
-            command: "claude update",
-          },
-          needsUpdate: true,
           versionUnsupported: false,
         },
         "acp-cursor": {
@@ -160,22 +138,11 @@ describe("provider CLI schemas", () => {
           executableName: "agent",
           executablePath: null,
           installed: false,
-          installSource: "notInstalled",
           currentVersion: null,
-          latestVersion: null,
           minimumSupportedVersion: null,
-          npmPackageName: null,
-          npmGlobalPackageVersion: null,
-          installAction: {
-            kind: "install",
-            label: "Install",
-            command:
-              'tmp=$(mktemp "${TMPDIR:-/tmp}/provider-cli-install.XXXXXX") && trap \'rm -f "$tmp"\' EXIT && curl -fsSL https://cursor.com/install -o "$tmp" && bash "$tmp"',
-          },
-          needsUpdate: false,
           versionUnsupported: false,
         },
-      })["claude-code"].needsUpdate,
+      })["claude-code"].installed,
     ).toBe(true);
 
     expect(
@@ -185,18 +152,8 @@ describe("provider CLI schemas", () => {
           executableName: "codex",
           executablePath: "/usr/local/bin/codex",
           installed: true,
-          installSource: "npmGlobal",
           currentVersion: "0.133.0",
-          latestVersion: "0.133.0",
           minimumSupportedVersion: "0.136.0",
-          npmPackageName: "@openai/codex",
-          npmGlobalPackageVersion: "0.133.0",
-          installAction: {
-            kind: "update",
-            label: "Update",
-            command: "codex update",
-          },
-          needsUpdate: false,
           versionUnsupported: true,
         },
         "claude-code": {
@@ -204,19 +161,8 @@ describe("provider CLI schemas", () => {
           executableName: "claude",
           executablePath: null,
           installed: false,
-          installSource: "notInstalled",
           currentVersion: null,
-          latestVersion: "2.1.148",
           minimumSupportedVersion: null,
-          npmPackageName: "@anthropic-ai/claude-code",
-          npmGlobalPackageVersion: null,
-          installAction: {
-            kind: "install",
-            label: "Install",
-            command:
-              'tmp=$(mktemp "${TMPDIR:-/tmp}/provider-cli-install.XXXXXX") && trap \'rm -f "$tmp"\' EXIT && curl -fsSL https://claude.ai/install.sh -o "$tmp" && bash "$tmp"',
-          },
-          needsUpdate: false,
           versionUnsupported: false,
         },
         "acp-cursor": {
@@ -224,34 +170,11 @@ describe("provider CLI schemas", () => {
           executableName: "agent",
           executablePath: "/Users/me/.local/bin/agent",
           installed: true,
-          installSource: "external",
           currentVersion: null,
-          latestVersion: null,
           minimumSupportedVersion: null,
-          npmPackageName: null,
-          npmGlobalPackageVersion: null,
-          installAction: null,
-          needsUpdate: false,
           versionUnsupported: false,
         },
-      })["claude-code"].installAction,
-    ).toMatchObject({ kind: "install" });
-  });
-
-  it("accepts install requests and streamed install events", () => {
-    expect(
-      providerCliInstallRequestSchema.parse({
-        provider: "codex",
-        actionKind: "update",
-      }),
-    ).toEqual({ provider: "codex", actionKind: "update" });
-    expect(
-      providerCliInstallEventSchema.parse({
-        type: "output",
-        provider: "claude-code",
-        stream: "stderr",
-        text: "installing\n",
-      }),
-    ).toMatchObject({ type: "output", stream: "stderr" });
+      })["codex"].versionUnsupported,
+    ).toBe(true);
   });
 });

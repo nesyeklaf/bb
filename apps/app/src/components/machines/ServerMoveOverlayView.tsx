@@ -201,7 +201,7 @@ function ServerMoveOverlayActions({
       </div>
     );
   }
-  if (content.kind === "reconnecting" || content.kind === "waiting") {
+  if (content.kind === "waiting") {
     return null;
   }
   return (
@@ -278,8 +278,6 @@ function overlayTitle(content: VisibleServerMoveOverlayContent): string {
       return `Starting the server on ${name}…`;
     case "redirecting":
       return `Server moved to ${name}`;
-    case "reconnecting":
-      return `Reconnecting to ${name}…`;
     case "ended":
       if (isAbandonedSwitch(content.move)) {
         return "Server move abandoned";
@@ -307,8 +305,6 @@ function overlayDescription(content: VisibleServerMoveOverlayContent): string {
         : `The server on ${name} is starting. This page opens ${content.move.serverUrl} as soon as it answers.`;
     case "redirecting":
       return `Opening the server at ${content.move.serverUrl}…`;
-    case "reconnecting":
-      return `The server on ${name} is starting. This page reconnects as soon as it answers.`;
     case "ended":
       if (isAbandonedSwitch(content.move)) {
         return `The server keeps running here. If ${name} took over anyway, stop the server there.`;

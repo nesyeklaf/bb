@@ -51,7 +51,6 @@ import {
   environmentFilePreviewQueryKeyPrefix,
   hostsQueryKey,
   serverMoveStatusQueryKey,
-  systemAppUpdateQueryKey,
   pluginInstallJobsQueryKey,
   pluginUpdateJobsQueryKey,
   sidebarNavigationQueryKey,
@@ -574,9 +573,6 @@ export const REALTIME_SYSTEM_CHANGE_REGISTRY = {
   },
   "server-move-changed": {
     dirty: [dirtyServerMoveStatusQueries],
-  },
-  "app-update-changed": {
-    dirty: [dirtyAppUpdateStatusQueries],
   },
 } satisfies SystemChangeRegistry;
 
@@ -1187,10 +1183,6 @@ function dirtyMachineEnvironmentQueries({
 
 function dirtyServerMoveStatusQueries(): QueryKey[] {
   return [serverMoveStatusQueryKey()];
-}
-
-function dirtyAppUpdateStatusQueries(): QueryKey[] {
-  return [systemAppUpdateQueryKey()];
 }
 
 function dirtyPluginInstallJobQueries(): QueryKey[] {

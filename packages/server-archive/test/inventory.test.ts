@@ -42,7 +42,6 @@ describe("listServerOwnedEntries", () => {
       "plugins/npm",
       "plugins/snapshots",
       "skills",
-      "telemetry-id",
       "theme",
     ]);
     expect(

@@ -49,45 +49,6 @@ const LIVE_TOAST_DURATION = Infinity;
 
 const TOAST_EXAMPLES: readonly ToastExample[] = [
   {
-    id: "provider-queued",
-    group: "Provider CLI",
-    label: "setup queued",
-    source: "useProviderCliInstallRunner",
-    usage: ["Click Install/Update while another setup is running"],
-    current: {
-      tone: "message",
-      title: "Claude Code update queued",
-      description: "Starts after the current update.",
-    },
-  },
-  {
-    id: "provider-up-to-date",
-    group: "Provider CLI",
-    label: "provider success",
-    source: "useProviderCliInstallRunner",
-    usage: ["Provider CLI install/update succeeds"],
-    current: {
-      tone: "success",
-      title: "Codex is up to date",
-    },
-  },
-  {
-    id: "provider-update-failed",
-    group: "Provider CLI",
-    label: "provider update failed",
-    source: "useProviderCliInstallRunner",
-    usage: [
-      "Provider CLI install/update fails",
-      "View log opens the command output dialog",
-    ],
-    current: {
-      tone: "error",
-      title: "Codex update failed",
-      description: "Command exited with code 1",
-      primaryActionLabel: "View log",
-    },
-  },
-  {
     id: "plugin-update-failed",
     group: "Plugin management",
     label: "update failed",
@@ -102,7 +63,7 @@ const TOAST_EXAMPLES: readonly ToastExample[] = [
       description: pluginNotificationDescription(
         { id: "usage", name: "Usage" },
         "installed",
-        "bb connect: timed out waiting for the tunnel client.",
+        "usage: timed out waiting for the plugin worker.",
       ),
     },
   },

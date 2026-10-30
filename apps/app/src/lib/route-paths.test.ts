@@ -4,7 +4,6 @@ import {
   getPluginConfigurationRoutePath,
   getPluginDetailRoutePath,
   getPluginsRoutePath,
-  getRegistrySkillDetailRoutePath,
   getAutomationDetailRoutePath,
   getAutomationEditRoutePath,
   getAutomationsRoutePath,
@@ -82,11 +81,6 @@ describe("route path helpers", () => {
         skillId: "skill_abc123",
       }),
     ).toBe("/skills/library/skill_abc123");
-    expect(
-      getRegistrySkillDetailRoutePath({
-        registrySkillId: "moss-skills/moss-notes",
-      }),
-    ).toBe("/skills/registry/moss-skills%2Fmoss-notes");
     expect(getPluginsRoutePath()).toBe("/plugins");
     expect(getPluginDetailRoutePath({ pluginId: "github" })).toBe(
       "/plugins/github",
@@ -109,14 +103,12 @@ describe("route path helpers", () => {
       "/plugins/github",
       "/skills",
       "/skills/library/skill_abc123",
-      "/skills/registry/moss-skills%2Fmoss-notes",
       "/extensions",
       "/tools",
       "/tools/plugins/github",
       "/extensions/skills",
       "/extensions/skills/library/skill_abc123",
       "/extensions/skills/installed/skill_abc123",
-      "/extensions/skills/registry/moss-skills%2Fmoss-notes",
       "/extensions/plugins",
       "/extensions/plugins/browse",
       "/extensions/plugins/github",
@@ -129,7 +121,6 @@ describe("route path helpers", () => {
     ["/plugins/", "plugins"],
     ["/plugins/github/", "plugins"],
     ["/skills/", "skills"],
-    ["/skills/registry/", "skills"],
     ["/skills/library/skill_abc123/", "skills"],
   ])("keeps %s in its workspace", (pathname, workspace) => {
     expect(isRoutePath({ path: pathname })).toBe(true);

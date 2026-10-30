@@ -329,8 +329,8 @@ the lease length suits throttled background tabs.
 ## Plugin cache pruning
 
 `bb.sdk.plugins.experimental_pruneCache({ dryRun? })`
-(`POST /plugins/cache/prune`) deletes cached git and npm plugin versions
-under `<data>/plugins/cache` that no installed plugin uses and returns
+(`POST /plugins/cache/prune`) deletes cached git plugin versions and
+leftover npm-era cache entries under `<data>/plugins/cache` that no installed plugin uses and returns
 `{ dryRun, removed, bytes }`; each removed entry has `pluginId` (null for an
 unrecorded directory), `version`, `path`, and `bytes`, counting a shared
 monorepo checkout once. It removes every non-active version regardless of
@@ -1219,6 +1219,30 @@ Decide whether `target` (share ports) belongs here or stays refused. Confirm
 the audience should stay free-form or become a typed server id, and whether a
 plugin may open audiences for servers other than its own.
 
+## `bb.server.internal_DO_NOT_USE_requestPeers`
+
+Internal to bb's own connection overview plugin (`bb--connection-overview`): the `internal_DO_NOT_USE_` prefix marks members that are not part of the plugin API, are not offered to third-party plugins, and may change or disappear in any release.
+
+`internal_DO_NOT_USE_requestPeers({ after? })` returns
+`{ generation, capacity, oldestSeq, latestSeq, peers }` from a ring of 8192
+entries that the first middleware of the server app fills, before the host
+check, so rejected requests and WebSocket upgrades (which `@hono/node-ws`
+dispatches through the same app) are recorded too. Each peer holds `seq`,
+`at`, the socket's remote `address` and `port`, `localPort`, `method`,
+`status`, `websocket` and `tunnelIngress` (the request came through
+`internal_DO_NOT_USE_openTunnelIngress`). It never holds a URL, query, header,
+cookie, body or token, and no request header changes any field. `generation`
+changes when the server restarts; `oldestSeq` above `after + 1` means unread
+entries were overwritten. Recording observes only and changes no access
+decision.
+
+Core callers: none. The `bb--connection-overview` plugin is the only caller.
+
+**Audit before stabilizing.** Decide whether core should show incoming peers
+itself, whether the ring size should be configurable, and whether a typed
+per-request access decision (for example the host check result) belongs in
+the entry.
+
 ## `bb.hosts.internal_DO_NOT_USE_setNextTunnels`, `internal_DO_NOT_USE_nextTunnelStatuses`, `internal_DO_NOT_USE_onNextTunnelStatusChange`
 
 Internal to bb's own connect plugins (`connect`, `bb--connect-next`): the `internal_DO_NOT_USE_` prefix marks members that are not part of the plugin API, are not offered to third-party plugins, and may change or disappear in any release.
@@ -1312,43 +1336,30 @@ bridges need to say about a rejection (installation was deliberately left to
 runtime should bound the `rateLimited` ladder from the hint rather than from
 a constant.
 
-## Provider maintenance toolkit (`experimental_resolveExecutablePath`, `experimental_readCliVersion`, `experimental_commandOutput`, `experimental_versionFrom`, `experimental_compareVersions`, `experimental_formatCommand`, `experimental_npmCommand`, `experimental_npmGlobalInstallCommand`, `experimental_npmLatestVersion`, `experimental_probeNpmGlobalPackage`, `experimental_npmGlobalInstallSource`, `experimental_installationVerification`, `experimental_downloadedInstallerCommand`, `experimental_clampPercent`) (`@get-bb/plugin-sdk/provider-bridge`)
+## Provider maintenance toolkit (`experimental_resolveExecutablePath`, `experimental_readCliVersion`, `experimental_commandOutput`, `experimental_versionFrom`, `experimental_compareVersions`, `experimental_formatCommand`, `experimental_clampPercent`) (`@get-bb/plugin-sdk/provider-bridge`)
 
-These are the host-local probes and install commands behind a bridge's
-`provider/health`, `provider/usage` and `provider/installation/*` answers for
-a user-installed CLI.
+These are the host-local probes behind a bridge's `provider/health`,
+`provider/usage` and `provider/installation/status` answers for a
+user-installed CLI. They only inspect the host; none contacts a registry or
+installs anything.
 
 - Probes: `resolveExecutablePath` returns an absolute path or null, and on
   Windows prefers a PATHEXT match such as an npm `.cmd` launcher.
   `readCliVersion` runs `--version` with stdin closed and returns the first
   valid SemVer token or null. `commandOutput` returns trimmed stdout+stderr
-  or null. The others are `versionFrom`, `npmLatestVersion` and
-  `probeNpmGlobalPackage`.
+  or null. `versionFrom` extracts the SemVer token from text.
 - Decisions: `compareVersions` uses SemVer precedence and throws `TypeError`
-  on invalid input. `npmGlobalInstallSource` returns `npmGlobal`, `external`
-  or `notInstalled`. `installationVerification` passes an install on
-  existence, and an update on reaching the latest version (or any change
-  when the registry was unreachable).
-- Actions: `npmGlobalInstallCommand`; `downloadedInstallerCommand`, which runs
-  a vendor script from a temp file and, given `powershellUrl` on Windows,
-  returns `irm <url> | iex`; `npmCommand`; `formatCommand`; and
-  `clampPercent`.
+  on invalid input.
+- Formatting: `formatCommand` and `clampPercent`.
 
 **Audit before stabilizing.**
 
-1. **Timeouts are fixed.** 5 s for `which`/`--version` and 15 s for npm and
-   self-diagnostics, so a bridge whose CLI is slow to start (a JVM, a
-   first-run download) cannot lengthen them. Decide whether the budgets
-   become arguments before the signatures are a promise.
+1. **Timeouts are fixed.** 5 s for `which`/`--version`, so a bridge whose CLI
+   is slow to start (a JVM, a first-run download) cannot lengthen them.
+   Decide whether the budgets become arguments before the signatures are a
+   promise.
 2. **`compareVersions` throws.** Confirm the throwing contract for invalid
    inputs before stabilization.
-3. **The npm helpers assume a global install.** `probeNpmGlobalPackage` and
-   `npmGlobalInstallSource` model npm's global prefix only; pnpm, volta and
-   corepack shims read as `external`. Decide whether the source enum should
-   grow before it is relied on.
-4. **`downloadedInstallerCommand` without `powershellUrl` is POSIX.** On win32
-   it still returns `sh -c` with `mktemp`, `curl` and `bash`. Decide whether it
-   should refuse there rather than hand the daemon a command that cannot run.
 
 ## Presentation builders (`experimental_presentationTitle`, `experimental_presentationDetail`, `experimental_withTitle`, `experimental_presentationFileName`, `experimental_COMPACTION_PRESENTATION`, `experimental_REASONING_PRESENTATION`, `experimental_fileReadPresentation`, `experimental_searchPresentation`, `experimental_webSearchPresentation`, `experimental_webFetchPresentation`, `experimental_planStepsPresentation`, `experimental_toolPresentation`) (`@get-bb/plugin-sdk/provider-bridge`)
 
@@ -2497,8 +2508,8 @@ Docs: `backend-cli-agents.md`, [provider-plugin-api.md](provider-plugin-api.md) 
    instead of waiting for the next poll.
 3. **Voice payloads.** `transcribe` receives the whole `File` in process
    (25 MB cap). Decide whether streaming matters for long recordings.
-4. **Automatic order as policy.** Core prioritizes bb cloud, then sorts
-   by plugin id and service id, including third-party plugins. Decide whether
+4. **Automatic order as policy.** Core prioritizes the thread provider's
+   service, then sorts by plugin id and service id, including third-party plugins. Decide whether
    this order and automatic inclusion should become user-editable settings.
 5. **Several services per plugin.** Confirm the id-per-registration shape and
    the per-plugin id scope (plugin id plus service id).
@@ -3625,11 +3636,11 @@ switch starts, and in `recovery_required` it rolls the switch back.
 copy. All of them refuse machine credentials. Everything except status and
 cancel requires the default-off `serverMove` experiment (403
 `server_move_experiment_disabled`). CLI:
-`bb server move|export|import|unlock|allow-connect|delete-old-copy|install-machine-service`.
+`bb server move|export|import|unlock|delete-old-copy|install-machine-service`.
 
 Before stabilization, audit: authorization for plugin backends (`bb.sdk` runs
 with owner access, so a plugin can export every secret or move the server);
-the switch ordering against the bb connect tunnel and daemons that miss
+the switch ordering against daemons that miss
 `server.moved`; archive size limits and streaming memory use; cancellation
 and failure recovery at every step, including a server restart mid-move;
 behavior when the target runs a provider-managed machine; and whether
@@ -3815,19 +3826,6 @@ be cancelled during activation or rollback.
 
 Stabilization requires exercising reconnect/reload, concurrent deduplication,
 rollback delivery, missing jobs after restart, and CLI/SDK parity.
-
-## `PluginBbSdk.system.experimental_recordTelemetryEvent`
-
-Posts one anonymous product event to `POST /api/v1/system/telemetry/events`,
-which forwards it to usage telemetry under the install's anonymous id and
-drops it when usage data sharing is off. The schema is a strict allow-list of
-setup-guide and new-thread-submit events; anything else is a 400. Core
-callers, all through `recordTelemetryEvent` in
-`apps/app/src/components/onboarding/onboarding-telemetry.ts`: the setup guide
-(`OnboardingFlow`) and `NewThreadComposer`'s `new_thread_submit` outcomes.
-
-Stabilize after deciding whether third-party plugins may emit product events
-at all and, if so, how they are namespaced and rate limited.
 
 ## `PluginBbSdk.system.experimental_cliCommand`, `experimental_installCliCommand`, and `experimental_removeCliCommand`
 

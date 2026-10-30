@@ -32,7 +32,6 @@ import {
   testLogger,
   type TestAppHarness,
 } from "../../helpers/test-app.js";
-import { createNoopTelemetryService } from "../../../src/services/system/telemetry.js";
 
 const logger = testLogger as unknown as Logger;
 
@@ -104,7 +103,6 @@ describe("plugin skills tier", () => {
     workDir = await mkdtemp(join(tmpdir(), "bb-plugin-skills-test-"));
     service = createPluginService({
       aiServices: createAiServiceRegistry(),
-      telemetry: createNoopTelemetryService(),
       db,
       hub: {
         getDaemonSessionIdForHost: () => null,
@@ -216,7 +214,6 @@ describe("plugin agent contributions reach thread runtime config", () => {
     const db = createMigratedConnection();
     const service = createPluginService({
       aiServices: createAiServiceRegistry(),
-      telemetry: createNoopTelemetryService(),
       db,
       hub: {
         getDaemonSessionIdForHost: () => null,

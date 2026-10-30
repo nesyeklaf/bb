@@ -183,153 +183,30 @@ describe("server target store", () => {
     expect(store.getTarget()).toEqual({ kind: "builtin" });
   });
 
-  it("selects, persists, and refreshes a connect server target", async () => {
-    const { fs } = createMemoryFs();
-    const store = createServerTargetStore({ fs, storagePath: "/tmp/t.json" });
-    await store.load();
-    expect(await store.setTarget("connect")).toBe(false);
-
-    await store.setConnectServer({
-      handle: "laptop",
-      name: "Laptop",
-      url: "https://laptop.getbb.app",
-    });
-    expect(store.getTarget()).toEqual({
-      kind: "connect",
-      server: {
-        handle: "laptop",
-        name: "Laptop",
-        url: "https://laptop.getbb.app",
-      },
-    });
-
-    expect(await store.setTarget("builtin")).toBe(true);
-    expect(
-      await store.refreshConnectServer({
-        handle: "laptop",
-        name: "Laptop Renamed",
-        url: "https://laptop-new.getbb.app",
+  it("opens a saved bb connect target as the built-in server and drops its connect fields", async () => {
+    const { files, fs } = createMemoryFs({
+      "/tmp/t.json": JSON.stringify({
+        connectServer: {
+          handle: "laptop",
+          name: "Laptop",
+          url: "https://laptop.example.test",
+        },
+        connectServerNames: { laptop: "Laptop" },
+        customServerUrl: "https://work.example.test",
+        customServerUrls: ["https://work.example.test"],
+        target: "connect",
       }),
-    ).toBe(true);
-    expect(
-      await store.refreshConnectServer({
-        handle: "unknown",
-        name: "Nope",
-        url: "https://nope.getbb.app",
-      }),
-    ).toBe(false);
+    });
+    const store = createServerTargetStore({ fs, storagePath: "/tmp/t.json" });
+    await store.load();
     expect(store.getTarget()).toEqual({ kind: "builtin" });
-    expect(store.getConnectServer()?.name).toBe("Laptop Renamed");
+    expect(store.getCustomServerUrls()).toEqual(["https://work.example.test"]);
 
-    const reloaded = createServerTargetStore({
-      fs,
-      storagePath: "/tmp/t.json",
-    });
-    await reloaded.load();
-    expect(reloaded.getTarget()).toEqual({ kind: "builtin" });
-    expect(reloaded.getConnectServer()).toEqual({
-      handle: "laptop",
-      name: "Laptop Renamed",
-      url: "https://laptop-new.getbb.app",
-    });
-  });
-
-  it("keeps a connect target while clearing the custom URL", async () => {
-    const { fs } = createMemoryFs();
-    const store = createServerTargetStore({ fs, storagePath: "/tmp/t.json" });
-    await store.load();
-    await store.setCustomServerUrl("https://example.com");
-    await store.setConnectServer({
-      handle: "laptop",
-      name: "Laptop",
-      url: "https://laptop.getbb.app",
-    });
-    await store.setCustomServerUrl(null);
-    expect(store.getTarget().kind).toBe("connect");
-    expect(store.getCustomServerUrl()).toBeNull();
-  });
-
-  it("replaces saved custom URLs with the matching account servers", async () => {
-    const { files, fs } = createMemoryFs();
-    const store = createServerTargetStore({ fs, storagePath: "/tmp/t.json" });
-    await store.load();
-    const brsbl = {
-      handle: "brsbl",
-      name: "default",
-      url: "https://brsbl.getbb.app",
-    };
-    const bbox = {
-      handle: "brsbl-bbox",
-      name: "brsbl-bbox",
-      url: "https://brsbl-bbox.getbb.app",
-    };
-    await store.setConnectServer(brsbl);
-    await store.setCustomServerUrl("https://brsbl.getbb.app/");
-    await store.setCustomServerUrl("https://example.com", { name: "Example" });
-    await store.setCustomServerUrl("https://brsbl-bbox.getbb.app", {
-      name: "Devbox",
-    });
-
-    expect(await store.adoptConnectServers([brsbl, bbox])).toBe(true);
-    expect(store.getTarget()).toEqual({ kind: "connect", server: bbox });
-    expect(store.getCustomServers()).toEqual([
-      { url: "https://example.com", name: "Example" },
-    ]);
-    expect(store.getConnectServerName("brsbl-bbox")).toBe("Devbox");
-    expect(JSON.parse(files.get("/tmp/t.json") ?? "")).toMatchObject({
-      customServerNames: { "https://example.com": "Example" },
-      connectServerNames: { "brsbl-bbox": "Devbox" },
-    });
-    expect(store.getCustomServerUrl()).toBe("https://example.com");
-    expect(await store.adoptConnectServers([brsbl, bbox])).toBe(false);
-
-    const reloaded = createServerTargetStore({
-      fs,
-      storagePath: "/tmp/t.json",
-    });
-    await reloaded.load();
-    expect(reloaded.getTarget()).toEqual({ kind: "connect", server: bbox });
-    expect(reloaded.getCustomServers()).toEqual([
-      { url: "https://example.com", name: "Example" },
-    ]);
-  });
-
-  it("keeps the current target when adopting an inactive custom URL", async () => {
-    const { fs } = createMemoryFs();
-    const store = createServerTargetStore({ fs, storagePath: "/tmp/t.json" });
-    await store.load();
-    await store.setCustomServerUrl("https://laptop.getbb.app");
-    await store.setTarget("builtin");
-
-    expect(
-      await store.adoptConnectServers([
-        { handle: "laptop", name: "Laptop", url: "https://laptop.getbb.app" },
-      ]),
-    ).toBe(false);
-    expect(store.getTarget()).toEqual({ kind: "builtin" });
-    expect(store.getCustomServerUrls()).toEqual([]);
-    expect(store.getCustomServerUrl()).toBeNull();
-    expect(await store.setTarget("custom")).toBe(false);
-  });
-
-  it("keeps custom URLs that differ from an account server by protocol, port, path, or query", async () => {
-    const { fs } = createMemoryFs();
-    const store = createServerTargetStore({ fs, storagePath: "/tmp/t.json" });
-    await store.load();
-    const urls = [
-      "http://laptop.getbb.app",
-      "https://laptop.getbb.app:8443",
-      "https://laptop.getbb.app/other",
-      "https://laptop.getbb.app/?deployment=other",
-    ];
-    for (const url of urls) await store.setCustomServerUrl(url);
-
-    expect(
-      await store.adoptConnectServers([
-        { handle: "laptop", name: "Laptop", url: "https://laptop.getbb.app" },
-      ]),
-    ).toBe(false);
-    expect(store.getCustomServerUrls()).toEqual(urls);
+    await store.setShowBuiltinServer(true);
+    const saved = JSON.parse(files.get("/tmp/t.json") ?? "{}");
+    expect(saved).not.toHaveProperty("connectServer");
+    expect(saved).not.toHaveProperty("connectServerNames");
+    expect(saved.target).toBe("builtin");
   });
 
   it("falls back to builtin when the persisted file is corrupt or dangling", async () => {

@@ -21,7 +21,6 @@ import {
   validateDirectServerUrl,
   type ServerMoveCheckEnvironment,
 } from "../../src/services/server-move/checks.js";
-import type { ServerMoveModeResolution } from "../../src/services/server-move/mode.js";
 import {
   createTestServerMoveEnvironment,
   inspectResult,
@@ -69,9 +68,6 @@ function checkEnvironment(
     fullArtifact: environment.fullArtifact,
     inspectTimeoutMs: 2_000,
     readServerDiskFreeBytes: environment.readServerDiskFreeBytes,
-    resolveMode: async (): Promise<ServerMoveModeResolution> => ({
-      mode: "direct",
-    }),
     serverAppSurface: "web",
     serverTimeZone: "UTC",
     targetServerPort: () => 39_101,
@@ -410,8 +406,6 @@ describe("server move checks", () => {
         port: 39_101,
       });
       expect(result.response).toMatchObject({
-        mode: "direct",
-        requiresServerUrl: true,
         serverUrl: DIRECT_URL,
         targetDataDir: "/home/me/.bb-machines/laptop",
         existingTargetServerData: { path: "/home/me/.bb", sizeBytes: 2_048 },
@@ -790,77 +784,8 @@ describe("server move checks", () => {
           "warning:unencrypted-transfer",
         );
 
-        setAppSettings(harness.db, {
-          ...getAppSettings(harness.db),
-          machineServerUrl: "http://laptop.lan.test:38887",
-        });
-        const connect = await runServerMoveCheck(
-          checkEnvironment(harness, {
-            resolveMode: async () => ({
-              mode: "connect",
-              connectHandle: "laptop",
-              serverUrl: "https://laptop.getbb.test",
-            }),
-          }),
-          { moveInProgress: false, request: request({ serverUrl: null }) },
-        );
-        expect(itemIds(connect.response.items)).toEqual([
-          "info:connect-address",
-          "info:managed-config-replaced",
-          "warning:env-paths-missing",
-          "warning:skipped-server-files",
-        ]);
       } finally {
         await rm(outside, { force: true, recursive: true });
       }
-    }));
-
-  it("keeps the bb connect address and blocks when connect status is unavailable", () =>
-    withTestHarness(async (harness) => {
-      seedHost(harness.deps, { id: OLD, name: "Laptop" });
-      seedPrimaryHost(harness.deps, OLD);
-      seedHost(harness.deps, { id: NEW, name: "Desktop" });
-      seedHost(harness.deps, { id: "host-offline", name: "Studio" });
-      registerInspectingDaemon(harness, NEW, inspectResult());
-
-      const connect = await runServerMoveCheck(
-        checkEnvironment(harness, {
-          resolveMode: async () => ({
-            mode: "connect",
-            connectHandle: "laptop",
-            serverUrl: "https://laptop.getbb.test",
-          }),
-        }),
-        { moveInProgress: false, request: request({ serverUrl: null }) },
-      );
-      expect(connect.response).toMatchObject({
-        mode: "connect",
-        requiresServerUrl: false,
-        serverUrl: "https://laptop.getbb.test",
-        canMove: true,
-      });
-      expect(itemIds(connect.response.items)).toEqual([
-        "info:connect-address",
-        "info:managed-config-replaced",
-        "warning:offline-machines",
-      ]);
-      expect(
-        connect.response.items.find((item) => item.id === "offline-machines")
-          ?.detail,
-      ).toContain("bb connect");
-
-      const unavailable = await runServerMoveCheck(
-        checkEnvironment(harness, {
-          resolveMode: async () => ({
-            mode: "unavailable",
-            message: "bb connect isn't running",
-          }),
-        }),
-        { moveInProgress: false, request: request({ serverUrl: null }) },
-      );
-      expect(itemIds(unavailable.response.items)).toContain(
-        "blocker:connect-unavailable",
-      );
-      expect(unavailable.response.canMove).toBe(false);
     }));
 });

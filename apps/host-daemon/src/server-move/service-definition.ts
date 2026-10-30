@@ -49,7 +49,6 @@ export interface ServerStartArgumentsArgs {
   dataDir: string;
   serverPort: number;
   hostDaemonPort: number;
-  bindHost: string | null;
 }
 
 interface ParsedServiceDefinition {
@@ -436,7 +435,6 @@ export function buildServerStartArguments(
     String(args.serverPort),
     "--host-daemon-port",
     String(args.hostDaemonPort),
-    ...(args.bindHost === null ? [] : ["--server-bind-host", args.bindHost]),
   ];
 }
 

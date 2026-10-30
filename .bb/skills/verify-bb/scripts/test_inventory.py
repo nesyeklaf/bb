@@ -29,11 +29,7 @@ class InventoryTest(unittest.TestCase):
             'packages/plugin-sdk/src/index.ts': 'export {};',
             'apps/desktop/src/main.ts': 'export {};',
             'apps/mobile/app/index.tsx': 'export {};',
-            'apps/web/src/routes/index.tsx': 'createFileRoute("/");',
-            'apps/connect/src/worker.ts': 'export {};',
-            'apps/demo-server/src/index.ts': 'export {};',
             'apps/server/src/index.ts': 'export {};',
-            'scripts/bb-cloud-dev.mjs': 'export {};',
             'plugins/automations/package.json': json.dumps({'bb': {'server': './server.ts'}}),
             'plugins/automations/server.ts': 'bb.cli.register({name: "automation"});',
         }

@@ -224,46 +224,6 @@ describe("@bb/sdk", () => {
     ]);
   });
 
-  it("reads provider installation events through the response instance", async () => {
-    const events = [
-      {
-        type: "started",
-        provider: "codex",
-        command: "npm install --global @openai/codex",
-      },
-      {
-        type: "completed",
-        provider: "codex",
-        exitCode: 0,
-        signal: null,
-        success: true,
-      },
-    ];
-    const response = new Response(null, {
-      status: 200,
-      headers: { "content-type": "application/x-ndjson" },
-    });
-    Object.defineProperty(response, "text", {
-      value: async () =>
-        events.map((event) => JSON.stringify(event)).join("\n"),
-    });
-    const sdk = createBbSdk({
-      transport: createHttpTransport({
-        baseUrl: "http://bb.test",
-        fetch: async () => response,
-        runtime: "node",
-      }),
-    });
-
-    await expect(
-      sdk.hosts.installProviderCli({
-        hostId: "host_test",
-        provider: "codex",
-        actionKind: "install",
-      }),
-    ).resolves.toEqual(events);
-  });
-
   it("sends thread pane presentation actions through the typed transport", async () => {
     const queue = createFetchQueue([{ body: { delivered: 3 } }]);
     const sdk = createBbSdk({
@@ -2140,19 +2100,7 @@ describe("@bb/sdk", () => {
     ).rejects.toBeInstanceOf(ThreadWaitTimeoutError);
   });
 
-  it("exposes installed skills and canonical registry installation", async () => {
-    const registrySkill = {
-      id: "owner/repo/useful-skill",
-      source: "owner/repo",
-      skillId: "useful-skill",
-      name: "Useful skill",
-      installs: 12,
-      stars: null,
-      installUrl: "https://github.com/owner/repo",
-      url: "https://www.skills.sh/owner/repo/useful-skill",
-      topic: null,
-      summary: null,
-    };
+  it("lists installed skills", async () => {
     const queue = createFetchQueue([
       {
         body: {
@@ -2166,20 +2114,10 @@ describe("@bb/sdk", () => {
               pluginId: null,
               filePath: "/skills/local-skill/SKILL.md",
               manageable: true,
-              registrySkillId: null,
             },
           ],
         },
       },
-      {
-        body: {
-          skills: [registrySkill],
-          pagination: { page: 0, perPage: 24, total: 1, hasMore: false },
-          ranking: "trending",
-        },
-      },
-      { body: { stars: 27_053 } },
-      { body: { ok: true, filePath: "/skills/useful-skill/SKILL.md" } },
     ]);
     const sdk = createBbSdk({
       transport: createHttpTransport({
@@ -2192,43 +2130,12 @@ describe("@bb/sdk", () => {
     await expect(
       sdk.skills.list({ projectId: "proj_123", environmentId: null }),
     ).resolves.toMatchObject({ skills: [{ name: "local-skill" }] });
-    await expect(sdk.skills.registry.search()).resolves.toMatchObject({
-      skills: [registrySkill],
-    });
-    await expect(
-      sdk.skills.registry.repositoryStars({ source: registrySkill.source }),
-    ).resolves.toEqual({ stars: 27_053 });
-    await expect(
-      sdk.skills.registry.install({
-        registrySkillId: registrySkill.id,
-      }),
-    ).resolves.toEqual({
-      ok: true,
-      filePath: "/skills/useful-skill/SKILL.md",
-    });
 
     expect(queue.requests).toEqual([
       {
         method: "GET",
         url: "http://bb.test/api/v1/projects/proj_123/skills?environmentId=",
         bodyText: undefined,
-      },
-      {
-        method: "GET",
-        url: "http://bb.test/api/v1/skills-registry?page=0&perPage=24",
-        bodyText: undefined,
-      },
-      {
-        method: "GET",
-        url: "http://bb.test/api/v1/skills-registry/repository-stars?source=owner%2Frepo",
-        bodyText: undefined,
-      },
-      {
-        method: "POST",
-        url: "http://bb.test/api/v1/skills-registry/install",
-        bodyText: JSON.stringify({
-          registrySkillId: registrySkill.id,
-        }),
       },
     ]);
   });

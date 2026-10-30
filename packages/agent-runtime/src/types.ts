@@ -18,7 +18,6 @@ import type {
 import type {
   ProviderHealthResult,
   CommandListResult,
-  ProviderInstallationRunResult,
   ProviderInstallationStatus,
   ProviderUsageResult,
   SkillsConfigureRoot,
@@ -301,7 +300,6 @@ interface ProviderMaintenanceArgs {
 
 interface ProviderInstallationStatusArgs extends ProviderMaintenanceArgs {
   requirement?: "thread_rewind";
-  checkUpdates?: boolean;
 }
 
 export interface AgentRuntime {
@@ -345,10 +343,6 @@ export interface AgentRuntime {
   providerInstallationStatus(
     args: ProviderInstallationStatusArgs,
   ): Promise<ProviderInstallationStatus>;
-
-  providerInstallationRun(
-    args: ProviderMaintenanceArgs & { action: "install" | "update" },
-  ): Promise<ProviderInstallationRunResult>;
 
   listRunningProviders(): string[];
 

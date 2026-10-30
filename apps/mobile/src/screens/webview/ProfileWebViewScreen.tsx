@@ -25,7 +25,6 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { WebViewKeyboardFrame } from "./WebViewKeyboardFrame";
 import { WebView, type WebViewProps } from "react-native-webview";
 import { revealApp, useProfiles } from "@/app-shell";
-import { nativeSessionCache } from "@/lib/native";
 import {
   allowsSubframeLoad,
   bridgeServersForProfiles,
@@ -38,7 +37,6 @@ import {
   resolveShellScreenState,
   revealsShellFailure,
   shellPathFromUrl,
-  shouldReloadForSession,
   subscribeToShellCommands,
   type ShellLoadPhase,
 } from "@/lib/shell";
@@ -57,15 +55,12 @@ const APP_VERSION =
   nativeApplicationVersion ?? String(Constants.expoConfig?.version ?? "0.0.0");
 const ANDROID_VERSION_CODE = Number(nativeBuildVersion);
 
-const IDLE_SESSION = { status: "idle" } as const;
-
 export function ProfileWebViewScreen() {
   const { tokens } = useTheme();
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const params = useLocalSearchParams<{ profileId?: string; path?: string }>();
-  const { status, profiles, activeProfile, connection, setActiveProfile } =
-    useProfiles();
+  const { status, profiles, activeProfile, setActiveProfile } = useProfiles();
 
   const requestedProfileId = firstParam(params.profileId);
   const requestedPath = firstParam(params.path);
@@ -78,7 +73,6 @@ export function ProfileWebViewScreen() {
   }, [activeProfile?.id, profiles, requestedProfileId, setActiveProfile]);
 
   const profile = activeProfile;
-  const session = connection?.session ?? IDLE_SESSION;
   const webViewRef = useRef<WebView>(null);
   const canGoBack = useRef(false);
   const [load, setLoad] = useState<ShellLoadPhase>({ kind: "loading" });
@@ -176,7 +170,6 @@ export function ProfileWebViewScreen() {
     bridge.send({ type: "servers", servers });
   }, [bridge, servers]);
 
-  const connectProfileId = profile?.mode === "connect" ? profile.id : null;
   useEffect(
     () =>
       subscribeToShellCommands((command) => {
@@ -184,14 +177,11 @@ export function ProfileWebViewScreen() {
           webViewRef.current?.clearCache(true);
           void CookieManager.clearAll(false);
           void CookieManager.clearAll(true);
-          if (connectProfileId !== null) {
-            void nativeSessionCache.clear(connectProfileId);
-          }
         }
         setLoad({ kind: "loading" });
         setReloadKey((value) => value + 1);
       }),
-    [connectProfileId],
+    [],
   );
 
   const safeArea = useMemo(
@@ -219,17 +209,6 @@ export function ProfileWebViewScreen() {
     return () => subscription.remove();
   }, [bridge]);
 
-  const previousSession = useRef(session);
-  useEffect(() => {
-    if (
-      shouldReloadForSession(previousSession.current, session, Date.now(), load)
-    ) {
-      setReloadKey((value) => value + 1);
-      setLoad({ kind: "loading" });
-    }
-    previousSession.current = session;
-  }, [load, session]);
-
   const handshake = useMemo<NativeShellHandshake | null>(() => {
     if (profile === null || sourceUrl === null) return null;
     return {
@@ -246,7 +225,6 @@ export function ProfileWebViewScreen() {
       safeArea,
       capabilities: [
         "haptic",
-        "badge",
         "share",
         "open-external",
         "safe-area",
@@ -267,12 +245,10 @@ export function ProfileWebViewScreen() {
     storeReady: status === "ready",
     hasAnyProfile: profiles.length > 0,
     hasProfile: profile !== null && sourceUrl !== null,
-    requiresSession: profile?.mode === "connect",
-    session,
     load,
   });
 
-  const showsFailure = revealsShellFailure(screen, profile?.mode === "connect");
+  const showsFailure = revealsShellFailure(screen);
   useEffect(() => {
     if (showsFailure) revealApp();
   }, [showsFailure]);
@@ -307,20 +283,6 @@ export function ProfileWebViewScreen() {
             {screen.action === "retry" ? (
               <Button testID="shell-retry" onPress={retry}>
                 Try again
-              </Button>
-            ) : null}
-            {screen.action === "re-pair" ? (
-              <Button
-                testID="shell-repair"
-                onPress={() =>
-                  router.push(
-                    profile === null
-                      ? "/settings/servers"
-                      : `/connect?profileId=${encodeURIComponent(profile.id)}`,
-                  )
-                }
-              >
-                Pair again
               </Button>
             ) : null}
             <Button

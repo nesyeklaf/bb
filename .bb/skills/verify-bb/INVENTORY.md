@@ -51,8 +51,6 @@ has been exercised or that every behavior has been understood.
 - `app-route: packages/client-core/src/routes/route-paths.ts: TOOLS_PLUGINS_ROUTE_PATH "/extensions/plugins"`
 - `app-route: packages/client-core/src/routes/route-paths.ts: TOOLS_PLUGIN_BROWSE_ROUTE_PATH "/extensions/plugins/browse"`
 - `app-route: packages/client-core/src/routes/route-paths.ts: TOOLS_PLUGIN_DETAIL_ROUTE_PATH "/extensions/plugins/:pluginId"`
-- `app-route: packages/client-core/src/routes/route-paths.ts: TOOLS_REGISTRY_SKILLS_ROUTE_PATH "/extensions/skills/registry"`
-- `app-route: packages/client-core/src/routes/route-paths.ts: TOOLS_REGISTRY_SKILL_DETAIL_ROUTE_PATH "/extensions/skills/registry/:registrySkillId"`
 - `app-route: packages/client-core/src/routes/route-paths.ts: TOOLS_ROUTE_PATH "/extensions"`
 - `app-route: packages/client-core/src/routes/route-paths.ts: TOOLS_SKILLS_ROUTE_PATH "/extensions/skills"`
 - `app-route: packages/client-core/src/routes/route-paths.ts: TOOLS_SKILL_DETAIL_ROUTE_PATH "/extensions/skills/library/:skillId"`
@@ -257,13 +255,9 @@ has been exercised or that every behavior has been understood.
 
 - `cli-command: apps/cli/src/commands/skill.ts: cli-skills-status`
 - `cli-command: apps/cli/src/commands/skill.ts: delete <skill-id>`
-- `cli-command: apps/cli/src/commands/skill.ts: detail <registry-skill-id>`
 - `cli-command: apps/cli/src/commands/skill.ts: files <skill-id>`
-- `cli-command: apps/cli/src/commands/skill.ts: install <registry-skill-id>`
 - `cli-command: apps/cli/src/commands/skill.ts: install-cli-skills`
 - `cli-command: apps/cli/src/commands/skill.ts: list`
-- `cli-command: apps/cli/src/commands/skill.ts: registry`
-- `cli-command: apps/cli/src/commands/skill.ts: search [query]`
 - `cli-command: apps/cli/src/commands/skill.ts: show <skill-id>`
 - `cli-command: apps/cli/src/commands/skill.ts: skill`
 - `cli-command: apps/cli/src/commands/skill.ts: update <skill-id>`
@@ -682,7 +676,6 @@ has been exercised or that every behavior has been understood.
 - `api-route: packages/server-contract/src/public-api.ts: /hosts/:id/paths/exist post`
 - `api-route: packages/server-contract/src/public-api.ts: /hosts/:id/permission-ceiling patch`
 - `api-route: packages/server-contract/src/public-api.ts: /hosts/:id/pick-folder post`
-- `api-route: packages/server-contract/src/public-api.ts: /hosts/:id/provider-clis/install post`
 - `api-route: packages/server-contract/src/public-api.ts: /hosts/:id/provider-clis/status get`
 - `api-route: packages/server-contract/src/public-api.ts: /hosts/:id/retry-update post`
 - `api-route: packages/server-contract/src/public-api.ts: /hosts/join-codes post`
@@ -877,4 +870,3 @@ has been exercised or that every behavior has been understood.
 - `setting-or-key: packages/domain/src/app-settings.ts: showUnhandledProviderEvents`
 - `setting-or-key: packages/domain/src/app-settings.ts: steerActiveThreadOnEnter`
 - `setting-or-key: packages/domain/src/app-settings.ts: streamerMode`
-- `setting-or-key: packages/domain/src/experiments.ts: changelogPreview`

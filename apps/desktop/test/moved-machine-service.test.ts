@@ -19,14 +19,7 @@ const posixDescribe = process.platform === "win32" ? describe.skip : describe;
 const MOVE: DesktopServerMove = {
   moveId: "move-1",
   oldCopyKept: true,
-  target: {
-    kind: "connect",
-    server: {
-      handle: "desk",
-      name: "Studio desktop",
-      url: "https://desk.getbb.app",
-    },
-  },
+  target: { kind: "custom", url: "https://desk.example.test" },
   toHostName: "Studio desktop",
 };
 

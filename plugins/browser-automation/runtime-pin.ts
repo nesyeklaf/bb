@@ -1,15 +1,13 @@
 import {
   currentPlatform,
-  installRuntime,
-  type InstallOptions,
+  missingRuntimeMessage,
+  verifyInstalled,
   type RuntimeRelease,
 } from "./installer.js";
 
 export const runtimeRelease: RuntimeRelease = {
   package: "dev-browser",
   version: "1.0.0-rc.4",
-  registry: "https://registry.npmjs.org",
-  repository: "SawyerHood/dev-browser",
   artifacts: {
     "linux-x64":
       "fa6cec3f84463e171bd7b307e2e1f0243df59c70c38f96d790dc41b160db921a",
@@ -32,8 +30,7 @@ export async function resolveRuntime(args: {
   dataDir: string;
   signal: AbortSignal;
   release?: RuntimeRelease;
-  env?: NodeJS.ProcessEnv;
-  onProgress?: InstallOptions["onProgress"];
+  onProgress?: (detail: string) => void;
 }): Promise<ResolvedRuntime> {
   const release = args.release ?? runtimeRelease;
   const platform = currentPlatform();
@@ -41,14 +38,10 @@ export async function resolveRuntime(args: {
     throw new Error(
       `DevBrowser has no runtime for ${process.platform}-${process.arch}; choose a Linux or macOS browser host.`,
     );
-  const installed = await installRuntime({
-    release,
-    dataDir: args.dataDir,
-    platform,
-    signal: args.signal,
-    ...(args.env === undefined ? {} : { env: args.env }),
-    ...(args.onProgress === undefined ? {} : { onProgress: args.onProgress }),
-  });
+  args.signal.throwIfAborted();
+  const installed = await verifyInstalled(release, args.dataDir, platform);
+  if (installed === null)
+    throw new Error(missingRuntimeMessage(release, args.dataDir, platform));
   return {
     binary: installed.binary,
     version: release.version,

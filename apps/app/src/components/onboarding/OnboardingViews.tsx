@@ -231,10 +231,6 @@ function agentSubline(state: AgentSetupState): string {
       return "Not installed";
     case "update":
       return state.detail ?? "Update needed";
-    case "installing":
-      return "Installing…";
-    case "installFailed":
-      return state.message;
     case "unknown":
       return state.message ?? "Couldn't check this agent";
   }
@@ -242,29 +238,18 @@ function agentSubline(state: AgentSetupState): string {
 
 interface AgentRowHandlers {
   onSignIn: (id: string) => void;
-  onInstall: (id: string) => void;
-  onViewInstallLog: (id: string) => void;
   onCancelSignIn: (id: string) => void;
 }
 
 function AgentRow({
   agent,
   onSignIn,
-  onInstall,
-  onViewInstallLog,
   onCancelSignIn,
 }: AgentRowHandlers & { agent: OnboardingAgent }) {
   const { state } = agent;
   return (
     <li className="px-3 py-3" data-agent-id={agent.id}>
-      <div
-        className={cn(
-          "items-center gap-3",
-          state.status === "installFailed"
-            ? "grid grid-cols-[1.5rem_minmax(0,1fr)] @min-[36rem]/onboarding:flex"
-            : "flex",
-        )}
-      >
+      <div className="flex items-center gap-3">
         <ProviderIcon
           providerKind="agent"
           provider={agent.provider}
@@ -277,16 +262,13 @@ function AgentRow({
           <span className="text-sm font-medium">{agent.name}</span>
           <ExpandableText
             expandLabel="Show details"
-            className={cn(
-              "text-xs text-muted-foreground",
-              state.status === "installFailed" && "text-destructive-text",
-            )}
+            className="text-xs text-muted-foreground"
           >
             {agentSubline(state)}
           </ExpandableText>
         </div>
         <div className="col-start-2 flex shrink-0 items-center justify-end gap-2">
-          {state.status === "checking" || state.status === "installing" ? (
+          {state.status === "checking" ? (
             <Icon
               name="Spinner"
               aria-hidden
@@ -302,32 +284,6 @@ function AgentRow({
           {state.status === "signIn" && state.canSignIn ? (
             <Button size="sm" onClick={() => onSignIn(agent.id)}>
               Sign in
-            </Button>
-          ) : null}
-          {state.status === "installFailed" ? (
-            <Button
-              size="sm"
-              variant="ghost"
-              onClick={() => onViewInstallLog(agent.id)}
-            >
-              View log
-            </Button>
-          ) : null}
-          {(state.status === "install" ||
-            state.status === "update" ||
-            state.status === "installFailed") &&
-          state.canInstall ? (
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={() => onInstall(agent.id)}
-            >
-              <Icon name="Download" aria-hidden />
-              {state.status === "installFailed"
-                ? "Retry"
-                : state.status === "update"
-                  ? "Update"
-                  : "Install"}
             </Button>
           ) : null}
           {state.status === "signingIn" ? (
@@ -837,43 +793,14 @@ export function OnboardingPluginCard({
   );
 }
 
-function CopyableLine({
-  value,
-  onCopy,
-}: {
-  value: string;
-  onCopy: (value: string) => void;
-}) {
-  return (
-    <div className="mt-3 flex items-center gap-2 rounded-md border border-border bg-surface-recessed py-1 pl-3 pr-1">
-      <code className="min-w-0 flex-1 truncate font-mono text-xs">{value}</code>
-      <Button
-        variant="ghost"
-        size="sm"
-        aria-label="Copy address"
-        onClick={() => onCopy(value)}
-      >
-        <Icon name="Copy" aria-hidden />
-      </Button>
-    </div>
-  );
-}
-
 interface DeviceRowProps {
   icon: IconName;
   title: string;
   description: string;
   action: ReactNode;
-  children?: ReactNode;
 }
 
-function DeviceRow({
-  icon,
-  title,
-  description,
-  action,
-  children,
-}: DeviceRowProps) {
+function DeviceRow({ icon, title, description, action }: DeviceRowProps) {
   return (
     <li className="px-3 py-3">
       <div className="flex items-center gap-3">
@@ -888,69 +815,21 @@ function DeviceRow({
         </div>
         {action}
       </div>
-      {children}
     </li>
   );
 }
 
-export type OnboardingConnectState =
-  | { status: "on"; url: string }
-  | { status: "off" }
-  | { status: "unavailable" };
-
 interface DevicesStepProps {
-  connect: OnboardingConnectState;
-  connectSetup: ReactNode;
-  connectSetupOpen: boolean;
   otherMachineCount: number;
-  mobileLinks: { ios: string; android: string };
-  onToggleConnectSetup: () => void;
-  onCopyConnectUrl: (url: string) => void;
   onAddMachine: () => void;
 }
 
 export function DevicesStep({
-  connect,
-  connectSetup,
-  connectSetupOpen,
   otherMachineCount,
-  mobileLinks,
-  onToggleConnectSetup,
-  onCopyConnectUrl,
   onAddMachine,
 }: DevicesStepProps) {
   return (
     <ul className="divide-y divide-border-hairline rounded-lg border border-border">
-      <DeviceRow
-        icon="ComputerCloud"
-        title="Open bb from any browser"
-        description={
-          connect.status === "unavailable"
-            ? "bb connect is turned off on this server. Enable its plugin to get a private getbb.app address."
-            : "bb connect gives this bb a private getbb.app address that only you can open."
-        }
-        action={
-          connect.status === "on" ? (
-            <span className="flex items-center gap-1.5 text-xs font-medium text-success">
-              <Icon name="CircleCheck" aria-hidden className="size-4" />
-              On
-            </span>
-          ) : connect.status === "off" ? (
-            <Button size="sm" variant="outline" onClick={onToggleConnectSetup}>
-              {connectSetupOpen ? "Hide" : "Set up"}
-            </Button>
-          ) : null
-        }
-      >
-        {connect.status === "on" ? (
-          <CopyableLine value={connect.url} onCopy={onCopyConnectUrl} />
-        ) : null}
-        {connect.status === "off" && connectSetupOpen ? (
-          <div className="mt-3 rounded-md border border-border p-3">
-            {connectSetup}
-          </div>
-        ) : null}
-      </DeviceRow>
       <DeviceRow
         icon="Laptop"
         title="Add another machine"
@@ -963,25 +842,6 @@ export function DevicesStep({
           <Button size="sm" variant="outline" onClick={onAddMachine}>
             Add machine
           </Button>
-        }
-      />
-      <DeviceRow
-        icon="Smartphone"
-        title="Get the mobile app"
-        description="Get a push when a thread needs you."
-        action={
-          <span className="flex items-center gap-2">
-            <Button size="sm" variant="outline" asChild>
-              <a href={mobileLinks.ios} target="_blank" rel="noreferrer">
-                iOS
-              </a>
-            </Button>
-            <Button size="sm" variant="outline" asChild>
-              <a href={mobileLinks.android} target="_blank" rel="noreferrer">
-                Android
-              </a>
-            </Button>
-          </span>
         }
       />
     </ul>

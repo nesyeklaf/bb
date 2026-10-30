@@ -11,9 +11,7 @@ import {
 import { makeWorkspaceStatus } from "bb-plugin-bb--git/testing";
 import { installGitPluginWithHost } from "../helpers/git-plugin.js";
 import { installMachineProvider } from "../helpers/machine-provider.js";
-import {
-  setPluginMachineProviderBridge,
-} from "../../src/services/plugins/plugin-machine-provider-registry.js";
+import { setPluginMachineProviderBridge } from "../../src/services/plugins/plugin-machine-provider-registry.js";
 import {
   startTestServer,
   withTestHarness,
@@ -126,7 +124,9 @@ async function commitThroughRoute(
   });
   expect(
     responder.requests.map((request) =>
-      request.command.type === "plugin.host.call" ? request.command.method : null,
+      request.command.type === "plugin.host.call"
+        ? request.command.method
+        : null,
     ),
   ).toEqual(expect.arrayContaining(["status", "diff"]));
   responder.unregister();
@@ -153,7 +153,7 @@ describe("commit message generation", () => {
       );
 
       await expect(
-        generateCommitMessage(harness.deps, commitMessageArgs),
+        generateCommitMessage(harness.deps, commitMessageArgs, null),
       ).resolves.toBe("fix: export the changed flag");
       const prompt = codex.completeCalls[0]?.prompt ?? "";
       expect(prompt).toContain("uncommitted changes");
@@ -173,6 +173,7 @@ describe("commit message generation", () => {
       const message = await generateCommitMessage(
         harness.deps,
         commitMessageArgs,
+        null,
       );
       expect(message?.length).toBeLessThanOrEqual(72);
       expect(message).toMatch(/^feat: add an extremely long commit subject/u);
@@ -182,13 +183,13 @@ describe("commit message generation", () => {
   it("returns null when no AI service answers", async () => {
     await withTestHarness({}, async (harness) => {
       await expect(
-        generateCommitMessage(harness.deps, commitMessageArgs),
+        generateCommitMessage(harness.deps, commitMessageArgs, null),
       ).resolves.toBeNull();
       registerCodex(harness, async () => {
         throw new Error("Codex request failed");
       });
       await expect(
-        generateCommitMessage(harness.deps, commitMessageArgs),
+        generateCommitMessage(harness.deps, commitMessageArgs, null),
       ).resolves.toBeNull();
     });
   });

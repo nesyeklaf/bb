@@ -23,10 +23,8 @@
         "ITSAppUsesNonExemptEncryption": false,
         "NSAppTransportSecurity": {
           "NSAllowsLocalNetworking": true
-        },
-        "UIBackgroundModes": ["remote-notification"]
-      },
-      "associatedDomains": ["applinks:getbb.app", "applinks:*.getbb.app"]
+        }
+      }
     },
     "android": {
       "package": "app.getbb.mobile",
@@ -37,38 +35,13 @@
         "backgroundImage": "./assets/android-icon-background.png",
         "monochromeImage": "./assets/android-icon-monochrome.png"
       },
-      "predictiveBackGestureEnabled": false,
-      "intentFilters": [
-        {
-          "action": "VIEW",
-          "autoVerify": true,
-          "data": [
-            {
-              "scheme": "https",
-              "host": "*.getbb.app",
-              "pathPrefix": "/threads/"
-            },
-            {
-              "scheme": "https",
-              "host": "*.getbb.app",
-              "pathPrefix": "/projects/"
-            },
-            {
-              "scheme": "https",
-              "host": "*.getbb.app",
-              "pathPrefix": "/settings/"
-            }
-          ],
-          "category": ["BROWSABLE", "DEFAULT"]
-        }
-      ]
+      "predictiveBackGestureEnabled": false
     },
     "web": {
       "favicon": "./assets/favicon.png"
     },
     "plugins": [
       "./plugins/with-selection-accent",
-      "./plugins/with-push-consent",
       "expo-router",
       "expo-secure-store",
       "expo-image",
@@ -87,14 +60,6 @@
               "backgroundColor": "#151515"
             }
           }
-        }
-      ],
-      [
-        "expo-notifications",
-        {
-          "icon": "./assets/android-notification-icon.png",
-          "color": "#000000",
-          "defaultChannel": "threads"
         }
       ],
       "expo-quick-actions",

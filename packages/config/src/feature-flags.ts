@@ -7,10 +7,8 @@ import {
 import {
   BB_FF_PLACEHOLDER_ENV,
   BB_FF_TIMELINE_WINDOW_EVENT_BUDGET_ENV,
-  BB_FF_INITIATOR_TELEMETRY_ENV,
   DEFAULT_BB_FF_PLACEHOLDER,
   DEFAULT_BB_FF_TIMELINE_WINDOW_EVENT_BUDGET,
-  DEFAULT_BB_FF_INITIATOR_TELEMETRY,
 } from "./env-vars.js";
 
 type LoadFeatureFlagsArgs = EnvLoaderArgs;
@@ -24,12 +22,6 @@ export function loadFeatureFlags(
       context: loader.context,
       defaultValue: DEFAULT_BB_FF_PLACEHOLDER,
       definition: BB_FF_PLACEHOLDER_ENV,
-      env: loader.env,
-    }),
-    initiatorTelemetry: readEnvVarWithDefault({
-      context: loader.context,
-      defaultValue: DEFAULT_BB_FF_INITIATOR_TELEMETRY,
-      definition: BB_FF_INITIATOR_TELEMETRY_ENV,
       env: loader.env,
     }),
     timelineWindowEventBudget: readEnvVarWithDefault({

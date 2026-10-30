@@ -118,7 +118,7 @@ describe("Pi version probe", () => {
         ok: true,
         installedVersion: "0.85.1",
       });
-      expect(await getPiProviderInstallationStatus(false)).toMatchObject({
+      expect(await getPiProviderInstallationStatus()).toMatchObject({
         executablePath: path.join(root, "pi.cmd"),
         currentVersion: "0.85.1",
       });

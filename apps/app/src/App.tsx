@@ -49,8 +49,6 @@ import {
   LEGACY_PROJECT_SETTINGS_ROUTE_PATH,
   PLUGIN_DETAIL_ROUTE_PATH,
   PLUGINS_ROUTE_PATH,
-  REGISTRY_SKILL_DETAIL_ROUTE_PATH,
-  REGISTRY_SKILLS_ROUTE_PATH,
   SETTINGS_PLUGIN_ROUTE_PATH,
   SETTINGS_PLUGINS_ROUTE_PATH,
   SETTINGS_MACHINE_ROUTE_PATH,
@@ -62,8 +60,6 @@ import {
   TOOLS_PLUGIN_BROWSE_ROUTE_PATH,
   TOOLS_PLUGIN_DETAIL_ROUTE_PATH,
   TOOLS_PLUGINS_ROUTE_PATH,
-  TOOLS_REGISTRY_SKILL_DETAIL_ROUTE_PATH,
-  TOOLS_REGISTRY_SKILLS_ROUTE_PATH,
   TOOLS_ROUTE_PATH,
   APP_ROOT_ROUTE_PATH,
   TOOLS_SKILL_DETAIL_ROUTE_PATH,
@@ -78,10 +74,8 @@ import {
 import { AppCommandProvider } from "./components/commands/AppCommandProvider";
 import { WindowFindHost } from "./components/layout/WindowFindHost";
 import { DesktopZoomIndicator } from "./components/layout/DesktopZoomIndicator";
-import { ProviderCliInstallLogDialogHost } from "./components/provider-cli/provider-cli-install";
 import { ServerMoveOverlay } from "./components/machines/ServerMoveOverlay";
 import { OnboardingGate } from "./components/onboarding/OnboardingGate";
-import { AppUpdateHost } from "./components/app-update/AppUpdateHost";
 import { PluginInstallJobsHost } from "./components/plugin/PluginInstallJobsHost";
 import { RouteLoadingSkeleton } from "./components/ui/route-loading-skeleton";
 import { ThreadTimelineLoadingSkeleton } from "./components/thread/timeline/ThreadTimelineLoadingSkeleton";
@@ -400,14 +394,6 @@ export function AppRoutes() {
             element={<LegacySkillsPathRedirect />}
           />
           <Route
-            path={TOOLS_REGISTRY_SKILLS_ROUTE_PATH}
-            element={<LegacySkillsPathRedirect />}
-          />
-          <Route
-            path={TOOLS_REGISTRY_SKILL_DETAIL_ROUTE_PATH}
-            element={<LegacySkillsPathRedirect />}
-          />
-          <Route
             path={LEGACY_TOOLS_PREFIX_ROUTE_PATH}
             element={<LegacyToolsPathRedirect />}
           />
@@ -417,11 +403,6 @@ export function AppRoutes() {
           />
           <Route path={SKILLS_ROUTE_PATH} element={<SkillsView />} />
           <Route path={SKILL_DETAIL_ROUTE_PATH} element={<SkillsView />} />
-          <Route path={REGISTRY_SKILLS_ROUTE_PATH} element={<SkillsView />} />
-          <Route
-            path={REGISTRY_SKILL_DETAIL_ROUTE_PATH}
-            element={<SkillsView />}
-          />
           <Route path={PLUGINS_ROUTE_PATH} element={<PluginsRoute />} />
           <Route path={PLUGIN_DETAIL_ROUTE_PATH} element={<PluginsRoute />} />
           <Route
@@ -505,9 +486,7 @@ export function App() {
               </Routes>
               <WindowFindHost />
               <DesktopZoomIndicator />
-              <ProviderCliInstallLogDialogHost />
               <ServerMoveOverlay />
-              <AppUpdateHost />
               <PluginInstallJobsHost />
               <PluginUpdateJobsHost />
             </AppFileExternalNavigationHost>

@@ -16,7 +16,6 @@ import {
   ThreadOpenSignalHandler,
   useAppBoot,
 } from "@/app-shell";
-import { PushNotificationsHost } from "@/notifications";
 import { RootNavigator, RouteErrorBoundary } from "@/screens";
 import { ThemeProvider } from "@/theme";
 import { SheetProvider, Toaster } from "@/ui";
@@ -46,7 +45,6 @@ export default function RootLayout() {
                     <ThreadOpenSignalHandler />
                     <ShareIntentHandler />
                     <QuickActionsHandler />
-                    <PushNotificationsHost />
                     <Toaster />
                     <LaunchSplash />
                   </SheetProvider>

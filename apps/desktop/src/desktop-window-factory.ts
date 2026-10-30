@@ -24,7 +24,7 @@ import {
   MACOS_TRAFFIC_LIGHT_SIZE_PX,
   MACOS_TRAFFIC_LIGHT_TOP_INSET_PX,
 } from "@bb/desktop-contract";
-import { BB_DESKTOP_ZOOM_CHANGED_CHANNEL } from "./desktop-update-ipc.js";
+import { BB_DESKTOP_ZOOM_CHANGED_CHANNEL } from "./desktop-ipc-channels.js";
 
 type DesktopWindowIcon = BrowserWindowConstructorOptions["icon"];
 

@@ -1,12 +1,10 @@
 import { statfs } from "node:fs/promises";
 import type { AppSurface } from "@bb/config/app-surface";
-import type { ServerBindHost } from "@bb/config/server";
 import type {
   AppDeps,
   LoggedPendingInteractionWorkSessionDeps,
 } from "../../types.js";
 import { resumeEnvironmentProvisioningForHost } from "../environments/environment-engine.js";
-import { serverAccess } from "../machines/server-access.js";
 import type { PluginService } from "../plugins/plugin-service.js";
 import { requestQueuedMessageDispatch } from "../threads/queued-message-dispatch.js";
 import type {
@@ -15,8 +13,6 @@ import type {
 } from "./coordinator.js";
 import { exportServerArchive } from "./export.js";
 import { createFullBbAppArtifactService } from "./full-artifact.js";
-import { CONNECT_HOLD_SOURCES } from "./connect-hold.js";
-import { resolveServerMoveMode } from "./mode.js";
 import { stopRunningServerWork } from "./stop-work.js";
 
 export const SERVER_MOVE_ALLOW_LOOPBACK_URL_ENV =
@@ -40,7 +36,6 @@ export const SERVER_MOVE_TIMINGS: ServerMoveTimings = {
 
 export interface CreateDefaultServerMoveEnvironmentArgs {
   appSurface: AppSurface;
-  bindHost: ServerBindHost | null;
   deps: AppDeps;
   env: NodeJS.ProcessEnv;
   pluginService: PluginService;
@@ -108,7 +103,6 @@ export function createDefaultServerMoveEnvironment(
   const targetPortOverride = parseServerMoveTargetPort(args.env);
   return {
     allowLoopbackServerUrl: allowsLoopbackServerMoveUrl(args.env),
-    bindHost: args.bindHost,
     deps,
     exportArchive: (exportArgs) =>
       exportServerArchive({
@@ -132,23 +126,11 @@ export function createDefaultServerMoveEnvironment(
       },
       setSchedulesPaused: (paused) => pluginService.setSchedulesPaused(paused),
       stop: () => pluginService.stop(),
-      suspendAllButConnect: async () => {
-        await pluginService.suspendPlugins({
-          keep: (plugin) =>
-            CONNECT_HOLD_SOURCES.some((source) => source === plugin.source),
-        });
+      suspendAll: async () => {
+        await pluginService.suspendPlugins();
       },
     },
     readServerDiskFreeBytes: () => readDiskFreeBytes(deps.config.dataDir),
-    resolveMode: () => resolveServerMoveMode(deps, pluginService),
-    resolveServerHostGrant: async (hostId, signal) => {
-      const grant = await serverAccess.resolve(deps, {
-        key: hostId,
-        hostId,
-        signal,
-      });
-      return { serverUrl: grant.serverUrl, headers: grant.headers ?? {} };
-    },
     resumeDeferredWork: () => resumeServerMoveDeferredWork(deps),
     retireProcess: args.retireProcess,
     serverAppSurface: args.appSurface,

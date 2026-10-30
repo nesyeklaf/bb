@@ -596,8 +596,6 @@ const ECHO_HEALTH: ProviderHealthResult = {
     planLabel: null,
     installedVersion: null,
     minimumSupportedVersion: null,
-    canInstall: false,
-    canUpdate: false,
     loginCommand: null,
   },
 };

@@ -292,8 +292,9 @@ bb.experimental_aiServices.register({
 - The functions run in the server process. To use host-local state (a login
   file, a local model), call your own `bb.host` entry through
   `bb.hosts.experimental_client`, as the Codex plugin does.
-- Automatic tries bb cloud first, then other compatible registered services
-  by plugin id and service id in lexicographic order. Third-party services
+- Automatic tries the service of the thread's provider first, then other
+  compatible registered services by plugin id and service id in lexicographic
+  order. Third-party services
   participate automatically; explicit selection uses only that service.
 - bb identifies a service by plugin id and service id, so ids only need to be
   unique within your plugin; registering one id twice fails your plugin's

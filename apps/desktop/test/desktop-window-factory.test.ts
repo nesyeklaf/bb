@@ -16,7 +16,7 @@ import {
   type DesktopWindowWebContents,
 } from "../src/desktop-window-factory.js";
 import type { DesktopContextMenuWebContents } from "../src/desktop-context-menu.js";
-import { BB_DESKTOP_ZOOM_CHANGED_CHANNEL } from "../src/desktop-update-ipc.js";
+import { BB_DESKTOP_ZOOM_CHANGED_CHANNEL } from "../src/desktop-ipc-channels.js";
 import { readPersistedWindowStateFile } from "../src/window-state.js";
 import {
   MIN_WINDOW_HEIGHT,

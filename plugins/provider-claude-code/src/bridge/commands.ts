@@ -16,7 +16,6 @@ import {
   commandListParamsSchema,
   bridgeRequestEnvelopeSchema,
   providerMaintenanceParamsSchema,
-  providerInstallationRunParamsSchema,
   providerInstallationStatusParamsSchema,
 } from "@get-bb/plugin-sdk/provider-bridge";
 import { z } from "zod";
@@ -129,10 +128,6 @@ const claudeCodeCommandSchema = z.discriminatedUnion("method", [
   z.object({
     method: z.literal("provider/installation/status"),
     params: providerInstallationStatusParamsSchema,
-  }),
-  z.object({
-    method: z.literal("provider/installation/run"),
-    params: providerInstallationRunParamsSchema,
   }),
   z.object({
     method: z.literal("thread/start"),

@@ -7,7 +7,6 @@ export const READ_ONLY_COMMAND_PATHS: ReadonlySet<string> = new Set([
   "status",
   "guide",
   "settings show",
-  "settings version",
   "settings keyboard list",
   "settings ui list",
   "settings ui get",
@@ -27,7 +26,6 @@ export const READ_ONLY_COMMAND_PATHS: ReadonlySet<string> = new Set([
   "machine providers",
   "machine provider-cli status",
   "machine env list",
-  "updates status",
   "terminal list",
   "terminal show",
   "terminal output",
@@ -71,8 +69,6 @@ export const READ_ONLY_COMMAND_PATHS: ReadonlySet<string> = new Set([
   "skill list",
   "skill show",
   "skill files",
-  "skill search",
-  "skill registry detail",
   "skill cli-skills-status",
 ]);
 

@@ -36,6 +36,11 @@ const REPO_PLUGINS_DIRECTORY_NAME = "plugins";
 
 export const BUILTIN_PLUGINS = [
   {
+    name: "connection-overview",
+    pluginId: "bb--connection-overview",
+    defaultEnabled: true,
+  },
+  {
     name: "storage-retention",
     pluginId: "bb--storage-retention",
     defaultEnabled: false,
@@ -59,26 +64,6 @@ export const BUILTIN_PLUGINS = [
     name: "automations",
     pluginId: "automations",
     defaultEnabled: true,
-  },
-  {
-    name: "bb-account",
-    pluginId: "bb-account",
-    defaultEnabled: true,
-  },
-  {
-    name: "bb-ai",
-    pluginId: "bb-ai",
-    defaultEnabled: true,
-  },
-  {
-    name: "connect",
-    pluginId: "connect",
-    defaultEnabled: true,
-  },
-  {
-    name: "connect-next",
-    pluginId: "bb--connect-next",
-    defaultEnabled: false,
   },
   {
     name: "environment-project-checkout",
@@ -235,17 +220,14 @@ export const BUILTIN_PLUGINS = [
     pluginId: "bb--composer",
     defaultEnabled: true,
   },
-].map((plugin): BundledPluginDefinition => ({
-  ...plugin,
-  autoInstall: true,
-}));
+].map(
+  (plugin): BundledPluginDefinition => ({
+    ...plugin,
+    autoInstall: true,
+  }),
+);
 
 export const OFFICIAL_PLUGINS = [
-  {
-    name: "environment-modal-sandbox",
-    pluginId: "environment-modal-sandbox",
-    defaultEnabled: true,
-  },
   {
     name: "browser-automation",
     pluginId: "browser-automation",
@@ -276,10 +258,12 @@ export const OFFICIAL_PLUGINS = [
     pluginId: "theme-preview",
     defaultEnabled: true,
   },
-].map((plugin): BundledPluginDefinition => ({
-  ...plugin,
-  autoInstall: false,
-}));
+].map(
+  (plugin): BundledPluginDefinition => ({
+    ...plugin,
+    autoInstall: false,
+  }),
+);
 
 export const BUNDLED_PLUGINS: readonly BundledPluginDefinition[] = [
   ...BUILTIN_PLUGINS,

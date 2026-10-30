@@ -1,0 +1,8 @@
+# path prefix	reason
+.github	get-bb CI and release workflows, not run by the fork
+README.md	get-bb download links, no runtime access
+CHANGELOG.md	upstream release history
+apps/mobile/README.md	App Store listing documentation, not in the app bundle
+apps/desktop/README.md	get-bb release documentation
+docs	get-bb release documentation
+plugins/provider-claude-code/src/__fixtures__	recorded transcripts contain the word as data

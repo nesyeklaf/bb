@@ -39,8 +39,6 @@ import {
   pathsExistRequestSchema,
   pathsExistResponseSchema,
   pickFolderResponseSchema,
-  providerCliInstallEventSchema,
-  providerCliInstallActionKindSchema,
 } from "./local.js";
 import { HOST_ARTIFACT_MAX_BYTES } from "./protocol.js";
 import {
@@ -55,11 +53,9 @@ import {
 export {
   HOST_ARTIFACT_MAX_BYTES,
   HOST_DAEMON_COMPATIBLE_PROTOCOL_VERSIONS,
-  HOST_DAEMON_CONNECT_NEXT_PROTOCOL_VERSION,
   HOST_DAEMON_DESKTOP_BROKER_PROOF_PROTOCOL_VERSION,
   HOST_DAEMON_ENVIRONMENT_CLEANUP_INSPECTION_PROTOCOL_VERSION,
   HOST_DAEMON_PROTOCOL_VERSION,
-  hostDaemonSupportsConnectNext,
   hostDaemonSupportsDesktopBrokerProof,
   hostDaemonSupportsEnvironmentCleanupInspection,
   isCompatibleHostDaemonProtocolVersion,
@@ -77,37 +73,6 @@ export const workspaceContextSchema = z.object({
   workspacePath: z.string().min(1),
 });
 export type WorkspaceContext = z.infer<typeof workspaceContextSchema>;
-
-function isConnectBaseDomain(value: string): boolean {
-  try {
-    const parsed = new URL(`https://${value}`);
-    return (
-      parsed.host === value &&
-      parsed.username === "" &&
-      parsed.password === "" &&
-      parsed.pathname === "/" &&
-      parsed.search === "" &&
-      parsed.hash === ""
-    );
-  } catch {
-    return false;
-  }
-}
-
-export const hostDaemonConnectTunnelIdentitySchema = z
-  .object({
-    label: z
-      .string()
-      .min(1)
-      .max(63)
-      .regex(/^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$/)
-      .refine((label) => !label.includes("--")),
-    baseDomain: z.string().min(1).refine(isConnectBaseDomain),
-  })
-  .strict();
-export type HostDaemonConnectTunnelIdentity = z.infer<
-  typeof hostDaemonConnectTunnelIdentitySchema
->;
 
 const hostDaemonThreadTargetSchema = z
   .object({
@@ -671,12 +636,6 @@ const pluginHostDisposeCommandSchema = z
   })
   .strict();
 
-const connectTunnelEnsureIdentityCommandSchema = z
-  .object({
-    type: z.literal("connect-tunnel.ensure-identity"),
-  })
-  .strict();
-
 const directoryEntrySchema = z.object({
   kind: hostPathEntryKindSchema,
   name: z.string(),
@@ -937,15 +896,6 @@ const providerInstallationStatusCommandSchema = z
   })
   .strict();
 
-const providerInstallationRunCommandSchema = z
-  .object({
-    type: z.literal("provider.installation.run"),
-    providerId: z.string().min(1),
-    action: providerCliInstallActionKindSchema,
-    bridgeLaunch: hostDaemonBridgeLaunchSchema,
-  })
-  .strict();
-
 export type {
   ProviderHealth,
   ProviderHealthResult,
@@ -1195,12 +1145,6 @@ const providerUsageCommandSchema = z
     type: z.literal("provider.usage"),
     providerId: z.string().min(1),
     bridgeLaunch: hostDaemonBridgeLaunchSchema,
-  })
-  .strict();
-
-const providerCliInstallResultSchema = z
-  .object({
-    events: z.array(providerCliInstallEventSchema),
   })
   .strict();
 
@@ -1696,15 +1640,6 @@ export const hostDaemonCommandRegistry = {
     flushEventsBeforeResult: false,
     envLane: null,
   }),
-  "connect-tunnel.ensure-identity": defineHostDaemonCommandDescriptor({
-    type: "connect-tunnel.ensure-identity",
-    schema: connectTunnelEnsureIdentityCommandSchema,
-    resultSchema: hostDaemonConnectTunnelIdentitySchema,
-    transport: "onlineRpc",
-    retryable: true,
-    flushEventsBeforeResult: false,
-    envLane: null,
-  }),
   "host.list_commands": defineHostDaemonCommandDescriptor({
     type: "host.list_commands",
     schema: hostListCommandsCommandSchema,
@@ -1846,15 +1781,6 @@ export const hostDaemonCommandRegistry = {
     resultSchema: providerInstallationStatusSchema,
     transport: "onlineRpc",
     retryable: true,
-    flushEventsBeforeResult: false,
-    envLane: null,
-  }),
-  "provider.installation.run": defineHostDaemonCommandDescriptor({
-    type: "provider.installation.run",
-    schema: providerInstallationRunCommandSchema,
-    resultSchema: providerCliInstallResultSchema,
-    transport: "onlineRpc",
-    retryable: false,
     flushEventsBeforeResult: false,
     envLane: null,
   }),

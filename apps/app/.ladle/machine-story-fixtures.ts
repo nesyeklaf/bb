@@ -4,21 +4,20 @@ import type {
 } from "@bb/server-contract";
 import { machineServerAccessBlockedReason } from "../src/components/machines/machine-server-access";
 import type { MachineAccessState } from "../src/components/settings/MachineAccessSettings";
-import modalLogoUrl from "../../../plugins/environment-modal-sandbox/modal-logo.svg";
 
 const noop = () => {};
 const noopAsync = async () => {};
 
-export const CONNECT_UNPAIRED: ServerAccessStatus = {
+export const TAILNET_SETUP_REQUIRED: ServerAccessStatus = {
   providers: [
     {
-      id: "connect",
-      displayName: "bb connect",
-      description: "Use a private getbb.app address.",
-      pluginId: "connect",
+      id: "tailnet",
+      displayName: "Tailnet",
+      description: "Use this computer's tailnet address.",
+      pluginId: "tailnet-access",
       availability: {
         status: "setup-required",
-        message: "Pair with bb connect",
+        message: "Sign in to Tailscale",
       },
     },
     {
@@ -29,15 +28,15 @@ export const CONNECT_UNPAIRED: ServerAccessStatus = {
       availability: null,
     },
   ],
-  defaultProviderId: "connect",
+  defaultProviderId: "tailnet",
   effectiveUrl: null,
   urlSource: null,
 };
 
-export const CONNECT_PAIRED: ServerAccessStatus = {
-  ...CONNECT_UNPAIRED,
-  providers: CONNECT_UNPAIRED.providers.map((provider) =>
-    provider.id === "connect"
+export const TAILNET_READY: ServerAccessStatus = {
+  ...TAILNET_SETUP_REQUIRED,
+  providers: TAILNET_SETUP_REQUIRED.providers.map((provider) =>
+    provider.id === "tailnet"
       ? {
           ...provider,
           availability: {
@@ -49,10 +48,10 @@ export const CONNECT_PAIRED: ServerAccessStatus = {
   ),
 };
 
-export const CONNECT_UNAVAILABLE: ServerAccessStatus = {
-  ...CONNECT_UNPAIRED,
-  providers: CONNECT_UNPAIRED.providers.map((provider) =>
-    provider.id === "connect"
+export const TAILNET_UNAVAILABLE: ServerAccessStatus = {
+  ...TAILNET_SETUP_REQUIRED,
+  providers: TAILNET_SETUP_REQUIRED.providers.map((provider) =>
+    provider.id === "tailnet"
       ? {
           ...provider,
           availability: {
@@ -65,7 +64,7 @@ export const CONNECT_UNAVAILABLE: ServerAccessStatus = {
 };
 
 export const MANUAL_WITHOUT_URL: ServerAccessStatus = {
-  ...CONNECT_UNPAIRED,
+  ...TAILNET_SETUP_REQUIRED,
   defaultProviderId: "direct",
 };
 
@@ -73,7 +72,7 @@ export function machineAccessState(
   access: ServerAccessStatus,
   overrides: Partial<MachineAccessState> = {},
 ): MachineAccessState {
-  const selected = overrides.selected ?? access.defaultProviderId ?? "connect";
+  const selected = overrides.selected ?? access.defaultProviderId ?? "tailnet";
   return {
     access,
     disabled: false,
@@ -112,8 +111,7 @@ export const MODAL_MACHINE_PROVIDER = machineProvider({
   displayName: "Modal Sandbox",
   description: "Create a sandbox in your Modal account.",
   pluginId: "environment-modal-sandbox",
-  icon: "./modal-logo.svg",
-  logoUrl: modalLogoUrl,
+  icon: "Terminal",
   supportsSuspend: true,
 });
 

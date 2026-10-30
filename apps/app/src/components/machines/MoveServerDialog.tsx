@@ -118,7 +118,7 @@ function MoveServerDialogContent({
         onSuccess: (response) => {
           setResult(response);
           setCheckedServerUrl(null);
-          if (response.requiresServerUrl && response.serverUrl !== null) {
+          if (response.serverUrl !== null) {
             setAddressDraft(response.serverUrl);
           }
         },
@@ -126,12 +126,9 @@ function MoveServerDialogContent({
     );
   }, [runCheck, targetHostId]);
 
-  const showAddress =
-    result?.requiresServerUrl === true || checkedServerUrl !== null;
-
   const check = () => {
     const trimmed = addressDraft.trim();
-    const serverUrl = showAddress && trimmed.length > 0 ? trimmed : null;
+    const serverUrl = trimmed.length > 0 ? trimmed : null;
     startMove.reset();
     checkMove.mutate(
       { targetHostId, serverUrl },
@@ -154,7 +151,6 @@ function MoveServerDialogContent({
     result,
     checking: checkMove.isPending,
     starting: startMove.isPending,
-    showAddress,
     addressDraft,
     checkedServerUrl,
     archiveConfirmed,
@@ -195,7 +191,6 @@ function MoveServerDialogContent({
             })
           : null
       }
-      showAddress={showAddress}
       addressDraft={addressDraft}
       archiveConfirmed={archiveConfirmed}
       startAllowed={startAllowed}
@@ -222,7 +217,6 @@ export interface MoveServerDialogViewProps {
   result: ServerMoveCheckResponse | null;
   checking: boolean;
   checkError: string | null;
-  showAddress: boolean;
   addressDraft: string;
   archiveConfirmed: boolean;
   startAllowed: boolean;
@@ -240,7 +234,6 @@ export function MoveServerDialogView({
   result,
   checking,
   checkError,
-  showAddress,
   addressDraft,
   archiveConfirmed,
   startAllowed,
@@ -252,11 +245,6 @@ export function MoveServerDialogView({
   onStart,
   onCancel,
 }: MoveServerDialogViewProps) {
-  const hasBlockers =
-    result?.items.some((item) => item.severity === "blocker") ?? false;
-  const showCheckAgain =
-    !checking && (checkError !== null || hasBlockers) && !showAddress;
-
   return (
     <>
       <DialogHeader>
@@ -278,16 +266,14 @@ export function MoveServerDialogView({
           </span>
         </div>
       ) : null}
-      {showAddress ? (
-        <ServerAddressField
-          targetName={targetName}
-          value={addressDraft}
-          checking={checking}
-          disabled={starting}
-          onChange={onAddressDraftChange}
-          onCheck={onCheck}
-        />
-      ) : null}
+      <ServerAddressField
+        targetName={targetName}
+        value={addressDraft}
+        checking={checking}
+        disabled={starting}
+        onChange={onAddressDraftChange}
+        onCheck={onCheck}
+      />
       {checkError === null ? null : (
         <p role="alert" className="text-sm text-destructive-text">
           {checkError}
@@ -322,16 +308,6 @@ export function MoveServerDialogView({
         >
           Cancel
         </Button>
-        {showCheckAgain ? (
-          <Button
-            type="button"
-            variant="outline"
-            disabled={starting}
-            onClick={onCheck}
-          >
-            Check again
-          </Button>
-        ) : null}
         <Button type="button" disabled={!startAllowed} onClick={onStart}>
           {starting ? "Starting…" : "Stop all and move"}
         </Button>

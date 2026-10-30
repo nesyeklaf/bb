@@ -20,7 +20,6 @@ import {
   decodeBridgeJsonRpcResponse,
   experimental_defineProviderBridge,
   initializeParamsSchema,
-  providerInstallationRunParamsSchema,
   providerInstallationStatusParamsSchema,
   providerMaintenanceParamsSchema,
   isStandaloneBuiltinCompactCommand,
@@ -55,7 +54,6 @@ import {
 import { type InteractionUiRequest } from "../extension-ui-contract.js";
 import {
   getPiInstallGate,
-  getPiProviderInstallationRun,
   getPiProviderInstallationStatus,
   piHealthResult,
   resetPiInstallGateForTests,
@@ -93,10 +91,6 @@ const piCommandSchema = z.discriminatedUnion("method", [
   z.object({
     method: z.literal("provider/installation/status"),
     params: providerInstallationStatusParamsSchema,
-  }),
-  z.object({
-    method: z.literal("provider/installation/run"),
-    params: providerInstallationRunParamsSchema,
   }),
   z.object({
     method: z.literal("thread/start"),
@@ -537,16 +531,7 @@ async function handleRequest(
       sendResult(request.id, { supported: false });
       break;
     case "provider/installation/status":
-      sendResult(
-        request.id,
-        await getPiProviderInstallationStatus(request.params.checkUpdates),
-      );
-      break;
-    case "provider/installation/run":
-      sendResult(
-        request.id,
-        await getPiProviderInstallationRun(request.params.action),
-      );
+      sendResult(request.id, await getPiProviderInstallationStatus());
       break;
     case "thread/start":
       await handleThreadConstruction(

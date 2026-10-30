@@ -90,13 +90,13 @@ describe("createServerClient", () => {
         serverUrl: "https://studio.example.test",
         toHostName: "studio",
         movedAt: 1_700_000_000_000,
-        headers: { "x-bb-connect-machine": "bbcm_new" },
+        headers: { "x-bb-machine-access": "bbcm_new" },
       },
       expected: {
         serverUrl: "https://studio.example.test",
         toHostName: "studio",
         movedAt: 1_700_000_000_000,
-        headers: { "x-bb-connect-machine": "bbcm_new" },
+        headers: { "x-bb-machine-access": "bbcm_new" },
       },
     },
     {
@@ -155,54 +155,6 @@ describe("createServerClient", () => {
         retryable: false,
         serverMoved: expected,
       });
-    },
-  );
-
-  it.each([
-    {
-      serverHeaders: { "x-bb-connect-machine": "bbcm_machine" },
-      hasMachineCredential: true,
-    },
-    { serverHeaders: undefined, hasMachineCredential: false },
-  ])(
-    "reports live machine-credential capability as $hasMachineCredential",
-    async ({ serverHeaders, hasMachineCredential }) => {
-      const fetchFn = vi.fn<FetchFn>(async (_input, init) => {
-        expect(JSON.parse(String(init?.body))).toMatchObject({
-          hasMachineCredential,
-          localApiPort: 38_888,
-        });
-        return Response.json(
-          {
-            sessionId: "session-1",
-            machineEnvironment: { revision: 0, entries: [] },
-            idleProviderSessionTimeoutMinutes: 30,
-            heartbeatIntervalMs: 5_000,
-            leaseTimeoutMs: 30_000,
-          },
-          { status: 201 },
-        );
-      });
-      const client = createServerClient({
-        fetchFn,
-        getSessionId: () => "session-1",
-        hostKey: "host-key",
-        logger: createLogger(),
-        ...(serverHeaders !== undefined ? { serverHeaders } : {}),
-        serverUrl: "https://bb.example.test",
-      });
-
-      await client.openSession({
-        hostId: "host-1",
-        hostName: "Host",
-        dataDir: "/tmp/bb",
-        instanceId: "instance-1",
-        localApiPort: 38_888,
-        activeThreads: [],
-        undeliveredEventThreadIds: [],
-        loadedEnvironments: [],
-      });
-      expect(fetchFn).toHaveBeenCalledOnce();
     },
   );
 
@@ -296,7 +248,7 @@ describe("createServerClient", () => {
       expect(new Headers(init?.headers).get("authorization")).toBe(
         "Bearer host-key",
       );
-      expect(new Headers(init?.headers).get("x-bb-connect-machine")).toBeNull();
+      expect(new Headers(init?.headers).get("x-bb-machine-access")).toBeNull();
       if (url.pathname === `/internal/skills/tree/${treeHash}`) {
         return new Response(JSON.stringify(manifest), { status: 200 });
       }
@@ -346,7 +298,7 @@ describe("createServerClient", () => {
     const fetchFn = vi.fn<FetchFn>(async (_input, init) => {
       const headers = new Headers(init?.headers);
       expect(headers.get("authorization")).toBe("Bearer host-key");
-      expect(headers.get("x-bb-connect-machine")).toBe("bbcm_machine");
+      expect(headers.get("x-bb-machine-access")).toBe("bbcm_machine");
       return new Response(JSON.stringify({ treeHash, files: [] }), {
         status: 200,
       });
@@ -356,7 +308,7 @@ describe("createServerClient", () => {
       getSessionId: () => "session-1",
       hostKey: "host-key",
       logger: createLogger(),
-      serverHeaders: { "x-bb-connect-machine": "bbcm_machine" },
+      serverHeaders: { "x-bb-machine-access": "bbcm_machine" },
       serverUrl: "https://bb.example.test",
     });
 

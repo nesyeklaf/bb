@@ -30,8 +30,7 @@ command’s `--help` before mutation. Use fresh browser snapshots for controls.
 | Disconnect and reconnect | Stop only the disposable daemon, observe unavailable host, restart it, and retry a targeted read. | Status and routing recover to the same host; offline operations do not route to a different machine. |
 | Suspend and resume | Suspend a disposable provider-managed machine, send a thread follow-up to wake it, then repeat with the prompt banner's Resume action. | Every wake exposes a durable `resuming` lifecycle phase; the prompt banner says “Machine is resuming…” until the machine becomes active, and queued work dispatches once. |
 | Protocol mismatch and automatic update | Use the documented QA setup with a deliberately older disposable daemon; inspect rejected protocol and retry-update. | Mismatch initiates the expected update or actionable failure; incompatible payloads are not accepted in a reconnect loop. |
-| Provider CLI installation | Inspect machine provider-cli status; install/update a chosen provider on the disposable host. | Version and health refresh on that host; failure does not claim installation. |
-| Updates status and apply | Compare updates status and Settings → Updates; apply only available fixture-host updates. | Per-host/per-provider outcomes are reported; absent updates produce a truthful no-op. |
+| Provider CLI status | Inspect machine provider-cli status. | Installed state and version reflect the disposable host; bb offers no install or update action. |
 | Remove host | Remove a disposable fixture machine with running and idle threads through the UI or `machine remove`, then try reconnecting with its old enrollment. | Work stops and threads remain as read-only history showing Machine removed and the old machine name. Revoked hosts cannot reconnect; unrelated hosts and projects are unaffected. |
 
 ## Evidence and cleanup

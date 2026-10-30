@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { resolveShellIncomingLink } from "./shell-links";
 
 const profiles = [
-  { id: "p_bee", serverUrl: "https://bee.getbb.app" },
+  { id: "p_bee", serverUrl: "https://bee.example.test" },
   { id: "p_lan", serverUrl: "http://10.0.0.7:38886" },
   { id: "p_prefix", serverUrl: "https://box.example.ts.net/bb" },
 ];
@@ -17,10 +17,8 @@ describe("resolveShellIncomingLink", () => {
   it.each([
     ["bb://", "/webview"],
     ["bb://threads/thr_1", "/webview?path=%2Fthreads%2Fthr_1"],
-    ["bb://connect?code=ABCD-EFGH", "/connect?code=ABCD-EFGH"],
     ["bb://settings/servers/add", "/settings/servers/add"],
     ["bb://settings/device", "/settings/device"],
-    ["bb://settings/notifications", "/settings/notifications"],
     ["bb://settings", "/webview?path=%2Fsettings"],
     ["bb://settings/general", "/webview?path=%2Fsettings%2Fgeneral"],
     ["bb://connections", "/webview?path=%2Fconnections"],
@@ -50,7 +48,10 @@ describe("resolveShellIncomingLink", () => {
 
   it("opens a web link on the profile that owns it", () => {
     expect(
-      resolveShellIncomingLink("https://bee.getbb.app/threads/x?a=1", context),
+      resolveShellIncomingLink(
+        "https://bee.example.test/threads/x?a=1",
+        context,
+      ),
     ).toEqual({
       kind: "navigate",
       path: "/webview?path=%2Fthreads%2Fx%3Fa%3D1",
@@ -94,12 +95,12 @@ describe("resolveShellIncomingLink", () => {
 
   it("offers to add a server the phone does not know", () => {
     const resolution = resolveShellIncomingLink(
-      "https://other.getbb.app/threads/x",
+      "https://other.example.test/threads/x",
       context,
     );
     expect(resolution.kind).toBe("unknown-server");
     if (resolution.kind !== "unknown-server") throw new Error("unreachable");
-    expect(resolution.serverUrl).toBe("https://other.getbb.app");
+    expect(resolution.serverUrl).toBe("https://other.example.test");
     expect(resolution.path).toBe("/webview?path=%2Fthreads%2Fx");
   });
 

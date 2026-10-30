@@ -291,7 +291,6 @@ describe("service definition rewrites", () => {
         dataDir,
         serverPort: 38_886,
         hostDaemonPort: 38_887,
-        bindHost: "0.0.0.0",
       }),
     );
 
@@ -308,8 +307,6 @@ describe("service definition rewrites", () => {
         "38886",
         "--host-daemon-port",
         "38887",
-        "--server-bind-host",
-        "0.0.0.0",
       ],
       environment: {
         BB_APP_NPM_PREFIX: "/Users/me/.bb-machines/npm",
@@ -387,7 +384,6 @@ describe("service definition rewrites", () => {
           dataDir: "/data",
           serverPort: 39_001,
           hostDaemonPort: 39_002,
-          bindHost: null,
         },
       ),
     ).toEqual([

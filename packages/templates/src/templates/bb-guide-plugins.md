@@ -13,7 +13,7 @@ optional entry that runs on enrolled hosts, UI, agent skills and tools, and
 
 Builtin plugins (`builtin:<name>`) ship with bb and install automatically.
 Official store plugins ship with the app and install on request; third-party
-plugins come from marketplaces, Git, npm, or a local path. Plugin state lives
+plugins come from marketplaces, Git, or a local path. Plugin state lives
 under `<bb-data-dir>/plugins/<id>/` (SQLite database, secrets, logs).
 
   bb plugin search <query>       Search the store: the bundled official
@@ -25,8 +25,7 @@ under `<bb-data-dir>/plugins/<id>/` (SQLite database, secrets, logs).
                                  memory, tasks, github, ...),
                                  <entry-id>@<marketplace>, a Git repository
                                  URL, a local path, builtin:<name>,
-                                 git:<url>[@<ref|semver-range>], or
-                                 npm:<package>[@<version|tag|range>].
+                                 git:<url>[@<ref|semver-range>].
                                  Installs ask for confirmation; --yes skips it.
                                  --subdirectory <path> or --plugin <name>
                                  selects one plugin of a multi-plugin
@@ -86,7 +85,7 @@ under `<bb-data-dir>/plugins/<id>/` (SQLite database, secrets, logs).
                                  secrets, and schedules (local path sources
                                  stay on disk; builtin removals are
                                  remembered)
-  bb plugin prune [--dry-run]    Delete cached git:/npm: plugin versions no
+  bb plugin prune [--dry-run]    Delete cached git: plugin versions no
                                  installed plugin uses (left by earlier bb
                                  releases, rolled-back updates, or
                                  interrupted operations) and leftover cache
@@ -96,8 +95,8 @@ under `<bb-data-dir>/plugins/<id>/` (SQLite database, secrets, logs).
                                  version or a local path source. Also in the
                                  command palette
 
-  bb marketplace add <source>    Add a marketplace from an https manifest URL,
-                                 git:<url>[@<ref>], or path:<directory>.
+  bb marketplace add <source>    Add a marketplace from git:<url>[@<ref>] or
+                                 path:<directory>.
                                  Adding a marketplace installs nothing. For a
                                  git: source, --subdirectory <path> reads
                                  marketplace.json from that directory of the
@@ -111,8 +110,7 @@ under `<bb-data-dir>/plugins/<id>/` (SQLite database, secrets, logs).
   bb marketplace remove <name>   Forget a marketplace. Plugins installed from
                                  it keep running as direct installs and keep
                                  updating from their recorded source.
-                                 bb-official and bb-community cannot be
-                                 removed
+                                 bb-official cannot be removed
 
 Installed plugins and their settings also appear under Settings → Installed
 plugins.
@@ -155,9 +153,9 @@ Each bundled plugin documents its commands and behavior in its own skill.
 - Thread list (builtin): owns the sidebar's layout preferences, synced to
   every window. `bb thread-list prefs list|get|set|reset`; see the
   `thread-list` skill.
-- Push notifications (builtin): notifies mobile, web, and desktop clients
+- Push notifications (builtin): notifies web and desktop clients
   when a thread needs attention.
-  `bb push-notifications status|list|add|remove|test|thread`; see the
+  `bb push-notifications status|test|thread`; see the
   `push-notifications` skill.
 - Secrets (builtin): `bb secret request <NAME...> --write-env <path>` collects
   credentials through a secure form into a dotenv file without exposing them
@@ -166,8 +164,8 @@ Each bundled plugin documents its commands and behavior in its own skill.
   fenced `inline-vis` code block or a `::inline-vis{file="demo.html"}`
   workspace or thread-storage file; see the `inline-vis` skill.
 - MCP server (builtin, disabled by default): `bb plugin enable bb--mcp` lets
-  ChatGPT, Claude, or another MCP client control this bb; an approved app can
-  run any `bb` command. `bb mcp status|clients|revoke`; see the `mcp` skill.
+  an MCP client on this machine or your tailnet control this bb; a client can
+  run any `bb` command. `bb mcp status`; see the `mcp` skill.
 - Storage & retention (builtin, disabled by default): enable with
   `bb plugin enable bb--storage-retention`. Owns thread retention policies
   and machine storage cleanup through its sidebar panel and `bb storage`
@@ -188,10 +186,6 @@ Each bundled plugin documents its commands and behavior in its own skill.
 - Tasks (official, `bb plugin install tasks`): a task tracker with agent
   delegation. `bb tasks show|list|comment|update|attach`, and
   `bb tasks --help` for the rest; see the `tasks` skill.
-- Modal sandboxes (official, `bb plugin install environment-modal-sandbox`):
-  reusable Modal cloud machines. `bb modal account inspect`,
-  `bb machine create --provider modal-sandbox`, and `bb modal image|sandbox`;
-  see the `modal-sandboxes` skill.
 
 Multi-plugin repositories
 
@@ -200,7 +194,6 @@ with its own package.json. An optional `.bb/plugins.json` collection manifest
 indexes them:
 
   {
-    "$schema": "https://getbb.app/schemas/plugins.schema.json",
     "schemaVersion": 1,
     "name": "acme-plugins",
     "plugins": [
@@ -231,19 +224,14 @@ and never uses the network; install its entries by bare name or qualified name
 (`bb plugin install docs` or `bb plugin install docs@bb-official`). An app
 update also updates the bundled copy.
 
-`bb-community` lists reviewed plugins that live outside the app bundle, read
-from https://getbb.app/marketplace/v2/marketplace.json at startup and every two
-hours. Set BB_MARKETPLACE_URL (read at startup) to override the URL. An invalid
-manifest keeps the last valid catalog. `bb plugin search` shows install counts
-that bb measures through anonymous telemetry, so they undercount; third-party
-marketplaces have none. Builtins show "Built in", and a plugin under 25
-installs that was published in the last 30 days shows "New".
-`bb plugin search --json` returns the raw `installs`, `installedByDefault`,
-and long-form `overview` fields.
+bb makes no network request to list a marketplace: only `path:` and `git:`
+marketplaces are supported, and bb reads them from disk or a git checkout. An
+invalid manifest keeps the last valid catalog. Builtins show "Built in".
+`bb plugin search --json` returns the `installedByDefault` and long-form
+`overview` fields.
 
 Anyone can host a third-party marketplace:
 
-  bb marketplace add https://plugins.acme.dev/marketplace.json
   bb marketplace add git:github.com/acme/bb-marketplace@main
   bb marketplace add git:github.com/acme/agent-plugins@main --subdirectory bb
   bb marketplace add path:/work/acme-marketplace
@@ -280,19 +268,18 @@ demand and `bb plugin update` applies compatible candidates. Reinstalling an
 installed managed plugin is refused; use `bb plugin update`. A failed
 activation restores the previous version and leaves the failure visible.
 
-Exact npm versions, Git tags and commits, path sources, and bundled official
-plugins are pinned. npm ranges, dist-tags, and omitted specs, omitted Git refs
-(the default branch), Git branches, and Git semver ranges track compatible
-updates. Change a pinned git:/npm: source with `bb plugin remove` (which
+Git tags and commits, path sources, and bundled official plugins are pinned.
+Omitted Git refs (the default branch), Git branches, and Git semver ranges track compatible
+updates. Change a pinned git: source with `bb plugin remove` (which
 deletes settings, secrets, and schedules) and a fresh install. Edit a local
 path plugin in place and `bb plugin reload <id>`, or move it with
 `bb plugin install path:<new dir>`; both keep its configuration.
 
-Managed git:/npm: installs refuse engines.bb and engines.bbPluginSdk
+Managed git: installs refuse engines.bb and engines.bbPluginSdk
 mismatches, manifest and artifact identity mismatches, and ids reserved by
 bundled plugins. Git and path installs build the plugin on install (git
 sources need `git`; bb ships its own npm), and a build failure fails the
-install. npm packages must ship their prebuilt app and host bundles.
+install.
 
 Git semver ranges
 

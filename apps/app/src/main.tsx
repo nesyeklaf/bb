@@ -6,7 +6,6 @@ import { App } from "./App";
 import { AppErrorBoundary } from "./components/AppErrorBoundary";
 import { ApplicationUrlDialog } from "./components/ApplicationUrlDialog";
 import { AppToaster } from "./components/AppToaster";
-import { registerProviderCliInstallQueryClient } from "./components/provider-cli/provider-cli-install-store";
 import { initializePreferredTheme } from "./hooks/useTheme";
 import { initializeFavicon } from "./lib/favicon-color-preference";
 import { installForeignDomMutationGuard } from "./lib/foreign-dom-mutation-guard";
@@ -26,7 +25,6 @@ installThreadSwitchTrace(window);
 Error.stackTraceLimit = 50;
 
 installAppQueryClientBrowserEvents(appQueryClient);
-registerProviderCliInstallQueryClient(appQueryClient);
 
 initializePreferredTheme();
 applyCachedAppThemeCss();

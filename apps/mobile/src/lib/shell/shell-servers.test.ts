@@ -5,12 +5,10 @@ import { bridgeServersForProfiles, canSwitchToProfile } from "./shell-servers";
 const profiles: ServerProfile[] = [
   {
     id: "studio",
-    mode: "connect",
-    serverUrl: "https://studio.getbb.app",
+    mode: "direct",
+    serverUrl: "https://studio.example.test",
     label: "Studio",
     createdAt: 1,
-    handle: "studio",
-    credential: "secret-credential",
   },
   {
     id: "laptop",
@@ -22,14 +20,14 @@ const profiles: ServerProfile[] = [
 ];
 
 describe("shell server list", () => {
-  it("offers each saved server by origin, never its credential, path or login", () => {
+  it("offers each saved server by origin, never its path or login", () => {
     const servers = bridgeServersForProfiles(profiles, "laptop");
     expect(servers).toEqual([
       {
         id: "studio",
         name: "Studio",
-        origin: "https://studio.getbb.app",
-        kind: "account",
+        origin: "https://studio.example.test",
+        kind: "custom",
         active: false,
       },
       {
@@ -40,7 +38,7 @@ describe("shell server list", () => {
         active: true,
       },
     ]);
-    expect(JSON.stringify(servers)).not.toMatch(/secret|password|team/u);
+    expect(JSON.stringify(servers)).not.toMatch(/password|team/u);
   });
 
   it("switches only to another saved server", () => {

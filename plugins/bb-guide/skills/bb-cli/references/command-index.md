@@ -10,7 +10,6 @@ This index lists every command path that the core CLI registers, including alias
 
 - `bb settings`
 - `bb settings show`
-- `bb settings mobile-app`
 - `bb settings ai-services`
 - `bb settings ai-services show`
 - `bb settings ai-services set`
@@ -34,7 +33,6 @@ This index lists every command path that the core CLI registers, including alias
 - `bb settings ui set`
 - `bb settings ui reset`
 - `bb settings usage`
-- `bb settings version`
 - `bb settings reload`
 
 `bb settings usage` accepts `--refresh` to fetch fresh provider usage.
@@ -100,7 +98,6 @@ Use `--selected-model <model-id>` to discover its reasoning choices and include 
 - `bb machine retry-update`
 - `bb machine provider-cli`
 - `bb machine provider-cli status`
-- `bb machine provider-cli install`
 
 ## server
 
@@ -111,19 +108,10 @@ Use `--selected-model <model-id>` to discover its reasoning choices and include 
 - `bb server export`
 - `bb server import`
 - `bb server unlock`
-- `bb server allow-connect`
 - `bb server delete-old-copy`
 - `bb server install-machine-service`
 
 ## updates
-
-- `bb updates`
-- `bb updates status`
-- `bb updates apply`
-- `bb updates app`
-- `bb updates app status`
-- `bb updates app apply`
-- `bb updates app dismiss`
 
 ## terminal
 
@@ -300,10 +288,6 @@ Use `--selected-model <model-id>` to discover its reasoning choices and include 
 - `bb skill files`
 - `bb skill update`
 - `bb skill delete`
-- `bb skill search`
-- `bb skill registry`
-- `bb skill registry detail`
-- `bb skill install`
 - `bb skill cli-skills-status`
 - `bb skill install-cli-skills`
 

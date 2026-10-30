@@ -26,7 +26,6 @@ export interface PendingServerLaunchRequest {
   bbServerEntry: string;
   dataDir: string;
   serverPort: number;
-  bindHost: string | null;
   hostDaemonPort: number | null;
   env: NodeJS.ProcessEnv;
   logPath: string;
@@ -85,9 +84,6 @@ export function createDefaultPendingServerLauncher(
         ...(request.hostDaemonPort === null
           ? []
           : ["--host-daemon-port", String(request.hostDaemonPort)]),
-        ...(request.bindHost === null
-          ? []
-          : ["--server-bind-host", request.bindHost]),
       ],
       env: request.env,
       logPath: request.logPath,

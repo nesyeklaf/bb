@@ -19,7 +19,6 @@ import type {
   ProviderListResult as RootProviderList,
   ProviderModelsArgs as RootProviderModelsArgs,
   StatusResult as RootStatus,
-  SystemVersionResult as RootSystemVersion,
   TerminalCreateArgs as RootTerminalCreateArgs,
   TerminalListResult as RootTerminalListResult,
   ThemeCatalogResult as RootThemeCatalog,
@@ -46,7 +45,6 @@ import type {
   ProviderListResult as BrowserProviderList,
   ProviderModelsArgs as BrowserProviderModelsArgs,
   StatusResult as BrowserStatus,
-  SystemVersionResult as BrowserSystemVersion,
   TerminalCreateArgs as BrowserTerminalCreateArgs,
   TerminalListResult as BrowserTerminalListResult,
   ThemeCatalogResult as BrowserThemeCatalog,
@@ -73,7 +71,6 @@ import type {
   ProviderListResult as CoreProviderList,
   ProviderModelsArgs as CoreProviderModelsArgs,
   StatusResult as CoreStatus,
-  SystemVersionResult as CoreSystemVersion,
   TerminalCreateArgs as CoreTerminalCreateArgs,
   TerminalListResult as CoreTerminalListResult,
   ThemeCatalogResult as CoreThemeCatalog,
@@ -99,7 +96,6 @@ import type {
   ProviderListResult as NodeProviderList,
   ProviderModelsArgs as NodeProviderModelsArgs,
   StatusResult as NodeStatus,
-  SystemVersionResult as NodeSystemVersion,
   TerminalCreateArgs as NodeTerminalCreateArgs,
   TerminalListResult as NodeTerminalListResult,
   ThemeCatalogResult as NodeThemeCatalog,
@@ -125,7 +121,6 @@ interface RootSurface {
   providerModelsArgs: RootProviderModelsArgs;
   realtimeConnection: RootRealtimeConnection;
   status: RootStatus;
-  systemVersion: RootSystemVersion;
   terminalCreateArgs: RootTerminalCreateArgs;
   terminalList: RootTerminalListResult;
   themeCatalog: RootThemeCatalog;
@@ -151,7 +146,6 @@ interface BrowserSurface {
   providerModelsArgs: BrowserProviderModelsArgs;
   realtimeConnection: BrowserRealtimeConnection;
   status: BrowserStatus;
-  systemVersion: BrowserSystemVersion;
   terminalCreateArgs: BrowserTerminalCreateArgs;
   terminalList: BrowserTerminalListResult;
   themeCatalog: BrowserThemeCatalog;
@@ -177,7 +171,6 @@ interface CoreSurface {
   providerModelsArgs: CoreProviderModelsArgs;
   realtimeConnection: CoreRealtimeConnection;
   status: CoreStatus;
-  systemVersion: CoreSystemVersion;
   terminalCreateArgs: CoreTerminalCreateArgs;
   terminalList: CoreTerminalListResult;
   themeCatalog: CoreThemeCatalog;
@@ -203,7 +196,6 @@ interface NodeSurface {
   providerModelsArgs: NodeProviderModelsArgs;
   realtimeConnection: NodeRealtimeConnection;
   status: NodeStatus;
-  systemVersion: NodeSystemVersion;
   terminalCreateArgs: NodeTerminalCreateArgs;
   terminalList: NodeTerminalListResult;
   themeCatalog: NodeThemeCatalog;
@@ -271,7 +263,6 @@ type ExpectedHostsKey =
   | "directory"
   | "experimental_discoverRepos"
   | "get"
-  | "installProviderCli"
   | "list"
   | "experimental_listProviders"
   | "pathsExist"
@@ -353,11 +344,6 @@ type ExpectedProvidersKey = "catalog" | "list" | "models" | "setEnabled";
 type ExpectedStatusKey = "get";
 
 type ExpectedSystemKey =
-  | "acknowledgeAppUpdate"
-  | "mobileAppDownloads"
-  | "mobileAppReleases"
-  | "appUpdate"
-  | "applyAppUpdate"
   | "setMachineEnvironmentVariable"
   | "deleteMachineEnvironmentVariable"
   | "machineEnvironment"
@@ -370,7 +356,6 @@ type ExpectedSystemKey =
   | "installCliSkills"
   | "experimental_cliCommand"
   | "experimental_installCliCommand"
-  | "experimental_recordTelemetryEvent"
   | "experimental_removeCliCommand"
   | "reloadConfig"
   | "setAiServiceSelection"
@@ -381,8 +366,7 @@ type ExpectedSystemKey =
   | "updateGeneralSettings"
   | "updateKeyboardSettings"
   | "providerStates"
-  | "usageLimits"
-  | "version";
+  | "usageLimits";
 
 type ExpectedSystemUiPreferencesKey = "list" | "reset" | "set";
 

@@ -47,26 +47,9 @@ describe("rewriteLocalhostLinkHref", () => {
     }
   });
 
-  it("leaves localhost links alone on getbb.app hosts", () => {
+  it("rewrites to the current hostname", () => {
     for (const currentHostname of [
-      "sawyer.getbb.app",
-      "sawyer--8000.getbb.app",
-      "getbb.app",
-      "SAWYER.GETBB.APP",
-    ]) {
-      expect(
-        rewriteLocalhostLinkHref({
-          currentHostname,
-          enabled: true,
-          href: "http://localhost:5173/app",
-        }),
-      ).toBe("http://localhost:5173/app");
-    }
-  });
-
-  it("does not ignore unrelated hostnames", () => {
-    for (const currentHostname of [
-      "notgetbb.app",
+      "bb.example.test",
       "sawyer.localhost",
       "sawyer--8000.localhost",
       "sawyer.bb.localhost",
@@ -81,9 +64,9 @@ describe("rewriteLocalhostLinkHref", () => {
     }
   });
 
-  it("preserves bb Connect share links", () => {
+  it("preserves non-loopback share links", () => {
     for (const href of [
-      "https://sawyer--5173.getbb.app/app",
+      "https://sawyer--5173.example.test/app",
       "http://sawyer--5173.localhost:59332/app",
     ]) {
       expect(

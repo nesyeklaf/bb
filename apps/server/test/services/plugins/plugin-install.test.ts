@@ -1,11 +1,8 @@
 import { execFile } from "node:child_process";
-import { createHash } from "node:crypto";
-import { createServer, type Server } from "node:http";
 import {
   mkdtemp,
   mkdir,
   readFile,
-  readdir,
   realpath,
   rename,
   rm,
@@ -13,7 +10,6 @@ import {
   symlink,
   writeFile,
 } from "node:fs/promises";
-import type { AddressInfo } from "node:net";
 import { tmpdir } from "node:os";
 import { existsSync, readFileSync } from "node:fs";
 import { createRequire } from "node:module";
@@ -38,7 +34,6 @@ import {
   gitArtifactCacheDir,
   gitRangeSourceSpec,
   hashInstallDir,
-  npmArtifactCacheDir,
   parsePluginSource,
   runInstallCommand,
 } from "../../../src/services/plugins/install-sources.js";
@@ -48,7 +43,6 @@ import {
   type PluginService,
 } from "../../../src/services/plugins/plugin-service.js";
 import { testLogger } from "../../helpers/test-app.js";
-import { createNoopTelemetryService } from "../../../src/services/system/telemetry.js";
 
 const logger = testLogger as unknown as Logger;
 const run = promisify(execFile);
@@ -313,38 +307,9 @@ describe("plugin install sources", () => {
     }
   });
 
-  it("classifies omitted, exact, range, and dist-tag npm specs", () => {
-    expect(parsePluginSource("npm:bb-plugin-linear@0.3.0")).toEqual({
-      kind: "npm",
-      name: "bb-plugin-linear",
-      spec: "0.3.0",
-      specKind: "exact",
-    });
-    expect(parsePluginSource("npm:@acme/bb-plugin-x@1.2.3")).toEqual({
-      kind: "npm",
-      name: "@acme/bb-plugin-x",
-      spec: "1.2.3",
-      specKind: "exact",
-    });
-    expect(parsePluginSource("npm:bb-plugin-x@^1.0.0")).toMatchObject({
-      spec: "^1.0.0",
-      specKind: "range",
-    });
-    expect(parsePluginSource("npm:bb-plugin-x@next")).toMatchObject({
-      spec: "next",
-      specKind: "tag",
-    });
-    expect(parsePluginSource("npm:bb-plugin-x")).toMatchObject({
-      spec: "",
-      specKind: "default",
-    });
-    expect(parsePluginSource("npm:@acme/bb-plugin-x")).toMatchObject({
-      name: "@acme/bb-plugin-x",
-      spec: "",
-      specKind: "default",
-    });
-    expect(() => parsePluginSource("npm:--registry@latest")).toThrow(
-      /invalid npm package name/,
+  it("refuses npm sources", () => {
+    expect(() => parsePluginSource("npm:bb-plugin-linear@0.3.0")).toThrow(
+      /npm plugin sources are not supported/,
     );
   });
 
@@ -395,10 +360,7 @@ describe("plugin install sources", () => {
     }
   });
 
-  it("keeps scoped npm and nested git cache paths inside their roots", () => {
-    expect(npmArtifactCacheDir("/data", "@acme/plugin", "1.2.3")).toBe(
-      resolve("/data/plugins/cache/npm/@acme/plugin/1.2.3"),
-    );
+  it("keeps nested git cache paths inside their roots", () => {
     expect(
       gitArtifactCacheDir(
         "/data",
@@ -409,9 +371,6 @@ describe("plugin install sources", () => {
       resolve(
         "/data/plugins/cache/git/github.com/acme/nested/plugin/abcdef1234567",
       ),
-    );
-    expect(() => npmArtifactCacheDir("/data", "../plugin", "1.2.3")).toThrow(
-      /invalid npm package/,
     );
     expect(() =>
       gitArtifactCacheDir("/data", "github.com/acme/../evil", "abcdef1"),
@@ -441,7 +400,6 @@ describe("plugin install flows", () => {
     materializationCount = 0;
     service = createPluginService({
       aiServices: createAiServiceRegistry(),
-      telemetry: createNoopTelemetryService(),
       db,
       hub: {
         getDaemonSessionIdForHost: () => null,
@@ -573,38 +531,6 @@ describe("plugin install flows", () => {
         ),
       );
       expect(getInstalledPluginRegistration(db, "sdk-listed")).toBeUndefined();
-    });
-
-    it("refuses a listed npm registry that is not a public https host", async () => {
-      for (const registry of [
-        "https://127.0.0.1/registry",
-        "https://localhost/registry",
-        "https://registry.acme.test:8443/",
-        "https://user:secret@registry.acme.test/",
-      ]) {
-        await expect(
-          service.installCatalogPlugin({
-            marketplace: "bb-community",
-            entryId: "catalog-npm-entry",
-            pluginId: "registry",
-            source: "npm:bb-plugin-registry@^1.0.0",
-            selection: ROOT_PLUGIN_SOURCE_SELECTION,
-            npmRegistry: registry,
-          }),
-        ).rejects.toThrow(/marketplace/);
-      }
-      expect(getInstalledPluginRegistration(db, "registry")).toBeUndefined();
-    });
-
-    it("guards a listed npm registry while it resolves an install plan", async () => {
-      await expect(
-        service.resolveCatalogNpmSource({
-          packageName: "bb-plugin-registry",
-          registry: "https://localhost/registry",
-          requestedSpec: "latest",
-          specKind: "tag",
-        }),
-      ).rejects.toThrow(/not public/u);
     });
 
     it("refuses a git catalog install whose manifest id differs from the entry", async () => {
@@ -773,15 +699,15 @@ describe("plugin install flows", () => {
     });
 
     it("refuses a git plugin that shadows a builtin after materialization", async () => {
-      const repoDir = join(workDir, "repo-connect");
-      await writePluginFixture(repoDir, { name: "bb-plugin-connect" });
+      const repoDir = join(workDir, "repo-github");
+      await writePluginFixture(repoDir, { name: "bb-plugin-github" });
       await initGitRepo(repoDir);
       await commitAll(repoDir, "init");
 
       await expect(
         service.install(`git:${repoDir}@main`, { kind: "root" }),
-      ).rejects.toThrowError(/reserved by the bundled plugin.*builtin:connect/);
-      expect(getInstalledPluginRegistration(db, "connect")).toBeUndefined();
+      ).rejects.toThrowError(/reserved by the bundled plugin.*builtin:github/);
+      expect(getInstalledPluginRegistration(db, "github")).toBeUndefined();
     });
 
     it("installs a pinned commit sha via clone + checkout", async () => {
@@ -1034,7 +960,6 @@ describe("plugin install flows", () => {
 
       service = createPluginService({
         aiServices: createAiServiceRegistry(),
-        telemetry: createNoopTelemetryService(),
         db,
         hub: {
           getDaemonSessionIdForHost: () => null,
@@ -1134,7 +1059,6 @@ describe("plugin install flows", () => {
       await writeFile(join(`${entry.rootDir}.promoting`, "partial"), "copy");
       service = createPluginService({
         aiServices: createAiServiceRegistry(),
-        telemetry: createNoopTelemetryService(),
         db,
         hub: {
           getDaemonSessionIdForHost: () => null,
@@ -1622,165 +1546,20 @@ describe("plugin install flows", () => {
     });
   });
 
-  describe.skipIf(!hasNpm)("npm sources", () => {
-    it(
-      "installs a scoped package into the immutable cache and deletes it on removal",
-      { timeout: 120_000 },
-      async () => {
-        const name = "@acme/bb-plugin-npmhero";
-        const version = "0.1.0";
-        const fixtureDir = join(workDir, "npm-fixture");
-        await writePluginFixture(fixtureDir, { name, version });
-        const packDir = join(workDir, "npm-pack");
-        await mkdir(packDir, { recursive: true });
-        await run("npm", ["pack", "--pack-destination", packDir], {
-          cwd: fixtureDir,
-        });
-        const [tarballName] = await readdir(packDir);
-        if (tarballName === undefined)
-          throw new Error("npm pack produced no tarball");
-        const tarball = await readFile(join(packDir, tarballName));
-        let tarballRequests = 0;
-
-        const registry = await new Promise<Server>((resolvePromise) => {
-          const server = createServer((request, response) => {
-            const url = request.url ?? "";
-            if (url === "/package.tgz") {
-              tarballRequests += 1;
-              response.writeHead(200, {
-                "content-type": "application/octet-stream",
-              });
-              response.end(tarball);
-              return;
-            }
-            if (decodeURIComponent(url) === `/${name}`) {
-              const origin = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
-              response.writeHead(200, { "content-type": "application/json" });
-              response.end(
-                JSON.stringify({
-                  name,
-                  "dist-tags": { latest: version },
-                  versions: {
-                    [version]: {
-                      name,
-                      version,
-                      dist: {
-                        tarball: `${origin}/package.tgz`,
-                        shasum: createHash("sha1")
-                          .update(tarball)
-                          .digest("hex"),
-                        integrity: `sha512-${createHash("sha512").update(tarball).digest("base64")}`,
-                      },
-                    },
-                  },
-                }),
-              );
-              return;
-            }
-            response.writeHead(404);
-            response.end();
-          });
-          server.listen(0, "127.0.0.1", () => resolvePromise(server));
-        });
-        const port = (registry.address() as AddressInfo).port;
-        const previousCache = process.env.npm_config_cache;
-        const previousPackageLock = process.env.npm_config_package_lock;
-        const previousUserConfig = process.env.NPM_CONFIG_USERCONFIG;
-        const userConfig = join(workDir, "npmrc");
-        await writeFile(
-          userConfig,
-          `@acme:registry=http://127.0.0.1:${port}\nregistry=https://registry.npmjs.org\n`,
-        );
-        process.env.NPM_CONFIG_USERCONFIG = userConfig;
-        process.env.npm_config_cache = join(workDir, "npm-cache");
-        process.env.npm_config_package_lock = "false";
-        try {
-          const source = `npm:${name}@${version}`;
-          const entry = await service.install(source, { kind: "root" });
-          expect(tarballRequests).toBe(1);
-          expect(entry.id).toBe("npmhero");
-          expect(entry.status).toBe("running");
-          expect(entry.source).toBe(source);
-          const prefix = join(
-            dataDir,
-            "plugins",
-            "cache",
-            "npm",
-            ...name.split("/"),
-            version,
-          );
-          expect(entry.rootDir).toBe(join(prefix, "node_modules", name));
-          await expect(
-            stat(join(prefix, "package-lock.json")),
-          ).rejects.toThrow();
-          expect(getInstalledPluginRegistration(db, "npmhero")).toMatchObject({
-            provenance: "direct",
-            sourceKind: "npm",
-            sourceNpmPackage: name,
-            sourceNpmRegistry: `http://127.0.0.1:${port}`,
-            sourceNpmRequestedSpec: version,
-            sourceNpmSpecKind: "exact",
-            npmResolvedVersion: version,
-            npmIntegrity: expect.stringMatching(/^sha512-/),
-            activeArtifactId: expect.any(String),
-          });
-
-          await expect(service.applyUpdate("npmhero")).resolves.toMatchObject({
-            ok: false,
-            error: expect.stringContaining("pinned by its source intent"),
-          });
-          expect(tarballRequests).toBe(1);
-          expect(getInstalledPluginRegistration(db, "npmhero")).toMatchObject({
-            source,
-            sourceNpmRequestedSpec: version,
-            sourceNpmSpecKind: "exact",
-            rootDir: join(prefix, "node_modules", name),
-          });
-          await stat(prefix);
-
-          expect(await service.remove("npmhero")).toBe(true);
-          await expect(stat(prefix)).rejects.toMatchObject({
-            code: "ENOENT",
-          });
-          expect(listPluginArtifacts(db, "npmhero")).toEqual([]);
-        } finally {
-          if (previousCache === undefined) {
-            delete process.env.npm_config_cache;
-          } else {
-            process.env.npm_config_cache = previousCache;
-          }
-          if (previousPackageLock === undefined) {
-            delete process.env.npm_config_package_lock;
-          } else {
-            process.env.npm_config_package_lock = previousPackageLock;
-          }
-          if (previousUserConfig === undefined) {
-            delete process.env.NPM_CONFIG_USERCONFIG;
-          } else {
-            process.env.NPM_CONFIG_USERCONFIG = previousUserConfig;
-          }
-          await new Promise<void>((resolvePromise) =>
-            registry.close(() => resolvePromise()),
-          );
-        }
-      },
-    );
-  });
-
-  it("refuses an npm package whose derived id shadows a builtin before install", async () => {
+  it("refuses an npm source before installing anything", async () => {
     await expect(
       service.install("npm:bb-plugin-connect@1.2.3", { kind: "root" }),
-    ).rejects.toThrowError(/reserved by the bundled plugin.*builtin:connect/);
+    ).rejects.toThrowError(/npm plugin sources are not supported/);
     expect(getInstalledPluginRegistration(db, "connect")).toBeUndefined();
   });
 
   it("refuses a path plugin whose manifest id shadows a builtin", async () => {
-    const rootDir = join(workDir, "bb-plugin-connect");
-    await writePluginFixture(rootDir, { name: "bb-plugin-connect" });
+    const rootDir = join(workDir, "bb-plugin-github");
+    await writePluginFixture(rootDir, { name: "bb-plugin-github" });
     await expect(service.installPath(rootDir)).rejects.toThrowError(
-      /reserved by the bundled plugin.*builtin:connect/,
+      /reserved by the bundled plugin.*builtin:github/,
     );
-    expect(getInstalledPluginRegistration(db, "connect")).toBeUndefined();
+    expect(getInstalledPluginRegistration(db, "github")).toBeUndefined();
   });
 
   it("refuses a path plugin whose id uses the reserved bb-- prefix", async () => {
@@ -1790,12 +1569,6 @@ describe("plugin install flows", () => {
       /ids starting with "bb--" are reserved/,
     );
     expect(getInstalledPluginRegistration(db, "bb--notes")).toBeUndefined();
-  });
-
-  it("refuses an npm package whose derived id uses the reserved bb-- prefix before install", async () => {
-    await expect(
-      service.install("npm:@acme/bb-plugin-bb--notes@1.2.3", { kind: "root" }),
-    ).rejects.toThrowError(/ids starting with "bb--" are reserved/);
   });
 
   it("the bb plugin new scaffold installs and loads through the plugin service", async () => {

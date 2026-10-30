@@ -352,7 +352,6 @@ export class PendingInteractionLifecycle {
       pluginHostArtifacts: args.pluginHostArtifacts,
       aiServices: args.aiServices,
       skillTreeRegistry: args.skillTreeRegistry,
-      telemetry: args.telemetry,
       terminalSessions: args.terminalSessions,
     };
   }

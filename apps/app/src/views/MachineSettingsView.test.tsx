@@ -103,14 +103,8 @@ function providerCliStatus(
     ...identity,
     executablePath: `/usr/local/bin/${identity.executableName}`,
     installed: true,
-    installSource: "npmGlobal",
     currentVersion,
-    latestVersion: currentVersion,
     minimumSupportedVersion: null,
-    npmPackageName: null,
-    npmGlobalPackageVersion: null,
-    installAction: null,
-    needsUpdate: false,
     versionUnsupported: false,
   };
 }
@@ -197,34 +191,6 @@ afterEach(() => {
 });
 
 describe("MachineSettingsView", () => {
-  it("links update issues to Updates in a warning pill", async () => {
-    vi.mocked(sdk.system.config).mockResolvedValue(systemConfig());
-    vi.mocked(sdk.hosts.list).mockResolvedValue([host()]);
-    stubSupportingFetches();
-    const statuses = providerCliStatusResponse();
-    vi.mocked(sdk.hosts.providerCliStatus).mockResolvedValue({
-      ...statuses,
-      codex: {
-        ...statuses.codex,
-        latestVersion: "0.149.0",
-        needsUpdate: true,
-        installAction: {
-          kind: "update",
-          label: "Update",
-          command: "codex update",
-        },
-      },
-    });
-
-    renderView();
-
-    const issueLink = await screen.findByRole("link", { name: "1 to fix" });
-    expect(issueLink.getAttribute("href")).toBe("/settings/updates");
-    const pill = issueLink.firstElementChild;
-    expect(pill?.className).toContain("bg-surface-attention");
-    expect(pill?.className).toContain("text-warning-text");
-  });
-
   it("writes the selected limit to the owner-only route", async () => {
     vi.mocked(sdk.system.config).mockResolvedValue(systemConfig());
     vi.mocked(sdk.hosts.list).mockResolvedValue([host()]);
@@ -422,9 +388,7 @@ describe("MachineSettingsView", () => {
     vi.mocked(sdk.experimental_server.checkMove).mockResolvedValue({
       targetHostId: HOST_ID,
       targetHostName: "dev-vm",
-      mode: "connect",
       serverUrl: null,
-      requiresServerUrl: false,
       targetDataDir: "/home/sawyer/.bb-machines/workstation",
       existingTargetServerData: null,
       items: [],

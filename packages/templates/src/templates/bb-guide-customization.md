@@ -68,14 +68,13 @@ bb settings completed-turns [provider-id] [collapse|flat|default]
 bb settings experiment <key> <value>
 bb settings usage [--machine <id-or-name>] [--refresh]
 bb settings cli-command [install|remove]
-bb settings version [--force]
 bb settings reload Reload bb-managed configuration
 
 AI services: `bb settings ai-services` shows which AI service writes thread
 titles (and so branch names), commit messages, and voice transcripts, plus
 every service a plugin registers and whether it is ready. `set` picks
-`automatic` (bb cloud first, then all other compatible services by plugin id
-and service id in lexicographic order, including third-party plugins), `off`,
+`automatic` (the thread provider's service first, then all other compatible services by
+plugin id and service id in lexicographic order, including third-party plugins), `off`,
 or one service id; a picked service is never swapped for another. A service is
 identified by its plugin and its id, so two plugins may use the same id; pass
 `--plugin <plugin-id>` when they do. `test` runs a sample title or commit
@@ -142,7 +141,6 @@ General. Machine-related keys (`machineServerUrl`, `defaultMachineAccess`,
   `defaultProviderId` (default `null`) names the default provider; `null`
   clears it.
 - `idleProviderSessionTimeoutMinutes` (default `30`; Settings → Providers → Configuration → Release idle agent sessions) sets how long an agent can sit idle after its last turn before every machine stops its provider process. Allowed values are `0` (ASAP), `5`, `10`, `30`, and `60`, for example `bb settings general idleProviderSessionTimeoutMinutes 5`. Machines check every five minutes, so release can take up to five minutes beyond the timeout. Changes apply live and on reconnect. Only restorable sessions without active or pending work are eligible; threads keep their history and resume on the next message. `bb thread stop` still releases a runtime manually. This is not a limit on loaded processes or memory. Read the value with `bb settings show`; SDK callers use `system.config()` and `system.updateGeneralSettings({ ...config.generalSettings, idleProviderSessionTimeoutMinutes: 5 })`.
-- `telemetryEnabled`: see Telemetry below.
 
 `bb settings replay-onboarding` clears `onboardingCompletedAt`, so the
 first-run setup guide (connect an agent, add projects, pick plugins, set up
@@ -183,8 +181,7 @@ approvals locally for the current BB site and device profile. They do not sync
 across devices or server addresses. The Plugin SDK can list and revoke the
 viewing client's approvals; there is no CLI command that reads or modifies a
 remote client's localStorage.
-`changelogPreview` shows the latest
-release notes as a dismissible card on Settings → Updates. Experiments that
+Experiments that
 gate a feature are documented with it: `serverMove` in `bb guide machines`,
 `performanceDiagnostics` under Server performance diagnostics below.
 `timelinePush` sends an open thread's timeline updates over the live
@@ -222,19 +219,19 @@ Launcher settings
 
 `bb-app config` and `bb-app env` reload runtime settings in a running server,
 but the CLI identifies settings that are startup-only, including binding/ports,
-data and the dev-app port, telemetry, inherited skill roots, and
+data and the dev-app port, inherited skill roots, and
 `BB_LOG_LEVEL`. Use `bb-app config`, not `bb-app env`, to change `BB_APP_URL`
 live. After a startup-only change, run `bb-app stop && bb-app start` or restart
 the desktop app; until then, changing or unsetting `BB_SERVER_BIND_HOST` does
-not close a previous `0.0.0.0` listener.
+not close a listener on a previously listed address.
 
-`--server-bind-host 0.0.0.0` (or `BB_SERVER_BIND_HOST=0.0.0.0`) listens on
-every interface for direct remote access; containers must also publish the
-port. BB accepts request hosts that are `localhost`, IP addresses (including
+`--server-bind-host <addresses>` (or `BB_SERVER_BIND_HOST`) adds listeners on
+the listed tailnet or WireGuard interface addresses next to `127.0.0.1`;
+wildcard, LAN and public addresses stop the server at startup. BB accepts request hosts that are `localhost`, IP addresses (including
 LAN and Tailscale IPs), or the hostname in `BB_APP_URL`. For a custom DNS name
 or reverse proxy, run `npx bb-app config set BB_APP_URL https://bb.example.com`
 before connecting, including from the CLI or SDK; forwarded host headers cannot
-authorize an unconfigured name. BB Connect needs no additional configuration.
+authorize an unconfigured name.
 
 Keyboard shortcuts
 
@@ -415,28 +412,6 @@ preferred device is used on the next recording. A missing preference alone
 shows no warning. Capture failures warn on the idle microphone; five seconds
 of near-silent audio warns in the preview or recording row without switching
 inputs or stopping capture. Preview audio is never saved or transcribed.
-
-Telemetry
-
-Anonymous usage telemetry is controlled by Settings → General → Privacy &
-diagnostics, `bb settings general telemetryEnabled false`, or SDK
-`system.updateGeneralSettings` with `telemetryEnabled`. The saved preference
-takes effect immediately. `BB_TELEMETRY=false` always disables telemetry, even
-when the saved preference is enabled.
-
-Mobile app downloads
-
-Settings → Mobile links the iOS TestFlight
-(https://testflight.apple.com/join/T9MayTMb) and the Android APK from the
-public `get-bb/bb` GitHub `android-testing` release (`bb-android.apk`), and
-pairs either app through Add mobile device. `bb settings mobile-app --json` or
-SDK `system.mobileAppDownloads()` returns both links. Add `--details --json`
-or call `system.mobileAppReleases()` for the Android version, build, size, and
-upload date; `android` is `null` when that metadata is unavailable, and the
-links still work. Inside the Android app, this page compares the installed
-native build number with the published APK. Older apps without build reporting
-cannot determine update status. Installed version and build are device-local;
-CLI and SDK metadata report the published APK.
 
 Server performance diagnostics
 

@@ -8,7 +8,6 @@ export {
   resolveShellLoadPath,
   resolveShellScreenState,
   revealsShellFailure,
-  shouldReloadForSession,
   type ShellLoadPhase,
 } from "./shell-state";
 export { buildBridgeSharePayload } from "./shell-share";

@@ -9,15 +9,6 @@ interface RewriteLocalhostLinkHrefArgs {
 }
 
 const LOOPBACK_LINK_HOSTNAMES = new Set(["127.0.0.1", "localhost"]);
-const IGNORED_REWRITE_HOSTNAME_PATTERNS = [
-  /^(?:.+\.)?getbb\.app$/i,
-];
-
-function isIgnoredRewriteHostname(hostname: string): boolean {
-  return IGNORED_REWRITE_HOSTNAME_PATTERNS.some((pattern) =>
-    pattern.test(hostname),
-  );
-}
 
 function isRewriteableLoopbackLink(url: URL): boolean {
   return (
@@ -31,12 +22,7 @@ export function rewriteLocalhostLinkHref({
   enabled,
   href,
 }: RewriteLocalhostLinkHrefArgs): string | undefined {
-  if (
-    !enabled ||
-    href === undefined ||
-    currentHostname === undefined ||
-    isIgnoredRewriteHostname(currentHostname)
-  ) {
+  if (!enabled || href === undefined || currentHostname === undefined) {
     return href;
   }
 

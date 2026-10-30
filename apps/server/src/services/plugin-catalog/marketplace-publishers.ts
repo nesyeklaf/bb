@@ -1,4 +1,3 @@
-import { CURATED_PLUGIN_MARKETPLACE_NAME } from "@bb/server-contract";
 import {
   BUNDLED_MARKETPLACE_NAME,
   BUILTIN_PUBLISHER_LABEL,
@@ -13,11 +12,9 @@ export function marketplacePublisherLabel(args: {
   marketplaceName: string;
   displayName: string;
 }): string {
-  if (
-    args.marketplaceName === CURATED_PLUGIN_MARKETPLACE_NAME ||
-    args.marketplaceName === BUNDLED_MARKETPLACE_NAME
-  )
+  if (args.marketplaceName === BUNDLED_MARKETPLACE_NAME) {
     return args.displayName;
+  }
   return RESERVED_PUBLISHER_LABELS.has(args.displayName)
     ? args.marketplaceName
     : args.displayName;

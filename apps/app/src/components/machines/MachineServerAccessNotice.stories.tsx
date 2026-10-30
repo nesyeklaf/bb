@@ -2,8 +2,8 @@ import { StoryCard, StoryRow } from "../../../.ladle/story-card";
 import { MachineServerAccessNoticeContent } from "./MachineServerAccessNotice";
 import { machineServerAccessBlockedReason } from "./machine-server-access";
 import {
-  CONNECT_PAIRED,
-  CONNECT_UNPAIRED,
+  TAILNET_READY,
+  TAILNET_SETUP_REQUIRED,
 } from "../../../.ladle/machine-story-fixtures";
 
 export default {
@@ -18,7 +18,7 @@ export function Reasons() {
         hint="whatever the method's own complaint is, the reader is told the one thing to do"
       >
         <MachineServerAccessNoticeContent
-          reason={machineServerAccessBlockedReason(CONNECT_UNPAIRED)}
+          reason={machineServerAccessBlockedReason(TAILNET_SETUP_REQUIRED)}
         />
       </StoryRow>
       <StoryRow
@@ -26,7 +26,7 @@ export function Reasons() {
         hint="the notice renders nothing at all"
       >
         <MachineServerAccessNoticeContent
-          reason={machineServerAccessBlockedReason(CONNECT_PAIRED)}
+          reason={machineServerAccessBlockedReason(TAILNET_READY)}
         />
       </StoryRow>
     </StoryCard>

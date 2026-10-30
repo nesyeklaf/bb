@@ -5,18 +5,13 @@ import { describe, expect, it } from "vitest";
 import {
   LAST_SERVER_MOVE_FILE_NAME,
   readLastServerMoveFile,
-  readServerConnectHoldFile,
   readServerImportFile,
   readServerMovedFile,
-  removeServerConnectHoldFile,
-  SERVER_CONNECT_HOLD_FILE_NAME,
   SERVER_IMPORT_FILE_NAME,
   SERVER_MOVED_FILE_NAME,
-  type ServerConnectHoldFile,
   type ServerImportFile,
   type ServerMovedFile,
   writeLastServerMoveFile,
-  writeServerConnectHoldFile,
   writeServerImportFile,
   writeServerMovedFile,
 } from "../src/index.js";
@@ -29,8 +24,6 @@ const MOVED_FILE: ServerMovedFile = {
   toHostId: "host-new",
   toHostName: "desktop",
   serverUrl: "https://bb.example",
-  mode: "connect",
-  connectHandle: "sawyer",
   oldCopyEntries: ["bb.db", "attachments", "plugins/docs/data.db"],
 };
 
@@ -88,38 +81,14 @@ describe("server move marker files", () => {
     }
   });
 
-  it("round trips the bb connect hold with mode 0600 and removes it once", async () => {
+  it("reads a moved marker that still carries the retired move mode fields", async () => {
     const dataDir = await makeTempDir();
-    expect(SERVER_CONNECT_HOLD_FILE_NAME).toBe("server-connect-hold.json");
-    expect(await readServerConnectHoldFile(dataDir)).toBeNull();
-    expect(await removeServerConnectHoldFile(dataDir)).toBe(false);
-
-    const hold: ServerConnectHoldFile = {
-      version: 1,
-      reason: "manual-import",
-      createdAt: 1_757_000_000_000,
-    };
-    await writeServerConnectHoldFile(dataDir, hold);
-
-    expect(await readServerConnectHoldFile(dataDir)).toEqual(hold);
-    if (process.platform !== "win32") {
-      expect(
-        (await stat(path.join(dataDir, SERVER_CONNECT_HOLD_FILE_NAME))).mode &
-          0o777,
-      ).toBe(0o600);
-    }
-
     await writeFile(
-      path.join(dataDir, SERVER_CONNECT_HOLD_FILE_NAME),
-      JSON.stringify({ ...hold, reason: "move" }),
-    );
-    await expect(readServerConnectHoldFile(dataDir)).rejects.toThrow(
-      /Invalid/u,
+      path.join(dataDir, SERVER_MOVED_FILE_NAME),
+      JSON.stringify({ ...MOVED_FILE, mode: "direct", connectHandle: null }),
     );
 
-    expect(await removeServerConnectHoldFile(dataDir)).toBe(true);
-    expect(await removeServerConnectHoldFile(dataDir)).toBe(false);
-    expect(await readdir(dataDir)).toEqual([]);
+    expect(await readServerMovedFile(dataDir)).toEqual(MOVED_FILE);
   });
 
   it("throws on invalid JSON and on markers that fail the schema", async () => {

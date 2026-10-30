@@ -10,8 +10,8 @@ Usage: install.sh --bootstrap-env <NAME> [--host-daemon-port <port>]
 
 Machines enroll from a private bootstrap bundle. Get the one-line command that
 carries it from Settings -> Machines -> Add a machine, or from
-`bb machine create --provider manual`. That command works through bb connect,
-Tailscale, and any other address machines can reach.
+`bb machine create --provider manual`. That command works through Tailscale,
+WireGuard, and any other address machines can reach.
 --adopt installs the service for a data directory that is already enrolled,
 such as the one a server move leaves behind, reading its machine ID from
 auth.json and its server address and credentials from config.json.
@@ -474,7 +474,7 @@ if [ "$adopt" = yes ]; then
     try { url = new URL(config?.serverUrl); }
     catch { fail(`${configFile} has no server address.`); }
     if (!["http:", "https:"].includes(url.protocol) || url.username || url.password || url.search || url.hash) fail(`${configFile} has an unusable server address.`);
-    const headers = config.serverHeaders ?? (typeof config.machineCredential === "string" ? { "x-bb-connect-machine": config.machineCredential } : {});
+    const headers = config.serverHeaders ?? {};
     if (typeof headers !== "object" || headers === null || Array.isArray(headers) || !Object.values(headers).every((value) => typeof value === "string")) fail(`${configFile} has invalid server headers.`);
     process.stdout.write(JSON.stringify({ dataDir, hostId: auth.hostId, serverUrl: url.href.replace(/\/$/u, ""), headers }));
   ' "$requested_data_dir"); then
@@ -702,9 +702,6 @@ host_daemon_port_temp="$host_daemon_port_file.$$.tmp"
 mv "$host_daemon_port_temp" "$host_daemon_port_file"
 complete_step "Using local host-daemon port $host_daemon_port"
 
-# The server's own build is always installed when it offers one: version
-# strings cannot distinguish unpublished builds, so an existing bb-app is
-# trusted only when the server provides no package (404) or is unreachable.
 package_url="${server_url%/}/install/bb-app.tgz"
 package_dir=$(mktemp -d "${TMPDIR:-/tmp}/bb-app.XXXXXX")
 package_file="$package_dir/bb-app.tgz"
@@ -814,26 +811,12 @@ elif [ "$package_status" -ge 200 ] && [ "$package_status" -lt 300 ]; then
   fi
   bb_app_npm_prefix=$machine_npm_prefix
   complete_step "Installed the server's bb-app build"
-elif command -v bb-app >/dev/null 2>&1; then
-  rm -f "$host_artifact_digest_file"
-  bb_app=$(command -v bb-app)
-  if [ "$package_status" = 404 ]; then
-    warning_step "The server does not provide its bb-app package; using bb-app at $bb_app"
-  else
-    warning_step "Could not download the server's bb-app package (HTTP $package_status); using bb-app at $bb_app"
-  fi
 elif [ "$package_status" = 404 ]; then
-  require_npm
+  rm -rf "$package_dir"
   rm -f "$host_artifact_digest_file"
-  warning_step "The server does not provide its bb-app package"
-  active_step "Installing bb-app from the npm registry"
-  if ! npm install -g "$bb_app_allow_scripts" --prefix "$machine_npm_prefix" bb-app; then
-    rm -rf "$package_dir"
-    fail_step "Could not install bb-app for this machine. Check the npm error above, then rerun this command."
-    exit 1
-  fi
-  bb_app_npm_prefix=$machine_npm_prefix
-  complete_step "Installed bb-app from the npm registry"
+  fail_step "The server does not provide its bb-app package, so this machine cannot be installed from it."
+  detail "Install the bb-app package of this server on the machine, or use a server build that ships it." >&2
+  exit 1
 else
   rm -rf "$package_dir"
   fail_step "Could not download the server's bb-app package from $package_url (HTTP $package_status)."
@@ -869,8 +852,7 @@ fi
 
 if [ "$adopt" = no ]; then
   bb_cli="${bb_app%/*}/bb"
-  if [ ! -x "$bb_cli" ]; then bb_cli=$(command -v bb || true); fi
-  if [ -z "$bb_cli" ]; then
+  if [ ! -x "$bb_cli" ]; then
     fail_step "The installed build does not provide the machine enrollment CLI."
     exit 1
   fi

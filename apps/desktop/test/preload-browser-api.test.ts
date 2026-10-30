@@ -11,12 +11,10 @@ import type {
   BbDesktopWindowState,
 } from "@bb/desktop-contract";
 import {
-  BB_DESKTOP_CHECK_FOR_UPDATES_CHANNEL,
   BB_DESKTOP_GET_INFO_CHANNEL,
   BB_DESKTOP_INFO_CHANGED_CHANNEL,
-  BB_DESKTOP_INSTALL_UPDATE_CHANNEL,
   BB_DESKTOP_SET_THEME_CHANNEL,
-} from "../src/desktop-update-ipc.js";
+} from "../src/desktop-ipc-channels.js";
 import {
   BB_DESKTOP_BROWSER_ATTACH_CHANNEL,
   BB_DESKTOP_BROWSER_DETACH_CHANNEL,
@@ -63,12 +61,7 @@ const electronMock = vi.hoisted(() => {
   ) => void;
 
   const desktopInfo: BbDesktopInfo = {
-    lastCheckedAt: null,
-    latestVersion: null,
-    pendingVersion: null,
     platform: "macos",
-    updateAvailable: false,
-    updateDownloaded: false,
     version: "0.0.0-test",
   };
   const desktopWindowState: BbDesktopWindowState = {
@@ -315,11 +308,9 @@ describe("desktop preload browser API", () => {
     expect(api.focusWindow).toBeTypeOf("function");
     api.focusWindow?.();
     api.setTheme("dark");
-    await api.checkForUpdates();
     await expect(api.getWindowState?.()).resolves.toEqual({
       isFullScreen: false,
     });
-    await api.installUpdate();
 
     expect(electronMock.sendCalls).toEqual([
       { channel: BB_DESKTOP_BROWSER_ATTACH_CHANNEL, payload: attachRequest },
@@ -380,13 +371,7 @@ describe("desktop preload browser API", () => {
     ]);
     expect(electronMock.invokeCalls).toContain(BB_DESKTOP_GET_INFO_CHANNEL);
     expect(electronMock.invokeCalls).toContain(
-      BB_DESKTOP_CHECK_FOR_UPDATES_CHANNEL,
-    );
-    expect(electronMock.invokeCalls).toContain(
       BB_DESKTOP_GET_WINDOW_STATE_CHANNEL,
-    );
-    expect(electronMock.invokeCalls).toContain(
-      BB_DESKTOP_INSTALL_UPDATE_CHANNEL,
     );
   }, 10_000);
 

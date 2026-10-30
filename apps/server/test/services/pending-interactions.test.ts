@@ -532,7 +532,6 @@ describe("pending interaction lifecycle", () => {
         aiServices: harness.deps.aiServices,
         pluginHostArtifacts: harness.deps.pluginHostArtifacts,
         skillTreeRegistry: harness.deps.skillTreeRegistry,
-        telemetry: harness.deps.telemetry,
         terminalSessions: harness.deps.terminalSessions,
       });
       const { host } = seedHostSession(harness.deps, {

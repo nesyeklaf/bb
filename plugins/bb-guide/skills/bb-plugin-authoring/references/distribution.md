@@ -45,12 +45,11 @@ source files remain the contract.
 
 ## Distributing a plugin
 
-Users can install third-party plugins directly from a local path, npm package,
-or Git repository:
+Users can install third-party plugins directly from a local path or a Git
+repository:
 
 ```sh
 bb plugin install ./bb-plugin-notes
-bb plugin install npm:bb-plugin-notes@^1.0.0
 bb plugin install https://github.com/acme/bb-plugin-notes
 bb plugin install git:https://github.com/acme/bb-plugin-notes.git@main
 bb plugin install git:https://github.com/acme/bb-plugin-notes.git@^1.2.0
@@ -61,7 +60,7 @@ with an explicit branch, tag, or commit when that tracking intent matters.
 Install and update run third-party code with full trust. Interactive commands
 show the resolved source and ask for confirmation. Pass `--yes` only after the
 user confirms that exact source and version. quickstart.md covers what each
-install builds and which files an npm package must publish.
+install builds.
 
 ### Updates
 
@@ -97,7 +96,6 @@ root:
 
 ```json
 {
-  "$schema": "https://getbb.app/schemas/plugins.schema.json",
   "schemaVersion": 1,
   "name": "acme-plugins",
   "plugins": [
@@ -129,7 +127,6 @@ installing an entry runs the same install pipeline a direct install runs.
 
 ```json
 {
-  "$schema": "https://getbb.app/schemas/marketplace.schema.json",
   "schemaVersion": 1,
   "name": "acme-plugins",
   "displayName": "Acme Plugins",
@@ -162,14 +159,12 @@ A rejected manifest leaves the last catalog bb validated serving. `name` is the
 marketplace's identity and must be unique on the user's machine;
 `bb-official` and `bb-community` are reserved.
 Compatibility belongs in each plugin package manifest. Icons are `.svg`,
-`.png`, or `.webp`, either an absolute https URL or a path relative to the
-manifest — bb fetches and validates them server-side and serves them from its
-own origin.
+`.png`, or `.webp`, given as a path relative to the manifest; bb validates
+them and serves them from its own origin. An absolute icon URL is refused.
 
-Host it three ways, and users add whichever fits:
+Host it two ways, and users add whichever fits:
 
 ```sh
-bb marketplace add https://plugins.acme.dev/marketplace.json
 bb marketplace add git:github.com/acme/bb-marketplace@main
 bb marketplace add git:github.com/acme/agent-plugins@main --subdirectory bb
 bb marketplace add path:/work/acme-marketplace
@@ -182,8 +177,7 @@ bb marketplace remove acme-plugins
 icons without installing code. `remove` forgets the catalog, while installed
 plugins continue as direct installs.
 
-An https marketplace is re-read with a conditional request; a git one is
-read from a fresh checkout on each refresh, with `marketplace.json` and any
+A git marketplace is read from a fresh checkout on each refresh, with `marketplace.json` and any
 relative icons read from the repository root, or from the directory named by
 `--subdirectory <relative-path>`. An entry's `source.git.subdir` stays
 relative to the repository root. Prefer git tag ranges over
@@ -192,10 +186,10 @@ installing from a marketplace that does not ship with bb, bb resolves and
 shows the true source — including the exact release tag and commit a range
 lands on — so keep your listed URL, subdirectory, and range honest.
 
-Two marketplaces ship with bb. `bb-official` lists the plugins bundled inside
+One marketplace ships with bb. `bb-official` lists the plugins bundled inside
 the app, which install from that local copy with no network fetch; inclusion
-there is a BB release decision. `bb-community` lists public third-party
-plugins; to list one there, use the `submit-a-plugin` skill.
+there is a BB release decision. Publish every other plugin through your own
+marketplace.
 
 ### Store listing text
 
@@ -206,7 +200,7 @@ State the outcome the user gets.
 
 `PLUGIN_OVERVIEW.md` beside package.json holds the long-form description. The
 detail page shows it in an Overview section under the lead paragraph, in the
-app and on the public getbb.app marketplace. `bb plugin new` scaffolds one, the
+app and on the marketplace. `bb plugin new` scaffolds one, the
 BB Community marketplace requires one, and a plugin that is only installed from
 a local path or a private source still reads better with one.
 

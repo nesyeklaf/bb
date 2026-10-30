@@ -49,9 +49,7 @@ function checkResult(
   return {
     targetHostId: "host_desk",
     targetHostName: "desk",
-    mode: "connect",
     serverUrl: null,
-    requiresServerUrl: false,
     targetDataDir: "/home/michael/.bb-machines/macbook-pro",
     existingTargetServerData: null,
     items: [RUNNING_TURNS, SCHEDULES, TIMEZONE],
@@ -68,7 +66,6 @@ function Stage(overrides: Partial<MoveServerDialogViewProps>) {
         result={checkResult()}
         checking={false}
         checkError={null}
-        showAddress={false}
         addressDraft=""
         archiveConfirmed={false}
         startAllowed
@@ -95,10 +92,13 @@ export function Checklist() {
         <Stage result={null} checking startAllowed={false} />
       </StoryRow>
       <StoryRow
-        label="bb connect, ready"
-        hint="machines keep using the same connect address, so there is no address step; warnings never block"
+        label="ready"
+        hint="the checked address is set; warnings never block"
       >
-        <Stage />
+        <Stage
+          addressDraft="https://desk.example.com"
+          result={checkResult({ serverUrl: "https://desk.example.com" })}
+        />
       </StoryRow>
       <StoryRow
         label="nothing to report"
@@ -150,11 +150,8 @@ export function DirectAddress() {
         hint="a direct-address server has no shared handle, so the dialog asks where machines should reach the new server"
       >
         <Stage
-          showAddress
           startAllowed={false}
           result={checkResult({
-            mode: "direct",
-            requiresServerUrl: true,
             canMove: false,
             items: [
               {
@@ -173,11 +170,8 @@ export function DirectAddress() {
         hint="the latest check ran with this exact address, so the move can start"
       >
         <Stage
-          showAddress
           addressDraft="https://desk.example.com"
           result={checkResult({
-            mode: "direct",
-            requiresServerUrl: true,
             serverUrl: "https://desk.example.com",
             items: [RUNNING_TURNS],
           })}
@@ -188,13 +182,10 @@ export function DirectAddress() {
         hint="the previous results dim while the new address is checked"
       >
         <Stage
-          showAddress
           checking
           startAllowed={false}
           addressDraft="https://desk.tailnet.example"
           result={checkResult({
-            mode: "direct",
-            requiresServerUrl: true,
             items: [RUNNING_TURNS],
           })}
         />

@@ -42,12 +42,6 @@ type ParsedPluginSource =
       spec: string;
       selector: ParsedGitSelector;
       cachePath: string;
-    }
-  | {
-      kind: "npm";
-      name: string;
-      spec: string;
-      specKind: "default" | "exact" | "tag" | "range";
     };
 
 const COMMIT_SHA_PATTERN = /^[0-9a-f]{7,40}$/i;
@@ -57,7 +51,6 @@ const GIT_REF_SPEC_PREFIX = "ref:";
 const BARE_VERSION_SPEC_PATTERN = /^v?\d+(?:\.\d+)*$/u;
 const GIT_TAG_PREFIX_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._/-]*$/u;
 const MAX_GIT_TAG_PREFIX_LENGTH = 128;
-const NPM_NAME_PATTERN = /^(@[a-z0-9][a-z0-9._~-]*\/)?[a-z0-9][a-z0-9._~-]*$/;
 const BUILTIN_NAME_PATTERN = /^[a-z0-9][a-z0-9-]*$/;
 
 export function isCommitSha(ref: string): boolean {
@@ -235,32 +228,6 @@ function parseGitSource(spec: string): ParsedPluginSource {
   };
 }
 
-function parseNpmSource(spec: string): ParsedPluginSource {
-  const at = spec.lastIndexOf("@");
-  const hasSpec = at > 0 && at < spec.length - 1;
-  if (at > 0 && at === spec.length - 1) {
-    throw new Error(`npm source has an empty version spec: "${spec}"`);
-  }
-  const name = hasSpec ? spec.slice(0, at) : spec;
-  const requestedSpec = hasSpec ? spec.slice(at + 1) : "";
-  if (!NPM_NAME_PATTERN.test(name)) {
-    throw new Error(`invalid npm package name "${name}"`);
-  }
-  if (requestedSpec.length === 0) {
-    return { kind: "npm", name, spec: "", specKind: "default" };
-  }
-  if (semver.valid(requestedSpec) !== null) {
-    return { kind: "npm", name, spec: requestedSpec, specKind: "exact" };
-  }
-  if (semver.validRange(requestedSpec) !== null) {
-    return { kind: "npm", name, spec: requestedSpec, specKind: "range" };
-  }
-  if (/^[a-zA-Z][a-zA-Z0-9._-]*$/.test(requestedSpec)) {
-    return { kind: "npm", name, spec: requestedSpec, specKind: "tag" };
-  }
-  throw new Error(`invalid npm version, range, or dist-tag "${requestedSpec}"`);
-}
-
 function parseBuiltinSource(spec: string): ParsedPluginSource {
   if (!BUILTIN_NAME_PATTERN.test(spec)) {
     throw new Error(
@@ -273,7 +240,11 @@ function parseBuiltinSource(spec: string): ParsedPluginSource {
 export function parsePluginSource(source: string): ParsedPluginSource {
   if (source.startsWith("builtin:")) return parseBuiltinSource(source.slice(8));
   if (source.startsWith("git:")) return parseGitSource(source.slice(4));
-  if (source.startsWith("npm:")) return parseNpmSource(source.slice(4));
+  if (source.startsWith("npm:")) {
+    throw new Error(
+      "npm plugin sources are not supported; install from a local path or a git repository",
+    );
+  }
   if (/^https?:\/\//iu.test(source)) return parseGitSource(source);
   const path = source.startsWith("path:") ? source.slice(5) : source;
   if (path.length === 0) throw new Error("install source path is empty");
@@ -328,18 +299,6 @@ export function pluginRootDir(
     : join(checkoutDir, ...subdirectory.split("/"));
 }
 
-export function npmInstallPrefix(
-  dataDir: string,
-  name: string,
-  version: string,
-): string {
-  return join(dataDir, "plugins", "npm", ...`${name}@${version}`.split("/"));
-}
-
-export function npmPackageRoot(prefix: string, packageName: string): string {
-  return join(prefix, "node_modules", ...packageName.split("/"));
-}
-
 function resolveInside(
   root: string,
   segments: string[],
@@ -377,21 +336,6 @@ export async function realPathInside(
     throw new Error(`${label} resolves outside its root`);
   }
   return realTarget;
-}
-
-export function npmArtifactCacheDir(
-  dataDir: string,
-  packageName: string,
-  version: string,
-): string {
-  if (!NPM_NAME_PATTERN.test(packageName)) {
-    throw new Error(`invalid npm package name "${packageName}"`);
-  }
-  return resolveInside(
-    join(dataDir, "plugins", "cache", "npm"),
-    [...packageName.split("/"), version],
-    "npm artifact",
-  );
 }
 
 export function gitArtifactCacheDir(

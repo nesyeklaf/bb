@@ -4,7 +4,6 @@ import { PERSONAL_PROJECT_ID, type Host, type ProviderInfo } from "@bb/domain";
 import type {
   SidebarBootstrapResponse,
   SystemAiServicesResponse,
-  SystemVersionResponse,
 } from "@bb/server-contract";
 import type { ProviderCliStatusResponse } from "@bb/host-daemon-contract";
 import {
@@ -18,12 +17,8 @@ import {
   systemAiServicesQueryKey,
   systemConfigQueryKey,
   systemProvidersQueryKey,
-  systemVersionQueryKey,
 } from "../src/hooks/queries/query-keys";
-import {
-  buildUpdateInventoryProviderIssues,
-  type UpdateInventoryMachine,
-} from "../src/hooks/useUpdateInventory";
+import type { UpdateInventoryMachine } from "../src/hooks/useUpdateInventory";
 import { createAppQueryClient } from "../src/lib/query-client";
 import { makeSystemConfig } from "../src/test/fixtures/system-config";
 import { systemMachineProvidersQueryKey } from "../src/hooks/queries/query-keys";
@@ -33,10 +28,8 @@ import {
 } from "./machine-story-fixtures";
 import { makeProviderInfo } from "@bb/test-helpers/domain-fixtures";
 import {
-  BbAppUpdateRows,
-  BbUpdatesCard,
+  MachineUpdatesSection,
   PluginUpdatesSection,
-  ProviderCliUpdatesSection,
 } from "../src/components/settings/UpdatesSettingsSection";
 import {
   HOST_IDS,
@@ -77,9 +70,9 @@ const STORY_AI_SERVICES: SystemAiServicesResponse = {
   },
   services: [
     {
-      id: "bb",
-      displayName: "bb cloud",
-      pluginId: "bb-ai",
+      id: "claude-code",
+      displayName: "Claude Code",
+      pluginId: "provider-claude-code",
       tasks: ["thread-title", "commit-message", "voice"],
       automaticRank: 0,
       status: { ready: true },
@@ -116,45 +109,26 @@ const SETTINGS_STORY_HOSTS = [
 const localProviderStatus = {
   codex: makeProviderCliStatus("codex", {
     currentVersion: "0.145.0",
-    latestVersion: "0.146.0",
-    needsUpdate: true,
-    installAction: {
-      kind: "update",
-      label: "Update",
-      command: "codex update",
-    },
   }),
   "claude-code": makeProviderCliStatus("claude-code", {
     currentVersion: "2.1.0",
-    latestVersion: "2.1.0",
   }),
   "acp-cursor": makeProviderCliStatus("acp-cursor", {
     currentVersion: "0.49.0",
-    latestVersion: "0.49.0",
   }),
 } satisfies ProviderCliStatusResponse;
 
 const remoteProviderStatus = {
   codex: makeProviderCliStatus("codex", {
     currentVersion: "0.145.0",
-    latestVersion: "0.146.0",
-    needsUpdate: true,
-    installAction: {
-      kind: "update",
-      label: "Update",
-      command: "codex update",
-    },
   }),
   "claude-code": makeProviderCliStatus("claude-code", {
     currentVersion: "2.1.0",
-    latestVersion: "2.1.0",
   }),
   "acp-cursor": makeProviderCliStatus("acp-cursor", {
     installed: false,
     executablePath: null,
     currentVersion: null,
-    latestVersion: "0.49.0",
-    installSource: undefined,
   }),
 } satisfies ProviderCliStatusResponse;
 
@@ -231,17 +205,6 @@ const systemConfig = makeSystemConfig({
   dataDir: "/Users/michael/.bb",
 });
 
-const systemVersion = {
-  currentVersion: "0.39.0",
-  latestVersion: "0.39.0",
-  currentCommit: null,
-  installKind: "npm",
-  source: "npm",
-  updateAvailable: false,
-  isDevelopment: false,
-  upgradeCommand: "npx bb-app@latest",
-} satisfies SystemVersionResponse;
-
 const systemProviders = [
   makeProviderInfo({
     id: "codex",
@@ -263,43 +226,23 @@ const systemProviders = [
 const settingsUpdateMachine = {
   host: SETTINGS_STORY_PRIMARY_HOST,
   isPrimary: true,
-  providerStatus: localProviderStatus,
-  statusPending: false,
-  statusError: false,
-  statusFetching: false,
-  issues: buildUpdateInventoryProviderIssues(localProviderStatus),
   canRetryDaemonUpdate: false,
 } satisfies UpdateInventoryMachine;
 
 const noJobs: ReadonlySet<string> = new Set();
-const noFailures = new Map<string, never>();
 const noop = () => {};
 
 export function SettingsUpdatesStory() {
   return (
     <div className="space-y-6">
-      <BbUpdatesCard>
-        <BbAppUpdateRows
-          systemVersion={systemVersion}
-          desktopInfo={null}
-          isDesktop={false}
-          onRelaunchDesktop={null}
-          onRetryDesktop={null}
-        />
-      </BbUpdatesCard>
-      <ProviderCliUpdatesSection
+      <MachineUpdatesSection
         machines={[settingsUpdateMachine]}
         now={0}
         localDaemonHostId={null}
         serverHostId={null}
         retryPendingHostId={null}
-        runningJobKey={null}
-        queuedJobKeys={noJobs}
-        failuresByJobKey={noFailures}
-        onStartInstall={noop}
         onRetryDaemonUpdate={noop}
         onRetryAllDaemonUpdates={noop}
-        onRecheckClis={noop}
       />
       <PluginUpdatesSection
         plugins={{ trackedCount: 0, items: [] }}
@@ -327,7 +270,6 @@ function createSettingsStoryQueryClient(hosts: Host[] = SETTINGS_STORY_HOSTS) {
   queryClient.setQueryData(hostsQueryKey(true), hosts);
   queryClient.setQueryData(systemConfigQueryKey(), systemConfig);
   queryClient.setQueryData(systemProvidersQueryKey(), systemProviders);
-  queryClient.setQueryData(systemVersionQueryKey(), systemVersion);
   queryClient.setQueryData(sidebarNavigationQueryKey(), sidebarNavigation);
   queryClient.setQueryData(pluginMarketplacesQueryKey(), []);
   queryClient.setQueryData(systemAiServicesQueryKey(), STORY_AI_SERVICES);

@@ -110,10 +110,10 @@ prints `{"ok":false,"error":{"code":…,"message":…,"hint":…}}` on stdout (c
 `session_unavailable` when the session stopped or expired, `screenshot_limit`
 for capture limits) while the same message stays on stderr.
 
-An unavailable backend or a failed runtime install is an actionable setup
-error, not permission to attach to a random browser. The first open on a host
-installs the pinned `dev-browser` npm release into plugin-owned host storage
-there and verifies its provenance and digest; it needs npm, network access, and
-Chrome on that host, and can take a minute. Later opens reuse the verified
-install offline. The exact pin and Chrome setup are documented in the plugin
+An unavailable backend or a missing runtime is an actionable setup error, not
+permission to attach to a random browser. bb never downloads the pinned
+`dev-browser` runtime: the owner installs it on the browser host outside bb, and
+the first open fails with a message that names the expected directory, version
+and SHA-256 when it is missing or does not match. Headless sessions also need
+Chrome on that host. The exact pin and setup are documented in the plugin
 README. Cloud browsers and arbitrary CDP endpoints are unsupported.

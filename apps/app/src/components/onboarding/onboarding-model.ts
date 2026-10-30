@@ -1,7 +1,5 @@
-import type { ProviderCliStatus } from "@bb/host-daemon-contract";
 import type {
   HostDiscoveredRepo,
-  ServerAccessStatus,
   SystemProviderState,
 } from "@bb/server-contract";
 
@@ -31,8 +29,6 @@ export const ONBOARDING_PLUGINS: readonly {
   { entryId: "ask-user-question", pluginId: "ask-user-question" },
 ];
 
-export const CONNECT_PLUGIN_ID = "connect";
-
 export type AgentSetupState =
   | { status: "checking" }
   | { status: "ready"; detail: string | null }
@@ -42,30 +38,20 @@ export type AgentSetupState =
       canSignIn: boolean;
     }
   | { status: "signingIn" }
-  | { status: "install"; canInstall: boolean }
-  | { status: "update"; detail: string | null; canInstall: boolean }
-  | { status: "installing" }
-  | { status: "installFailed"; message: string; canInstall: boolean }
+  | { status: "install" }
+  | { status: "update"; detail: string | null }
   | { status: "unknown"; message: string | null };
 
 interface ResolveAgentSetupStateArgs {
   health: SystemProviderState;
-  cliStatus: ProviderCliStatus | undefined;
-  installing: boolean;
-  installFailure: string | null;
   signingIn: boolean;
   signInFailed: boolean;
-  installInfoPending: boolean;
 }
 
 export function resolveAgentSetupState({
   health,
-  cliStatus,
-  installing,
-  installFailure,
   signingIn,
   signInFailed,
-  installInfoPending,
 }: ResolveAgentSetupStateArgs): AgentSetupState {
   if (health.status === "ready") {
     const detail = [health.accountEmail, health.planLabel]
@@ -73,27 +59,16 @@ export function resolveAgentSetupState({
       .join(" · ");
     return { status: "ready", detail: detail === "" ? null : detail };
   }
-  if (installing) return { status: "installing" };
-  const canInstall =
-    cliStatus?.installAction !== null && cliStatus?.installAction !== undefined;
-  if (installFailure !== null) {
-    return { status: "installFailed", message: installFailure, canInstall };
-  }
-  const awaitingInstallInfo = cliStatus === undefined && installInfoPending;
   switch (health.status) {
     case "not_installed":
-      return awaitingInstallInfo
-        ? { status: "checking" }
-        : { status: "install", canInstall };
+      return { status: "install" };
     case "unsupported_version":
-      if (awaitingInstallInfo) return { status: "checking" };
       return {
         status: "update",
         detail:
           health.minimumSupportedVersion === null
             ? health.statusMessage
             : `Needs version ${health.minimumSupportedVersion} or newer`,
-        canInstall,
       };
     case "unauthenticated":
     case "expired":
@@ -155,25 +130,6 @@ export function shortRemoteName(originUrl: string | null): string | null {
   if (path === undefined) return null;
   const segments = path.split("/").filter((segment) => segment !== "");
   return segments.length < 2 ? null : segments.slice(-2).join("/");
-}
-
-export function connectAccessUrl(
-  serverAccess: ServerAccessStatus | undefined,
-):
-  | { status: "on"; url: string }
-  | { status: "off" }
-  | { status: "unavailable" } {
-  const provider = serverAccess?.providers.find(
-    (candidate) => candidate.pluginId === CONNECT_PLUGIN_ID,
-  );
-  if (provider === undefined) return { status: "unavailable" };
-  if (
-    provider.availability?.status === "available" &&
-    provider.availability.serverUrl !== undefined
-  ) {
-    return { status: "on", url: provider.availability.serverUrl };
-  }
-  return { status: "off" };
 }
 
 export interface SignInGuide {

@@ -6,7 +6,6 @@ import { describe, expect, it } from "vitest";
 import type { Logger } from "@bb/logger";
 import { createPluginRuntime } from "../../../src/services/plugins/plugin-runtime.js";
 import { testLogger } from "../../helpers/test-app.js";
-import { createNoopTelemetryService } from "../../../src/services/system/telemetry.js";
 import { createMigratedConnection } from "@bb/db/testing";
 
 async function createRuntime() {
@@ -25,7 +24,6 @@ async function createRuntime() {
       },
       logger: testLogger as unknown as Logger,
       aiServices: createAiServiceRegistry(),
-      telemetry: createNoopTelemetryService(),
       dataDir: await mkdtemp(join(tmpdir(), "bb-dev-build-problems-")),
       appVersion: "0.9.0",
     },

@@ -7,7 +7,6 @@ import {
   getInstalledPluginRegistration,
   listUnnormalizedPluginRegistrations,
   normalizeInstalledPluginRegistration,
-  setInstalledPluginSourceClassification,
   upsertInstalledPlugin,
   type InstalledPluginRow,
   type LegacyPluginExactResolution,
@@ -23,13 +22,12 @@ import {
   type BundledPluginRegistration,
 } from "./builtin-registry.js";
 import { BUNDLED_MARKETPLACE_NAME } from "../plugin-catalog/marketplace-manifest.js";
+import { LEGACY_COMMUNITY_MARKETPLACE_NAME } from "../plugin-catalog/remote-marketplaces.js";
 import {
-  CURATED_PLUGIN_MARKETPLACE_NAME,
   type InstalledPlugin,
   type PluginRuntimeStatus,
   type PluginSourceSelection,
 } from "@bb/server-contract";
-import type { TelemetryEvent } from "../system/telemetry.js";
 import { resolveSelectedSubdirectory } from "./collection-manifest.js";
 import {
   isCommitSha,
@@ -54,33 +52,8 @@ import {
   gitResolvedVersion,
   resolveGitRef,
   type GitRefKind,
-  type NpmSourceIntentForResolution,
   type PluginResolvedUpdateVersion,
 } from "./update-resolver.js";
-
-export function pluginInstalledTelemetryEvent(
-  pluginId: string,
-  provenance: PluginProvenance,
-  sourceIntent: PluginSourceIntent,
-): Extract<TelemetryEvent, { name: "plugin_installed" }> {
-  const isPublic =
-    provenance.kind === "builtin" ||
-    (provenance.kind === "catalog" &&
-      (provenance.marketplace === CURATED_PLUGIN_MARKETPLACE_NAME ||
-        provenance.marketplace === BUNDLED_MARKETPLACE_NAME));
-  return {
-    name: "plugin_installed",
-    properties: {
-      plugin_id: isPublic ? pluginId : null,
-      provenance: provenance.kind,
-      marketplace:
-        isPublic && provenance.kind === "catalog"
-          ? provenance.marketplace
-          : null,
-      source_kind: sourceIntent.kind,
-    },
-  };
-}
 
 interface PluginRegistrationContext {
   deps: PluginServiceDeps;
@@ -419,13 +392,6 @@ export function createPluginRegistration(context: PluginRegistrationContext) {
     if (isFreshInstall) await runInstallHandlers(manifest.id);
     const entry = list().find((p) => p.id === manifest.id);
     if (!entry) throw new Error(`plugin ${manifest.id} missing after install`);
-    deps.telemetry.capture(
-      pluginInstalledTelemetryEvent(
-        manifest.id,
-        args.provenance,
-        args.sourceIntent,
-      ),
-    );
     return entry;
   }
 
@@ -468,58 +434,9 @@ export function createPluginRegistration(context: PluginRegistrationContext) {
     });
   }
 
-  function npmIntentForRow(
-    row: InstalledPluginRow,
-  ): NpmSourceIntentForResolution {
-    if (
-      row.sourceKind !== "npm" ||
-      row.sourceNpmPackage === null ||
-      row.sourceNpmRegistry === null ||
-      row.sourceNpmRequestedSpec === null
-    ) {
-      throw new Error(`plugin "${row.id}" has corrupt normalized npm state`);
-    }
-    let specKind = row.sourceNpmSpecKind;
-    if (specKind === null) {
-      const parsed = parsePluginSource(
-        row.sourceNpmRequestedSpec.length === 0
-          ? `npm:${row.sourceNpmPackage}`
-          : `npm:${row.sourceNpmPackage}@${row.sourceNpmRequestedSpec}`,
-      );
-      if (parsed.kind !== "npm") {
-        throw new Error(`plugin "${row.id}" has corrupt normalized npm state`);
-      }
-      specKind = parsed.specKind;
-      if (
-        !setInstalledPluginSourceClassification(deps.db, row.id, {
-          kind: "npm",
-          specKind,
-        })
-      ) {
-        throw new Error(`plugin "${row.id}" disappeared during normalization`);
-      }
-    }
-    return {
-      packageName: row.sourceNpmPackage,
-      registry: row.sourceNpmRegistry,
-      requestedSpec: row.sourceNpmRequestedSpec,
-      specKind,
-    };
-  }
-
   function installedUpdateVersion(
     row: InstalledPluginRow,
   ): PluginResolvedUpdateVersion {
-    if (row.sourceKind === "npm") {
-      if (row.sourceNpmPackage === null || row.npmResolvedVersion === null) {
-        throw new Error(`plugin "${row.id}" has corrupt normalized npm state`);
-      }
-      return {
-        version: row.npmResolvedVersion,
-        label: row.npmResolvedVersion,
-        display: `${row.sourceNpmPackage}@${row.npmResolvedVersion}`,
-      };
-    }
     if (row.sourceKind === "git") {
       const ref = gitRefNameForRow(row);
       if (
@@ -540,7 +457,7 @@ export function createPluginRegistration(context: PluginRegistrationContext) {
   }
 
   function catalogMarketplaceOf(row: InstalledPluginRow): string {
-    return row.catalogMarketplaceName ?? CURATED_PLUGIN_MARKETPLACE_NAME;
+    return row.catalogMarketplaceName ?? BUNDLED_MARKETPLACE_NAME;
   }
 
   function provenanceForRow(row: InstalledPluginRow): PluginProvenance {
@@ -562,8 +479,6 @@ export function createPluginRegistration(context: PluginRegistrationContext) {
     if (row.sourceKind === "builtin" && row.sourceBuiltinName !== null) {
       return { kind: "builtin", name: row.sourceBuiltinName };
     }
-    if (row.sourceKind === "npm")
-      return { kind: "npm", ...npmIntentForRow(row) };
     if (row.sourceKind === "git") {
       const selector = gitSelectorForRow(row);
       if (row.sourceGitUrl !== null && selector !== null) {
@@ -583,17 +498,6 @@ export function createPluginRegistration(context: PluginRegistrationContext) {
   ): PluginExactResolution {
     if (row.sourceKind === "path" || row.sourceKind === "builtin") {
       return { kind: row.sourceKind };
-    }
-    if (
-      row.sourceKind === "npm" &&
-      row.npmResolvedVersion !== null &&
-      row.npmIntegrity !== null
-    ) {
-      return {
-        kind: "npm",
-        version: row.npmResolvedVersion,
-        integrity: row.npmIntegrity,
-      };
     }
     if (row.sourceKind === "git" && row.gitResolvedCommit !== null) {
       return { kind: "git", commit: row.gitResolvedCommit };
@@ -634,7 +538,7 @@ export function createPluginRegistration(context: PluginRegistrationContext) {
   ): PluginProvenance {
     if (
       existing?.provenance === "catalog" &&
-      (catalogMarketplaceOf(existing) === CURATED_PLUGIN_MARKETPLACE_NAME ||
+      (catalogMarketplaceOf(existing) === LEGACY_COMMUNITY_MARKETPLACE_NAME ||
         catalogMarketplaceOf(existing) === BUNDLED_MARKETPLACE_NAME)
     ) {
       return {
@@ -753,20 +657,6 @@ export function createPluginRegistration(context: PluginRegistrationContext) {
         provenance = { kind: "builtin" };
         sourceIntent = { kind: "builtin", name: parsed.name };
         exactResolution = { kind: "builtin" };
-      } else if (parsed.kind === "npm") {
-        sourceIntent = {
-          kind: "npm",
-          packageName: parsed.name,
-          registry:
-            process.env.npm_config_registry ?? "https://registry.npmjs.org",
-          requestedSpec: parsed.spec,
-          specKind: parsed.specKind,
-        };
-        exactResolution = {
-          kind: "npm",
-          version: parsed.specKind === "exact" ? parsed.spec : row.version,
-          integrity: null,
-        };
       } else {
         const ref =
           parsed.selector.kind === "range" ? parsed.spec : parsed.selector.ref;
@@ -810,7 +700,6 @@ export function createPluginRegistration(context: PluginRegistrationContext) {
     installBuiltinSource,
     installPathSource,
     installedUpdateVersion,
-    npmIntentForRow,
     provenanceForRow,
     reconcileBundled,
     registerInstalled,

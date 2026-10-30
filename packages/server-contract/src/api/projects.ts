@@ -344,7 +344,6 @@ export const skillSummarySchema = z.object({
   pluginId: z.string().min(1).nullable(),
   filePath: z.string(),
   manageable: z.boolean(),
-  registrySkillId: z.string().min(1).nullable(),
 });
 export type SkillSummary = z.infer<typeof skillSummarySchema>;
 

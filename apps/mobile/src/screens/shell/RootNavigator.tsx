@@ -90,20 +90,12 @@ export function RootNavigator() {
           options={{ title: "Appearance" }}
         />
         <Stack.Screen
-          name="settings/notifications"
-          options={{ title: "Notifications", ...listScreen }}
-        />
-        <Stack.Screen
           name="settings/servers/index"
           options={{ title: "Servers", ...listScreen }}
         />
         <Stack.Screen
           name="settings/servers/add"
           options={{ title: "Add server", ...MODAL_SCREEN_OPTIONS }}
-        />
-        <Stack.Screen
-          name="connect/index"
-          options={{ title: "bb connect", ...MODAL_SCREEN_OPTIONS }}
         />
         <Stack.Screen name="dev/webview-spike" options={hiddenHeader} />
         <Stack.Screen name="e2e/reset" options={hiddenHeader} />

@@ -82,9 +82,7 @@ import type {
   PluginHttpAuthMode,
   PluginHttpHandler,
   PluginHosts,
-  PluginSharedPortTunnelIdentity,
-  InternalDoNotUsePluginHostNextTunnelStatus,
-  InternalDoNotUsePluginNextTunnelConfig,
+  InternalDoNotUsePluginRequestPeer,
   PluginInteractionRequest,
   PluginInteractionResult,
   PluginKvStorage,
@@ -330,14 +328,6 @@ export interface FakePluginRegistrations {
   aiServiceRegistrations: PluginAiServiceDeclaration[];
 }
 
-/** One handle opened through `bb.server.internal_DO_NOT_USE_openTunnelIngress`. */
-export interface InternalDoNotUseFakeTunnelIngress {
-  readonly audience: string;
-  readonly baseUrl: string;
-  /** True once the plugin closed the handle or the host disposed it. */
-  readonly closed: boolean;
-}
-
 /** Read-only state for assertions after a plugin registers or handles work. */
 export interface FakePluginInspectionState {
   readonly pluginId: string;
@@ -358,20 +348,9 @@ export interface FakePluginInspectionState {
   /** Recorded `bb.sdk` calls + stub control. */
   readonly sdk: FakeSdkHarness;
   readonly registrations: FakePluginRegistrations;
-  /** Every `bb.server.internal_DO_NOT_USE_openTunnelIngress` handle, in order. */
-  readonly internal_DO_NOT_USE_tunnelIngresses: readonly InternalDoNotUseFakeTunnelIngress[];
-  readonly sharedPortDeclarations: Array<{
-    hostId: string;
-    ports: number[];
-  }>;
-  /** The last `bb.hosts.internal_DO_NOT_USE_setNextTunnels` config, or null. */
-  readonly internal_DO_NOT_USE_nextTunnelConfig: InternalDoNotUsePluginNextTunnelConfig | null;
-  /**
-   * Replace what `bb.hosts.internal_DO_NOT_USE_nextTunnelStatuses` returns and call
-   * every `internal_DO_NOT_USE_onNextTunnelStatusChange` listener.
-   */
-  internal_DO_NOT_USE_setNextTunnelStatuses(
-    statuses: readonly InternalDoNotUsePluginHostNextTunnelStatus[],
+  /** Append requests that `bb.server.internal_DO_NOT_USE_requestPeers` returns; seqs are assigned in order. */
+  internal_DO_NOT_USE_addRequestPeers(
+    peers: readonly Omit<InternalDoNotUsePluginRequestPeer, "seq">[],
   ): void;
   /** Calls made through bb.hosts.experimental_client, after input validation. */
   readonly experimental_hostRpcCalls: readonly ExperimentalFakeHostRpcCall[];
@@ -575,8 +554,6 @@ export interface CreateFakePluginHostOptions {
   sdk?: FakeSdkOverrides;
   /** Static manifest skill ids available to configure() in this fake host. */
   agentSkillIds?: readonly string[];
-  /** Read-only identities returned by bb.hosts.ensureSharedPortTunnel. */
-  sharedPortTunnelIdentities?: Record<string, PluginSharedPortTunnelIdentity>;
   /**
    * Whether the plugin's manifest declares a `bb.host` entry. Production
    * refuses `bb.providers.register` without one (the provider would have no
@@ -674,7 +651,8 @@ interface FakePluginPersistentState {
   storedSettings: Map<string, PluginSettingValue>;
 }
 
-const FAKE_TUNNEL_INGRESS_FIRST_PORT = 41_000;
+const FAKE_REQUEST_PEER_CAPACITY = 8192;
+const FAKE_REQUEST_PEER_GENERATION = "fake-request-peers";
 
 const fakeHostDisposers = new WeakMap<
   FakePluginHarness,
@@ -1183,39 +1161,22 @@ function createFakePluginHostInternal(
       assertLive();
       return dataDir;
     },
-    async internal_DO_NOT_USE_openTunnelIngress(ingressOptions) {
+    internal_DO_NOT_USE_requestPeers(peerOptions) {
       assertLive();
-      const audience: unknown = ingressOptions?.audience;
-      if (typeof audience !== "string" || audience.length === 0) {
-        throw new Error(
-          "bb.server.internal_DO_NOT_USE_openTunnelIngress needs a non-empty audience",
-        );
-      }
-      const shared = tunnelIngresses.find(
-        (entry) => entry.audience === audience && !entry.closed,
-      );
-      const entry = {
-        audience,
-        baseUrl:
-          shared?.baseUrl ??
-          `http://127.0.0.1:${FAKE_TUNNEL_INGRESS_FIRST_PORT + tunnelIngresses.length}`,
-        closed: false,
+      const after = peerOptions?.after ?? 0;
+      const latestSeq = requestPeers.at(-1)?.seq ?? 0;
+      return {
+        generation: FAKE_REQUEST_PEER_GENERATION,
+        capacity: FAKE_REQUEST_PEER_CAPACITY,
+        oldestSeq: requestPeers[0]?.seq ?? 1,
+        latestSeq,
+        peers: requestPeers
+          .filter((peer) => peer.seq > after)
+          .map((peer) => ({ ...peer })),
       };
-      tunnelIngresses.push(entry);
-      const close = async (): Promise<void> => {
-        entry.closed = true;
-        const index = disposeHooks.indexOf(close);
-        if (index !== -1) disposeHooks.splice(index, 1);
-      };
-      disposeHooks.push(close);
-      return { baseUrl: entry.baseUrl, close };
     },
   };
-  const tunnelIngresses: Array<{
-    audience: string;
-    baseUrl: string;
-    closed: boolean;
-  }> = [];
+  const requestPeers: InternalDoNotUsePluginRequestPeer[] = [];
 
   // --- sdk ---
   const { sdk, harness: sdkHarness } = createFakeSdk({
@@ -1318,11 +1279,6 @@ function createFakePluginHostInternal(
     });
   }
 
-  const sharedPortDeclarations: FakePluginHarness["sharedPortDeclarations"] =
-    [];
-  let nextTunnelConfig: InternalDoNotUsePluginNextTunnelConfig | null = null;
-  let nextTunnelStatuses: InternalDoNotUsePluginHostNextTunnelStatus[] = [];
-  const nextTunnelListeners = new Set<() => void>();
   const hostRpcCalls: ExperimentalFakeHostRpcCall[] = [];
   const hostWorkerExitSubscriptions: FakeHostWorkerExitSubscription[] = [];
   const hostSignalSubscriptions: FakeHostSignalSubscription[] = [];
@@ -1430,67 +1386,7 @@ function createFakePluginHostInternal(
         },
       };
     },
-    async ensureSharedPortTunnel(hostId) {
-      assertLive();
-      if (hostId.trim().length === 0) {
-        throw new Error("shared-port hostId must be non-empty");
-      }
-      const identity = options.sharedPortTunnelIdentities?.[hostId];
-      if (!identity) {
-        throw new Error(`host ${hostId} has no shared-port tunnel identity`);
-      }
-      return { ...identity };
-    },
-    declareSharedPorts(hostId, ports) {
-      assertLive();
-      if (hostId.trim().length === 0) {
-        throw new Error("shared-port hostId must be non-empty");
-      }
-      const normalizedPorts = [...new Set(ports)].sort((a, b) => a - b);
-      for (const port of normalizedPorts) {
-        if (!Number.isInteger(port) || port < 1 || port > 65535) {
-          throw new Error(
-            `shared port ${String(port)} must be an integer between 1 and 65535`,
-          );
-        }
-      }
-      const replacement = {
-        hostId,
-        ports: normalizedPorts,
-      };
-      const existingIndex = sharedPortDeclarations.findIndex(
-        (declaration) => declaration.hostId === hostId,
-      );
-      if (existingIndex === -1) {
-        sharedPortDeclarations.push(replacement);
-      } else {
-        sharedPortDeclarations[existingIndex] = replacement;
-      }
-    },
-    internal_DO_NOT_USE_setNextTunnels(config) {
-      assertLive();
-      nextTunnelConfig =
-        config === null
-          ? null
-          : { domain: config.domain, server: { ...config.server } };
-    },
-    internal_DO_NOT_USE_nextTunnelStatuses() {
-      assertLive();
-      return structuredClone(nextTunnelStatuses);
-    },
-    internal_DO_NOT_USE_onNextTunnelStatusChange(listener) {
-      assertLive();
-      nextTunnelListeners.add(listener);
-      return () => {
-        nextTunnelListeners.delete(listener);
-      };
-    },
   };
-  disposeHooks.push(() => {
-    sharedPortDeclarations.length = 0;
-    nextTunnelConfig = null;
-    nextTunnelListeners.clear();
-  });
 
   const events: PluginEvents = {
     on(event, handler) {
@@ -1739,14 +1635,15 @@ function createFakePluginHostInternal(
     get recheckCount() {
       return requestedDrains;
     },
-    internal_DO_NOT_USE_tunnelIngresses: tunnelIngresses,
-    sharedPortDeclarations,
-    get internal_DO_NOT_USE_nextTunnelConfig() {
-      return nextTunnelConfig;
-    },
-    internal_DO_NOT_USE_setNextTunnelStatuses(statuses) {
-      nextTunnelStatuses = structuredClone([...statuses]);
-      for (const listener of [...nextTunnelListeners]) listener();
+    internal_DO_NOT_USE_addRequestPeers(peers) {
+      for (const peer of peers) {
+        requestPeers.push({
+          ...peer,
+          seq: (requestPeers.at(-1)?.seq ?? 0) + 1,
+        });
+        if (requestPeers.length > FAKE_REQUEST_PEER_CAPACITY)
+          requestPeers.shift();
+      }
     },
     experimental_hostRpcCalls: hostRpcCalls,
     sdk: sdkHarness,

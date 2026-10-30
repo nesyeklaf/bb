@@ -5,11 +5,7 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { serve } from "@hono/node-server";
-import {
-  ensurePersonalProject,
-  listRunningThreads,
-  type DbConnection,
-} from "@bb/db";
+import { ensurePersonalProject, type DbConnection } from "@bb/db";
 import { createMigratedConnection } from "@bb/db/testing";
 import { defaultFeatureFlags } from "@bb/domain";
 import {
@@ -40,19 +36,15 @@ import {
 } from "../../../apps/server/src/services/skills/builtin-skills-copy.js";
 import { SkillTreeRegistry } from "../../../apps/server/src/services/skills/injected-skills.js";
 import { PluginHostArtifactRegistry } from "../../../apps/server/src/services/plugins/plugin-host-artifact-registry.js";
-import { createAppUpdateService } from "../../../apps/server/src/services/system/app-update.js";
 import { createCliCommandService } from "../../../apps/server/src/services/system/cli-command.js";
-import { createAppVersionService } from "../../../apps/server/src/services/system/app-version.js";
 import { createProviderNativeRootsCache } from "../../../apps/server/src/services/providers/native-roots.js";
 import { createProviderLiveCommandsCache } from "../../../apps/server/src/services/providers/provider-live-commands.js";
 import { createBbAppManagedConfigReloader } from "../../../apps/server/src/services/system/bb-app-managed-config.js";
-import { createNoopTelemetryService } from "../../../apps/server/src/services/system/telemetry.js";
 import { TerminalSessionLifecycle } from "../../../apps/server/src/services/terminals/terminal-session-lifecycle.js";
 import type {
   ServerLogger,
   ServerRuntimeConfig,
 } from "../../../apps/server/src/types.js";
-import { HostSharedPortCoordinator } from "../../../apps/server/src/ws/host-shared-ports.js";
 import { NotificationHub } from "../../../apps/server/src/ws/hub.js";
 import { WatchInterestCoordinator } from "../../../apps/server/src/ws/watch-interests.js";
 import { createPublicApiClient } from "@bb/server-contract";
@@ -120,7 +112,7 @@ export interface IntegrationHarness {
 
 interface CreateHarnessOptions {
   serverPort?: number;
-  bindHost?: "127.0.0.1" | "0.0.0.0";
+  bindHost?: string;
   staticDir?: string;
   builtinPlugins?: readonly string[];
 }
@@ -196,7 +188,6 @@ async function startIntegrationServer(
   const db = createMigratedConnection();
   ensurePersonalProject(db);
   const hub = new NotificationHub();
-  const sharedPorts = new HostSharedPortCoordinator({ db, hub });
   const watchInterests = new WatchInterestCoordinator({ db, hub });
   const config: ServerRuntimeConfig = {
     appVersion: INTEGRATION_APP_VERSION,
@@ -206,8 +197,6 @@ async function startIntegrationServer(
     featureFlags: defaultFeatureFlags,
     hostDaemonPort: 3001,
     inheritedSkillsRootPaths: [],
-    marketplaceUrl: "https://marketplace.invalid/marketplace.json",
-    connectGateKeysUrl: "https://gate-keys.invalid/bb-connect-gate-keys.json",
     appUrl: "https://bb.example.test",
     serverPort: 0,
     sharedSkillRoots: { user: [], project: [] },
@@ -234,7 +223,6 @@ async function startIntegrationServer(
     hub,
     logger: testLogger,
   });
-  const telemetry = createNoopTelemetryService();
   const skillTreeRegistry = new SkillTreeRegistry();
   const providerRegistry = createProviderRegistryService({});
   await registerFirstPartyProviders(providerRegistry);
@@ -253,29 +241,10 @@ async function startIntegrationServer(
     pluginHostArtifacts,
     aiServices,
     skillTreeRegistry,
-    telemetry,
     terminalSessions,
   });
   pendingInteractions.start();
-  const appVersion = createAppVersionService({
-    installKind: null,
-    sourceCommit: null,
-    config,
-    logger: testLogger,
-  });
-  const appUpdate = createAppUpdateService({
-    currentCommit: null,
-    appSurface: "web",
-    appVersion,
-    config,
-    countRunningThreads: () => listRunningThreads(db).length,
-    launcher: null,
-    logger: testLogger,
-    mode: null,
-    notifyChanged: () => hub.notifySystem(["app-update-changed"]),
-  });
   const serverDeps = {
-    appUpdate,
     cliCommand: createCliCommandService({
       env: {},
       homeDir: serverDataDir,
@@ -286,7 +255,6 @@ async function startIntegrationServer(
         write: () => Promise.reject(new Error("no Windows PATH in tests")),
       },
     }),
-    appVersion,
     bbAppManagedConfig,
     providerRegistry,
     providerNativeRoots: createProviderNativeRootsCache(),
@@ -300,9 +268,7 @@ async function startIntegrationServer(
     logger: testLogger,
     machineAuth,
     pendingInteractions,
-    sharedPorts,
     skillTreeRegistry,
-    telemetry,
     terminalSessions,
     watchInterests,
   };

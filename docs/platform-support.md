@@ -47,8 +47,7 @@ The native Windows host is alpha. It runs from the Windows desktop installer or
 [`apps/mobile`](../apps/mobile) is the iOS and Android client for a bb server.
 It runs no agents, host daemon, or plugins itself: it loads the server's web
 app and adds native screens for pairing, saved servers, device settings, and
-push registration. Install it from Settings → Mobile (iOS TestFlight or the
-Android APK; see [configuration.md](configuration.md)).
+push registration. Pair it from Settings → Mobile → **Add mobile device**.
 
 - **Direct** mode takes any `http(s)://` URL the phone can reach. It is
   unauthenticated, the same trust model as a browser on a LAN; iOS allows
@@ -56,8 +55,8 @@ Android APK; see [configuration.md](configuration.md)).
   Serve HTTPS.
 - **bb connect** mode pairs the phone as a connect machine; see
   [multiple-devices.md](multiple-devices.md#use-the-bb-mobile-app).
-- Push notifications need the server to reach `exp.host` and a bb connect or
-  HTTPS profile; a plain-HTTP direct profile cannot register.
+- The mobile app receives no push notifications; web and desktop clients get
+  them while open.
 - Phones have no host daemon, so local editor integration, "Open in …", and
   the native folder picker are unavailable; the remote path browser works.
   Provider sign-in still needs a terminal on the host.
@@ -70,8 +69,7 @@ Android APK; see [configuration.md](configuration.md)).
 
 - `npx bb-app`
 - `npx --package bb-app bb ...`
-- source checkout package startup with `pnpm start`, `pnpm start:worktree`, or
-  `pnpm start:worktree-remote`
+- source checkout package startup with `pnpm start` or `pnpm start:worktree`
 - source checkout validation with `pnpm install`, `pnpm build`,
   `pnpm exec turbo run typecheck`, and `pnpm exec turbo run test`
 - app + server + host-daemon startup on supported persistent-host OSes

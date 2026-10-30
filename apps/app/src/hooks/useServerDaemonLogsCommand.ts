@@ -1,8 +1,8 @@
 import { useAppCommandHandler } from "@/components/commands/AppCommandProvider";
-import { useDesktopUpdateInfo } from "@/hooks/useDesktopUpdateInfo";
+import { useDesktopInfo } from "@/hooks/useDesktopInfo";
 
 export function useServerDaemonLogsCommand(): void {
-  const { desktopApi, desktopInfo } = useDesktopUpdateInfo();
+  const { desktopApi, desktopInfo } = useDesktopInfo();
   const openLogs = desktopApi?.openServerDaemonLogs;
   const enabled =
     openLogs !== undefined && desktopInfo?.serverDaemonLogsAvailable === true;

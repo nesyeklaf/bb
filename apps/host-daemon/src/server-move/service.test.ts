@@ -1,10 +1,8 @@
 import { readdir, readFile, rm, symlink, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import {
-  readServerConnectHoldFile,
   readServerImportFile,
   readServerMovedFile,
-  writeServerConnectHoldFile,
   writeServerImportFile,
   writeServerMovedFile,
 } from "@bb/server-archive";
@@ -48,7 +46,7 @@ describe("ServerMoveService.prepare", () => {
       join(fixture.dataDir, "config.json"),
       JSON.stringify({
         serverUrl: "https://bb.example.test",
-        serverHeaders: { "x-bb-connect-machine": "bbcm_target" },
+        serverHeaders: { "x-bb-machine-access": "bbcm_target" },
         machineCredential: "bbcm_target",
         connectMachineId: "machine-target",
       }),
@@ -87,7 +85,7 @@ describe("ServerMoveService.prepare", () => {
     expect(await readJson(join(fixture.dataDir, "config.json"))).toEqual({
       config: { BB_LOG_LEVEL: "info" },
       serverUrl: "https://bb.example.test",
-      serverHeaders: { "x-bb-connect-machine": "bbcm_target" },
+      serverHeaders: { "x-bb-machine-access": "bbcm_target" },
       machineCredential: "bbcm_target",
       connectMachineId: "machine-target",
     });
@@ -109,13 +107,11 @@ describe("ServerMoveService.prepare", () => {
       createdAt: expect.any(Number),
       fixupsAppliedAt: null,
     });
-    expect(await readServerConnectHoldFile(fixture.dataDir)).toBeNull();
     expect(fixture.launches).toEqual([
       {
         bbServerEntry: join(fixture.packageRoot, "dist", "bb-server.js"),
         dataDir: fixture.dataDir,
         serverPort: command.serverPort,
-        bindHost: null,
         hostDaemonPort: 38_887,
         env: expect.objectContaining({ BB_HOST_DAEMON_PORT: "38887" }),
         logPath: join(
@@ -229,23 +225,6 @@ describe("ServerMoveService.prepare", () => {
     await expect(
       fixture.service.abort({ type: "server_move.abort", moveId: MOVE_ID }),
     ).resolves.toEqual({ ok: true });
-  });
-
-  it("abort removes a bb connect hold left beside the imported server", async () => {
-    const fixture = await createFixture();
-    await fixture.service.prepare(await prepareCommand(fixture));
-    await writeServerConnectHoldFile(fixture.dataDir, {
-      version: 1,
-      reason: "manual-import",
-      createdAt: 1,
-    });
-
-    await expect(
-      fixture.service.abort({ type: "server_move.abort", moveId: MOVE_ID }),
-    ).resolves.toEqual({ ok: true });
-
-    expect(await exists(join(fixture.dataDir, "bb.db"))).toBe(false);
-    expect(await readServerConnectHoldFile(fixture.dataDir)).toBeNull();
   });
 
   it("refuses to archive ~/.bb while bb is running from it", async () => {
@@ -520,7 +499,6 @@ describe("ServerMoveService own data dir guards", () => {
       moveId: "move-crashed",
       activationToken: ACTIVATION_TOKEN,
       serverPort: 39_999,
-      bindHost: null,
       importedEntries: null,
       archivedServerData: null,
       pendingServer: null,
@@ -598,34 +576,6 @@ describe("ServerMoveService own data dir guards", () => {
     );
   });
 
-  it("removes the bb connect hold of an interrupted manual import it rolls back before a move", async () => {
-    const fixture = await createFixture();
-    const { dataDir } = fixture;
-    await writeFileWithDirs(join(dataDir, "bb.db"), "half-imported database");
-    await writeFileWithDirs(
-      join(dataDir, "server-import-journal.json"),
-      JSON.stringify({
-        version: 1,
-        entries: ["bb.db"],
-        preexistingEntries: [],
-      }),
-    );
-    await writeServerConnectHoldFile(dataDir, {
-      version: 1,
-      reason: "manual-import",
-      createdAt: 1,
-    });
-
-    await expect(
-      fixture.service.prepare(await prepareCommand(fixture)),
-    ).resolves.toMatchObject({ pid: expect.any(Number) });
-
-    expect(await readFile(join(dataDir, "bb.db"), "utf8")).toBe(
-      "sqlite database bytes",
-    );
-    expect(await readServerConnectHoldFile(dataDir)).toBeNull();
-  });
-
   it("keeps a finished manual import whose journal outlived its marker and refuses the move", async () => {
     const fixture = await createFixture();
     const { dataDir } = fixture;
@@ -656,11 +606,6 @@ describe("ServerMoveService own data dir guards", () => {
       createdAt: 1,
       fixupsAppliedAt: null,
     });
-    await writeServerConnectHoldFile(dataDir, {
-      version: 1,
-      reason: "manual-import",
-      createdAt: 1,
-    });
 
     const inspected = await fixture.service.inspect({
       type: "server_move.inspect",
@@ -683,7 +628,6 @@ describe("ServerMoveService own data dir guards", () => {
       kind: "manual",
       importedEntries,
     });
-    expect(await readServerConnectHoldFile(dataDir)).not.toBeNull();
     expect(await exists(join(dataDir, "server-import-journal.json"))).toBe(
       false,
     );
@@ -754,8 +698,6 @@ describe("ServerMoveService.deleteOldCopy", () => {
       toHostId: "host-target",
       toHostName: "studio",
       serverUrl: "https://studio.example.test",
-      mode: "direct" as const,
-      connectHandle: null,
       oldCopyEntries: ["bb.db", "attachments", "plugins/tasks/data.db"],
     };
     await writeServerMovedFile(dataDir, marker);

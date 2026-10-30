@@ -99,7 +99,7 @@ A plugin's commands and settings are documented in that plugin's own skill.
   through a private file or environment variable. Machine and environment inputs
   are persisted and readable, so they never carry credentials. Do not print
   `serverHeaders`.
-- Install a registry skill or plugin by its ID. Never infer an install source
+- Install a plugin by its ID. Never infer an install source
   from a display name.
 
 ## Common checks

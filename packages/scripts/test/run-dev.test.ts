@@ -9,9 +9,7 @@ import {
 import { makeTempDir } from "@bb/test-helpers";
 import {
   createStartWorktreeCommand,
-  resolveDevCloud,
   resolveDevLaunchMode,
-  STAGING_CLOUD_URL,
   toDevLaunchProcessEnv,
 } from "../src/commands/run-dev.js";
 import { migrateLegacyDevData } from "../src/lib/legacy-dev-data-migration.js";
@@ -50,43 +48,12 @@ describe("run-dev", () => {
     expect(config.dataDir).toBe(expectedDevDataDir({ homeDir, repoRoot }));
     expect(config.ports).toEqual(expectedDevPorts(repoRoot));
     expect(config.serverUrl).toBe(expectedDevServerUrl(repoRoot));
-    expect(new Set(Object.values(config.ports))).toHaveLength(5);
+    expect(new Set(Object.values(config.ports))).toHaveLength(3);
     expect(Object.values(config.ports)).not.toContain(5173);
     expect(Object.values(config.ports)).not.toContain(3334);
     expect(Object.values(config.ports)).not.toContain(3002);
     expect(Object.values(config.ports)).not.toContain(38886);
     expect(Object.values(config.ports)).not.toContain(38887);
-  });
-
-  it("keeps Cloud gateway ports out of the worker band and packaged ports", () => {
-    const rootsByOffset = new Map([
-      [0, "/repo/port-13604"],
-      [1, "/repo/port-3079"],
-      [3886, "/repo/port-3186"],
-      [3887, "/repo/port-6427"],
-      [7998, "/repo/port-57923"],
-      [7999, "/repo/port-7517"],
-    ]);
-    const portsByOffset = new Map(
-      [...rootsByOffset].map(([offset, repoRoot]) => [
-        offset,
-        resolveDevInstanceConfig({ homeDir: "/Users/tester", repoRoot }).ports,
-      ]),
-    );
-
-    expect(portsByOffset.get(3886)?.cloudPort).toBe(59000);
-    expect(portsByOffset.get(3887)?.cloudPort).toBe(59001);
-    expect(portsByOffset.get(7998)?.cloudPort).toBe(42998);
-    expect(portsByOffset.get(7999)?.cloudPort).toBe(42999);
-    expect(portsByOffset.get(0)?.cloudWorkerPort).toBe(43000);
-    expect(portsByOffset.get(1)?.cloudWorkerPort).toBe(43001);
-    expect(
-      new Set(
-        [...portsByOffset.values()].flatMap(
-          ({ cloudPort, cloudWorkerPort }) => [cloudPort, cloudWorkerPort],
-        ),
-      ),
-    ).toHaveLength(rootsByOffset.size * 2);
   });
 
   it("uses the home-relative checkout path for non-managed checkout paths", () => {
@@ -121,9 +88,6 @@ describe("run-dev", () => {
     expect(env.BB_SERVER_URL).toBe(config.serverUrl);
     expect(env.BB_HOST_DAEMON_PORT).toBe(String(config.ports.hostDaemonPort));
     expect(env.BB_DEV_APP_PORT).toBe(String(config.ports.appPort));
-    expect(env.BB_DEV_CONNECT_BASE_URL).toBe(
-      `http://bb.localhost:${config.ports.cloudPort}`,
-    );
   });
 
   it("inherits parent bb skills for managed worktree dev apps", () => {
@@ -245,37 +209,8 @@ describe("run-dev", () => {
     expect(resolveDevLaunchMode([])).toBe("vite");
     expect(resolveDevLaunchMode(["--worktree"])).toBe("worktree");
     expect(() => resolveDevLaunchMode(["--watch"])).toThrow(
-      "Expected no arguments, --staging, or --worktree",
+      "Expected no arguments or --worktree",
     );
-  });
-
-  it("points bb account and Connect at staging only for pnpm dev --staging", () => {
-    const config = resolveDevInstanceConfig({
-      homeDir: "/Users/tester",
-      repoRoot: "/Users/tester/src/bb",
-    });
-
-    expect(resolveDevCloud({ staging: false, mode: "vite" })).toBe("local");
-    expect(resolveDevCloud({ staging: true, mode: "vite" })).toBe("staging");
-    expect(() => resolveDevCloud({ staging: true, mode: "worktree" })).toThrow(
-      "--staging is supported by pnpm dev only",
-    );
-    expect(
-      toDevLaunchProcessEnv({
-        baseEnv: {},
-        cloud: "staging",
-        config,
-        mode: "vite",
-      }).BB_DEV_CONNECT_BASE_URL,
-    ).toBe(STAGING_CLOUD_URL);
-    expect(
-      toDevLaunchProcessEnv({
-        baseEnv: { BB_DEV_CONNECT_BASE_URL: STAGING_CLOUD_URL },
-        cloud: "local",
-        config,
-        mode: "vite",
-      }).BB_DEV_CONNECT_BASE_URL,
-    ).toBe(`http://bb.localhost:${config.ports.cloudPort}`);
   });
 
   it.each(["vite", "worktree"] as const)(
@@ -287,7 +222,6 @@ describe("run-dev", () => {
       });
       const env = toDevLaunchProcessEnv({
         baseEnv: { BB_SKIP_ONBOARDING: "0" },
-        cloud: "local",
         config,
         mode,
       });
@@ -306,11 +240,9 @@ describe("run-dev", () => {
       baseEnv: {
         BB_DATA_DIR: "/Users/tester/.bb",
         BB_DEV_APP_PORT: "5173",
-        BB_TELEMETRY: "true",
         NODE_ENV: "development",
         OPENAI_API_KEY: "test-key",
       },
-      cloud: "local",
       config,
       mode: "worktree",
     });
@@ -321,7 +253,6 @@ describe("run-dev", () => {
       BB_SERVER_PORT: String(config.ports.serverPort),
       BB_SERVER_URL: config.serverUrl,
       BB_SKIP_ONBOARDING: "1",
-      BB_TELEMETRY: "false",
       NODE_ENV: "production",
       OPENAI_API_KEY: "test-key",
     });

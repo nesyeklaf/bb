@@ -145,14 +145,6 @@ npx --package bb-app bb settings cli-command install
 
 ### Updating from the app
 
-When bb has an update, Settings → Updates shows an **Update** button (or run
-`bb updates app apply`). bb downloads the new version into
-`~/.bb/app-versions/`, restarts into it, and reconnects the page. bb does not
-roll back: if the new version fails to start, run a newer release
-(`npx bb-app@latest`) or fix the cause. Later `npx bb-app` runs use the newer
-installed version; pass `--bundled` to run the copy npx downloaded instead.
-Start bb with `--no-in-app-updates` to turn in-app updates off.
-
 After the server moves to another machine, the old data directory keeps
 `server-moved.json`. `bb-app` there starts no server: it runs this computer's
 host daemon against the new server address in `config.json`, restarting it when
@@ -255,10 +247,10 @@ npx bb-app config list
 npx bb-app config refresh
 ```
 
-For remote access, use bb connect or publish the default loopback listener with
-Tailscale Serve. Direct tailnet or LAN access to port `38886` requires the
-explicit, security-sensitive `--server-bind-host 0.0.0.0` compatibility option;
-see the multiple-devices guide.
+For remote access, publish the default loopback listener with Tailscale Serve,
+or list the server's tailnet or WireGuard addresses with `--server-bind-host`
+(`BB_SERVER_BIND_HOST`); bb always keeps `127.0.0.1` and refuses wildcard, LAN
+and public addresses. See the multiple-devices guide.
 
 Use `bb-app client ssh-target` to configure local editor opens for remote
 bb servers under `~/.bb/client.json`. The target is the value that works after

@@ -80,7 +80,6 @@ import {
 import { useLocalOpenTargets } from "@/hooks/useLocalOpenTargets";
 import { pluginAdminErrorMessage } from "@/lib/plugin-admin-error";
 import {
-  REGISTRY_SKILLS_ROUTE_PATH,
   SKILLS_ROUTE_PATH,
   getPluginConfigurationRoutePath,
   getPluginDetailRoutePath,
@@ -734,9 +733,7 @@ export function PluginsView({ detailKey }: { detailKey?: string } = {}) {
 
 export function SkillsView() {
   const location = useLocation();
-  const isCollection =
-    matchPath(SKILLS_ROUTE_PATH, location.pathname) !== null ||
-    location.pathname === REGISTRY_SKILLS_ROUTE_PATH;
+  const isCollection = matchPath(SKILLS_ROUTE_PATH, location.pathname) !== null;
 
   return (
     <div className="-mx-4 -mb-4 -mt-4 flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden md:-mx-5 md:-mb-5 md:-mt-5">

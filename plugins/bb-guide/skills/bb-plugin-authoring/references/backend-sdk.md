@@ -45,7 +45,7 @@ signatures (see "Looking up the exact API" in distribution.md).
   `experimental_diffViewed` `experimental_markDiffViewed`
   `experimental_clearDiffViewed`
 - `hosts`: `list` `get` `update` `delete` `directory` `pathsExist`
-  `pickFolder` `cloneDefaultPath` `providerCliStatus` `installProviderCli`
+  `pickFolder` `cloneDefaultPath` `providerCliStatus`
   `retryUpdate` `experimental_listProviders` `experimental_create`
   `experimental_getEnrollmentCommand` `experimental_reconnect`
   `experimental_suspend` `experimental_resume` `experimental_retryCleanup`
@@ -69,16 +69,14 @@ signatures (see "Looking up the exact API" in distribution.md).
   `refresh` `remove`), `experimental_updateJobs` (`list` `get`)
 - `theme`: `get` `catalog` `resolve` `set`
 - `status`: `get`
-- `system`: `version` `config` `reloadConfig` `attention` `usageLimits`
+- `system`: `config` `reloadConfig` `attention` `usageLimits`
   `executionOptions` `providerStates` `transcribeVoice` `aiServices`
   `setAiServiceSelection` `testAiService` `updateGeneralSettings`
   `updateKeyboardSettings` `updateExperiments` `cliSkillsStatus`
   `installCliSkills` `machineEnvironment` `replaceMachineEnvironment`
   `setMachineEnvironmentVariable` `deleteMachineEnvironmentVariable`
-  `mobileAppDownloads` `mobileAppReleases` `appUpdate` `applyAppUpdate`
-  `acknowledgeAppUpdate` `experimental_cliCommand`
-  `experimental_installCliCommand` `experimental_removeCliCommand`
-  `experimental_recordTelemetryEvent`; sub-area `uiPreferences` (`list` `set` `reset`)
+  `experimental_cliCommand`
+  `experimental_installCliCommand` `experimental_removeCliCommand`; sub-area `uiPreferences` (`list` `set` `reset`)
 - `experimental_desktopBrowsers`: `listInstances` `listTabs` `createTab`
   `acquireControl` `openConnection` `releaseControl` `revealTab` `closeTab`
   `captureTab` `listImportSources` `importCookies` `subscribe`

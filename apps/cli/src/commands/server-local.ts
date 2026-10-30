@@ -26,14 +26,12 @@ import {
   discardImportBackups,
   readServerImportFile,
   readServerImportJournalStatus,
-  removeServerConnectHoldFile,
   removeServerImportJournalFile,
   rollBackServerImport,
   SERVER_IMPORT_FILE_NAME,
   SERVER_MOVED_FILE_NAME,
   ServerArchiveError,
   type ServerMovedFile,
-  writeServerConnectHoldFile,
   writeServerImportFile,
 } from "@bb/server-archive";
 import { z } from "zod";
@@ -113,8 +111,7 @@ export function isNewerBbVersion(candidate: string, current: string): boolean {
 
 export type MovedServerProbeResult =
   | { kind: "running" }
-  | { kind: "not-running" }
-  | { kind: "unconfirmed"; status: number };
+  | { kind: "not-running" };
 
 export interface ProbeMovedServerArgs {
   dataDir: string;
@@ -134,44 +131,13 @@ async function isHealthyServer(serverUrl: string): Promise<boolean> {
   }
 }
 
-async function readMovedServerHeaders(
-  dataDir: string,
-): Promise<Record<string, string> | null> {
-  const configPath = formatBbAppConfigPath(dataDir);
-  const text = await readOptionalText(configPath);
-  if (text === null) return null;
-  const headers = parseManagedConfigText(configPath, text).config.serverHeaders;
-  return headers === undefined || Object.keys(headers).length === 0
-    ? null
-    : headers;
-}
-
 export async function probeMovedServer(
   args: ProbeMovedServerArgs,
 ): Promise<MovedServerProbeResult> {
   const serverUrl = args.lock.serverUrl.replace(/\/+$/u, "");
-  const headers =
-    args.lock.mode === "connect"
-      ? await readMovedServerHeaders(args.dataDir)
-      : null;
-  if (headers === null) {
-    return (await isHealthyServer(serverUrl))
-      ? { kind: "running" }
-      : { kind: "not-running" };
-  }
-  let response: Response;
-  try {
-    response = await fetch(`${serverUrl}/api/v1/system/version`, {
-      headers,
-      signal: AbortSignal.timeout(MOVED_SERVER_PROBE_TIMEOUT_MS),
-    });
-  } catch {
-    return { kind: "not-running" };
-  }
-  await response.body?.cancel().catch(() => undefined);
-  if (response.status === 200) return { kind: "running" };
-  if (response.status === 503) return { kind: "not-running" };
-  return { kind: "unconfirmed", status: response.status };
+  return (await isHealthyServer(serverUrl))
+    ? { kind: "running" }
+    : { kind: "not-running" };
 }
 
 export interface ServerImportResult {
@@ -261,7 +227,6 @@ function describeUnsafeImport(archivePath: string, error: unknown): unknown {
 
 async function rollBackInterruptedImport(dataDir: string): Promise<void> {
   await rollBackServerImport(dataDir);
-  await removeServerConnectHoldFile(dataDir);
   const marker = await readServerImportFile(dataDir);
   if (marker?.kind === "manual") {
     await rm(join(dataDir, SERVER_IMPORT_FILE_NAME), { force: true });
@@ -324,11 +289,6 @@ export async function importServerArchive(
       throw describeUnsafeImport(archivePath, error);
     });
     try {
-      await writeServerConnectHoldFile(dataDir, {
-        version: 1,
-        reason: "manual-import",
-        createdAt: args.now(),
-      });
       await writeServerImportFile(dataDir, {
         version: 1,
         kind: "manual",
@@ -343,7 +303,6 @@ export async function importServerArchive(
         fixupsAppliedAt: null,
       });
     } catch (error) {
-      await removeServerConnectHoldFile(dataDir);
       await rollBackServerImport(dataDir);
       throw error;
     }

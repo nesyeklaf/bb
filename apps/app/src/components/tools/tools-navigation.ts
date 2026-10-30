@@ -1,11 +1,8 @@
 import { matchPath } from "react-router-dom";
 import {
   getPluginsRoutePath,
-  getRegistrySkillsRoutePath,
   getSkillsRoutePath,
   PLUGIN_DETAIL_ROUTE_PATH,
-  REGISTRY_SKILLS_ROUTE_PATH,
-  REGISTRY_SKILL_DETAIL_ROUTE_PATH,
   SKILL_DETAIL_ROUTE_PATH,
   SETTINGS_PLUGINS_ROUTE_PATH,
   isPluginsRoutePath,
@@ -106,17 +103,6 @@ function collectionCrumb(
 
 const DETAIL_ROUTES = [
   {
-    pattern: REGISTRY_SKILL_DETAIL_ROUTE_PATH,
-    section: "skills",
-    collection: collectionCrumb(
-      "skills",
-      "Browse",
-      getRegistrySkillsRoutePath(),
-    ),
-    param: "registrySkillId",
-    fallback: "Skill",
-  },
-  {
     pattern: SKILL_DETAIL_ROUTE_PATH,
     section: "skills",
     collection: collectionCrumb("skills"),
@@ -145,16 +131,13 @@ export function resolveToolsBreadcrumbs(
   if (pluginCreateBreadcrumbs !== null) {
     return pluginCreateBreadcrumbs;
   }
-  if (pathname === REGISTRY_SKILLS_ROUTE_PATH) {
-    return [sectionCrumb("skills"), { label: "Browse" }];
-  }
-
   for (const section of [TOOLS_SECTIONS.plugins, TOOLS_SECTIONS.skills]) {
     if (pathname === section.to) {
       return [
         sectionCrumb(section.id),
         {
           label:
+            section.id === "skills" ||
             view === TOOLS_OWNED_COLLECTION_VIEW[section.id]
               ? TOOLS_OWNED_COLLECTION_LABEL[section.id]
               : "Browse",
@@ -186,11 +169,7 @@ export function resolveToolsBreadcrumbs(
 }
 
 interface ResourcePageDefinition {
-  id:
-    | "plugins-browse"
-    | "plugins-installed"
-    | "skills-browse"
-    | "skills-library";
+  id: "plugins-browse" | "plugins-installed" | "skills-library";
   label: string;
   to: string;
 }
@@ -210,11 +189,6 @@ export const PLUGIN_PAGES: readonly ResourcePageDefinition[] = [
 
 export const SKILL_PAGES: readonly ResourcePageDefinition[] = [
   {
-    id: "skills-browse",
-    label: "Browse skills",
-    to: TOOLS_SECTIONS.skills.to,
-  },
-  {
     id: "skills-library",
     label: TOOLS_OWNED_COLLECTION_LABEL.skills,
     to: getToolsOwnedCollectionRoutePath("skills"),
@@ -233,9 +207,7 @@ export function resolveToolsActivePage(
         ? "plugins-installed"
         : "plugins-browse";
     }
-    return detail.collection.label === TOOLS_OWNED_COLLECTION_LABEL.skills
-      ? "skills-library"
-      : "skills-browse";
+    return "skills-library";
   }
   const section = resolveToolsSection(pathname);
   if (section === "plugins") {
@@ -243,9 +215,7 @@ export function resolveToolsActivePage(
       ? "plugins-installed"
       : "plugins-browse";
   }
-  return view === TOOLS_OWNED_COLLECTION_VIEW.skills
-    ? "skills-library"
-    : "skills-browse";
+  return "skills-library";
 }
 
 type ResourceWorkspaceHeaderMeta =

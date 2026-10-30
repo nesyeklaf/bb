@@ -54,7 +54,6 @@ interface RecordingBrowserApi {
 const BROWSER_PANEL_RECT = new DOMRect(12, 24, 420, 260);
 
 const desktopInfo = {
-  lastCheckedAt: null,
   latestVersion: null,
   pendingVersion: null,
   platform: "macos" as const,
@@ -691,8 +690,7 @@ describe("BrowserTabDeck native browser first-show ordering", () => {
   });
 
   it("follows the content box when a neighbouring panel's layout transition finishes", async () => {
-    const { api, bounds, visibilityWithoutFocus } =
-      createRecordingBrowserApi();
+    const { api, bounds, visibilityWithoutFocus } = createRecordingBrowserApi();
     installDesktopBrowser(api);
     renderBrowserDeck({ canShowNativeBrowserView: true });
     await waitFor(() => {

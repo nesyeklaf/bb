@@ -120,14 +120,6 @@ describe("marketplace entry schemas", () => {
     expect(
       marketplaceEntryV2Schema.safeParse({
         ...entry(),
-        source: {
-          npm: { package: "author-tools", registry: "https://" },
-        },
-      }).success,
-    ).toBe(true);
-    expect(
-      marketplaceEntryV2Schema.safeParse({
-        ...entry(),
         source: { git: { url: "https://", ref: "v1.0.0" } },
       }).success,
     ).toBe(true);
@@ -151,7 +143,9 @@ describe("marketplace entry schemas", () => {
       expect(
         marketplaceEntryV2Schema.safeParse({
           ...entry(),
-          source: { npm: { package: "author-tools", range } },
+          source: {
+            git: { url: "https://github.com/author/author-tools.git", range },
+          },
         }).success,
       ).toBe(true);
     }
@@ -159,7 +153,9 @@ describe("marketplace entry schemas", () => {
       expect(
         marketplaceEntryV2Schema.safeParse({
           ...entry(),
-          source: { npm: { package: "author-tools", range } },
+          source: {
+            git: { url: "https://github.com/author/author-tools.git", range },
+          },
         }).success,
       ).toBe(true);
     }
@@ -170,7 +166,10 @@ describe("marketplace entry schemas", () => {
     const result = marketplaceEntryV2Schema.safeParse({
       ...entry(),
       source: {
-        npm: { package: "author-tools", range: `${" ".repeat(20_000)}!` },
+        git: {
+          url: "https://github.com/author/author-tools.git",
+          range: `${" ".repeat(20_000)}!`,
+        },
       },
     });
 
@@ -183,12 +182,6 @@ describe("marketplace entry schemas", () => {
       marketplaceEntryV2Schema.safeParse({
         ...entry(),
         author: { name: "Author", url: "HTTPS://example.com/author" },
-        source: {
-          npm: {
-            package: "author-tools",
-            registry: "HTTPS://registry.example.com/",
-          },
-        },
       }).success,
     ).toBe(true);
     expect(
@@ -209,7 +202,7 @@ describe("marketplace entry schemas", () => {
       marketplaceEntryV2Schema.safeParse({
         ...entry(),
         source: {
-          npm: { package: "author-tools" },
+          bundled: { plugin: "docs" },
           git: {
             url: "https://github.com/author/author-tools.git",
             ref: "v1.0.0",
@@ -232,14 +225,6 @@ describe("marketplace entry schemas", () => {
   });
 
   it("rejects unknown source keys as the v2 tolerance exception", () => {
-    expect(
-      marketplaceEntryV2Schema.safeParse({
-        ...entry(),
-        source: {
-          npm: { package: "author-tools", regsitry: "https://npm.test/" },
-        },
-      }).success,
-    ).toBe(false);
     expect(
       marketplaceEntryV2Schema.safeParse({
         ...entry(),
@@ -277,7 +262,7 @@ describe("marketplace entry schemas", () => {
         ...bundled,
         source: {
           bundled: { plugin: "docs" },
-          npm: { package: "bb-plugin-docs" },
+          git: { url: "https://github.com/author/docs.git", ref: "v1.0.0" },
         },
       }).success,
     ).toBe(false);

@@ -20,11 +20,6 @@
     "icon": "MessageSquare"
   },
   {
-    "id": "bb-ai",
-    "name": "bb cloud AI",
-    "icon": "AiBrain01"
-  },
-  {
     "id": "browser-automation",
     "name": "Browser Automation",
     "icon": "Globe"
@@ -90,11 +85,6 @@
     "icon": "PanelLeft"
   },
   {
-    "id": "environment-modal-sandbox",
-    "name": "Modal Sandbox [Experimental]",
-    "icon": null
-  },
-  {
     "id": "environment-personal-workspace",
     "name": "Personal workspace",
     "icon": "Folder"
@@ -120,11 +110,6 @@
     "icon": "BellDot"
   },
   {
-    "id": "connect",
-    "name": "bb connect",
-    "icon": "ComputerCloud"
-  },
-  {
     "id": "secrets",
     "name": "Secrets",
     "icon": "Lock"
@@ -138,6 +123,11 @@
     "id": "side-chat",
     "name": "Side chat",
     "icon": "SideChat"
+  },
+  {
+    "id": "bb--connection-overview",
+    "name": "Connection overview [Experimental]",
+    "icon": null
   },
   {
     "id": "bb--storage-retention",
@@ -183,11 +173,6 @@
     "id": "agent-annotations",
     "name": "Agent Annotations",
     "icon": "MessageSquarePlus"
-  },
-  {
-    "id": "bb-account",
-    "name": "bb account",
-    "icon": "UserRound"
   },
   {
     "id": "bb-guide",

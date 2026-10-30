@@ -14,7 +14,7 @@ import {
   type AppKeybindingOverrides,
   type AppSettings,
 } from "@bb/domain";
-import { eq, inArray, sql } from "drizzle-orm";
+import { eq, inArray } from "drizzle-orm";
 import type { DbConnection, DbQueryConnection } from "../connection.js";
 import { appSettingsValues } from "../schema.js";
 
@@ -26,7 +26,6 @@ const AI_SERVICE_SELECTIONS_KEY = "aiServiceSelections";
 const PLUGIN_SAFE_MODE_KEY = "pluginSafeMode";
 const DISABLED_PROVIDER_IDS_KEY = "disabledProviderIds";
 const LEGACY_DIAGNOSTIC_EVENTS_KEY = "showUnhandledProviderEvents";
-const INSTALL_TURN_NUMBER_KEY = "installTurnNumber";
 
 function parseStoredValue(text: string): unknown {
   try {
@@ -190,6 +189,20 @@ export function setAiServiceSelection(
   return selections;
 }
 
+export function hasAppSettingsMarker(db: DbConnection, key: string): boolean {
+  return (
+    db
+      .select({ key: appSettingsValues.key })
+      .from(appSettingsValues)
+      .where(eq(appSettingsValues.key, key))
+      .get() !== undefined
+  );
+}
+
+export function setAppSettingsMarker(db: DbConnection, key: string): void {
+  writeValue(db, key, true, Date.now());
+}
+
 export function getEarlyAdopter(db: DbConnection): boolean {
   const row = db
     .select({ value: appSettingsValues.value })
@@ -282,20 +295,4 @@ export function forgetPluginProviders(
       .where(eq(appSettingsValues.key, pluginProviderCatalogKey(pluginId)))
       .run();
   });
-}
-
-export function claimInstallTurnNumber(db: DbQueryConnection, now: number): number {
-  const row = db
-    .insert(appSettingsValues)
-    .values({ key: INSTALL_TURN_NUMBER_KEY, value: "1", updatedAt: now })
-    .onConflictDoUpdate({
-      target: appSettingsValues.key,
-      set: {
-        value: sql`CAST(CAST(${appSettingsValues.value} AS INTEGER) + 1 AS TEXT)`,
-        updatedAt: now,
-      },
-    })
-    .returning({ value: appSettingsValues.value })
-    .get();
-  return Number(row!.value);
 }

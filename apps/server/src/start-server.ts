@@ -1,20 +1,13 @@
-import { createDesktopAppUpdateService } from "./services/system/desktop-app-update.js";
-import { createDesktopUpdateChannel } from "./services/system/desktop-update-channel.js";
 import { serve } from "@hono/node-server";
 import { existsSync } from "node:fs";
 import { homedir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import type { ServerConfig } from "@bb/config/server";
-import { isLoopbackHostname } from "@bb/config/loopback";
 import { toOptionalString } from "@bb/config/strings";
+import { BB_LOOPBACK_HOST } from "@bb/config/runtime";
 import { createLogger } from "@bb/logger";
-import {
-  getAppSettings,
-  getDisabledProviderIds,
-  listRunningThreads,
-  setAppSettings,
-} from "@bb/db";
+import { getAppSettings, getDisabledProviderIds, setAppSettings } from "@bb/db";
 import { initDb } from "./db.js";
 import { createApp } from "./server.js";
 import { PendingInteractionLifecycle } from "./services/interactions/pending-interactions.js";
@@ -25,13 +18,10 @@ import { PluginHostArtifactRegistry } from "./services/plugins/plugin-host-artif
 import { createProviderNativeRootsCache } from "./services/providers/native-roots.js";
 import { createProviderLiveCommandsCache } from "./services/providers/provider-live-commands.js";
 import { createAiServiceRegistry } from "./services/ai/ai-service-registry.js";
-import { createAppUpdateService } from "./services/system/app-update.js";
 import {
   createCliCommandService,
   createWindowsUserPath,
 } from "./services/system/cli-command.js";
-import { createAppVersionService } from "./services/system/app-version.js";
-import { createLauncherChannel } from "./services/system/launcher-channel.js";
 import { createBbAppManagedConfigReloader } from "./services/system/bb-app-managed-config.js";
 import { startGatedPerformanceDiagnostics } from "./services/system/performance-diagnostics.js";
 import { startEventLoopStallMonitor } from "./services/system/event-loop-stall-monitor.js";
@@ -45,24 +35,18 @@ import {
   type ProviderRegistryService,
 } from "./services/providers/provider-registry.js";
 import type { PluginService } from "./services/plugins/plugin-service.js";
-import {
-  appInstallFromServerConfig,
-  createTelemetryService,
-} from "./services/system/telemetry.js";
 import { TerminalSessionLifecycle } from "./services/terminals/terminal-session-lifecycle.js";
 import { createLifecycleDedupers } from "./lifecycle-dedupers.js";
 import type { ServerLogger, ServerRuntimeConfig } from "./types.js";
 import { NotificationHub } from "./ws/hub.js";
 import { startDaemonLivenessChecks } from "./ws/daemon-protocol.js";
 import { WatchInterestCoordinator } from "./ws/watch-interests.js";
-import { HostSharedPortCoordinator } from "./ws/host-shared-ports.js";
 import { disconnectImportedDaemonSessions } from "./internal/session-owner-side-effects.js";
 import {
   applyServerImportAtBoot,
   refuseInterruptedServerImport,
   repairLastServerMoveHostName,
 } from "./services/server-move/pending-boot.js";
-import { createConnectHold } from "./services/server-move/connect-hold.js";
 import { isServerMoveFrozen } from "./services/server-move/freeze-state.js";
 import { reconcileServerMoveRunAtBoot } from "./services/server-move/reconcile.js";
 import {
@@ -77,19 +61,60 @@ import {
 interface StartHttpListenerArgs {
   fetch: Parameters<typeof serve>[0]["fetch"];
   serverConfig: Pick<ServerConfig, "BB_SERVER_BIND_HOST" | "BB_SERVER_PORT">;
+  logger: Pick<ServerLogger, "warn">;
+  extraListenerRetryMs?: number;
 }
 
-export function startHttpListener(args: StartHttpListenerArgs) {
-  return serve({
-    hostname: args.serverConfig.BB_SERVER_BIND_HOST,
-    port: args.serverConfig.BB_SERVER_PORT,
+export const EXTRA_LISTENER_RETRY_MS = 10_000;
+
+export function startHttpListeners(args: StartHttpListenerArgs) {
+  const port = args.serverConfig.BB_SERVER_PORT;
+  const loopback = serve({
+    hostname: BB_LOOPBACK_HOST,
+    port,
     fetch: args.fetch,
+  });
+  const extras = args.serverConfig.BB_SERVER_BIND_HOST.map((hostname) => {
+    const server = serve({ hostname, port, fetch: args.fetch });
+    let retry: ReturnType<typeof setTimeout> | null = null;
+    server.on("error", (error: unknown) => {
+      args.logger.warn(
+        { err: error, hostname, port },
+        "Bind address unavailable; loopback keeps serving, retrying",
+      );
+      retry = setTimeout(() => {
+        retry = null;
+        server.listen(port, hostname);
+      }, args.extraListenerRetryMs ?? EXTRA_LISTENER_RETRY_MS);
+      retry.unref();
+    });
+    server.on("close", () => {
+      if (retry !== null) clearTimeout(retry);
+    });
+    return server;
+  });
+  return [loopback, ...extras];
+}
+
+export function closeHttpListener(
+  server: ReturnType<typeof startHttpListeners>[number],
+): Promise<void> {
+  return new Promise<void>((resolveClose, rejectClose) => {
+    server.close((error) => {
+      if (
+        error &&
+        (error as NodeJS.ErrnoException).code !== "ERR_SERVER_NOT_RUNNING"
+      ) {
+        rejectClose(error);
+        return;
+      }
+      resolveClose();
+    });
   });
 }
 
 export interface StartServerPluginsArgs {
-  dataDir: string;
-  logger: Pick<ServerLogger, "error" | "warn">;
+  logger: Pick<ServerLogger, "error">;
   pluginService: Pick<PluginService, "start" | "startPeriodicUpdateChecks">;
   providerRegistry: Pick<ProviderRegistryService, "markRegistrationsSettled">;
 }
@@ -98,9 +123,7 @@ export function startServerPlugins(
   args: StartServerPluginsArgs,
 ): Promise<void> {
   return args.pluginService
-    .start({
-      hold: createConnectHold({ dataDir: args.dataDir, logger: args.logger }),
-    })
+    .start()
     .catch((error: unknown) => {
       args.logger.error({ err: error }, "Plugin startup failed");
     })
@@ -159,7 +182,6 @@ export async function runServer(serverConfig: ServerConfig): Promise<void> {
       : null;
   const hub = new NotificationHub();
   const watchInterests = new WatchInterestCoordinator({ db, hub });
-  const sharedPorts = new HostSharedPortCoordinator({ db, hub });
   const lifecycleDedupers = createLifecycleDedupers();
   const appUrl = toOptionalString(serverConfig.BB_APP_URL);
 
@@ -172,8 +194,6 @@ export async function runServer(serverConfig: ServerConfig): Promise<void> {
   const runtimeConfig: ServerRuntimeConfig = {
     appVersion: serverConfig.BB_APP_VERSION,
     builtinSkillsRootPath: resolveBuiltinSkillsRootPath(),
-    marketplaceUrl: serverConfig.BB_MARKETPLACE_URL,
-    connectGateKeysUrl: serverConfig.BB_CONNECT_GATE_KEYS_URL,
     customModels: [],
     dataDir: serverConfig.BB_DATA_DIR,
     featureFlags: serverConfig.featureFlags,
@@ -218,18 +238,6 @@ export async function runServer(serverConfig: ServerConfig): Promise<void> {
     logger,
   });
 
-  const telemetry = await createTelemetryService({
-    apiKey: serverConfig.BB_POSTHOG_API_KEY,
-    appInstall: appInstallFromServerConfig(serverConfig),
-    appSurface: serverConfig.BB_APP_SURFACE,
-    appVersion: serverConfig.BB_APP_VERSION,
-    dataDir: serverConfig.BB_DATA_DIR,
-    enabled:
-      serverConfig.BB_TELEMETRY && isProduction && pendingServerMove === null,
-    telemetryEnabled: getAppSettings(db).telemetryEnabled,
-    logger,
-  });
-
   const machineAuth = await createMachineAuthService({
     dataDir: serverConfig.BB_DATA_DIR,
     db,
@@ -254,48 +262,11 @@ export async function runServer(serverConfig: ServerConfig): Promise<void> {
     pluginHostArtifacts,
     aiServices,
     skillTreeRegistry,
-    telemetry,
     terminalSessions,
   });
   pendingInteractions.start();
   setPluginToolCallRegistry(new PluginToolCallRegistry({ logger }));
 
-  const appVersion = createAppVersionService({
-    installKind: serverConfig.BB_APP_INSTALL_KIND ?? null,
-    sourceCommit: serverConfig.BB_APP_SOURCE_COMMIT ?? null,
-    config: runtimeConfig,
-    logger,
-  });
-  const appUpdateMode = serverConfig.BB_APP_UPDATE_MODE ?? null;
-  const desktopUpdateChannel =
-    serverConfig.BB_APP_SURFACE === "desktop"
-      ? createDesktopUpdateChannel(process)
-      : null;
-  const appUpdate =
-    desktopUpdateChannel === null
-      ? createAppUpdateService({
-          currentCommit:
-            serverConfig.BB_APP_INSTALL_KIND === "source"
-              ? (serverConfig.BB_APP_SOURCE_COMMIT ?? null)
-              : null,
-          appSurface: serverConfig.BB_APP_SURFACE,
-          appVersion,
-          config: runtimeConfig,
-          countRunningThreads: () => listRunningThreads(db).length,
-          launcher:
-            appUpdateMode === null ? null : createLauncherChannel(process),
-          logger,
-          mode: appUpdateMode,
-          notifyChanged: () => hub.notifySystem(["app-update-changed"]),
-        })
-      : createDesktopAppUpdateService({
-          channel: desktopUpdateChannel,
-          currentVersion: runtimeConfig.appVersion,
-          dataDir: serverConfig.BB_DATA_DIR,
-          countRunningThreads: () => listRunningThreads(db).length,
-          notifyChanged: () => hub.notifySystem(["app-update-changed"]),
-          logger,
-        });
   const cliCommand = createCliCommandService({
     env: process.env,
     homeDir: homedir(),
@@ -310,11 +281,8 @@ export async function runServer(serverConfig: ServerConfig): Promise<void> {
     pluginCatalogService,
     pluginService,
     serverMove,
-    tunnelIngress,
   } = createApp(
     {
-      appUpdate,
-      appVersion,
       bbAppManagedConfig,
       cliCommand,
       config: runtimeConfig,
@@ -330,15 +298,12 @@ export async function runServer(serverConfig: ServerConfig): Promise<void> {
       providerLiveCommands,
       aiServices,
       skillTreeRegistry,
-      telemetry,
       terminalSessions,
       watchInterests,
-      sharedPorts,
     },
     {
       serverMove: {
         appSurface: serverConfig.BB_APP_SURFACE,
-        bindHost: serverConfig.BB_SERVER_BIND_HOST,
         manualImportPending: serverImport.manualImportPending,
         pending: pendingServerMove,
         restoredRun: serverMoveRun,
@@ -361,7 +326,6 @@ export async function runServer(serverConfig: ServerConfig): Promise<void> {
       pluginHostArtifacts,
       aiServices,
       skillTreeRegistry,
-      telemetry,
       terminalSessions,
     },
     { sessions: serverImport.importedDaemonSessions },
@@ -389,9 +353,7 @@ export async function runServer(serverConfig: ServerConfig): Promise<void> {
     providerRegistry,
     pluginHostArtifacts,
     aiServices,
-    sharedPorts,
     skillTreeRegistry,
-    telemetry,
     terminalSessions,
   });
 
@@ -409,7 +371,6 @@ export async function runServer(serverConfig: ServerConfig): Promise<void> {
     skillTreeRegistry,
     pluginSchedules: pluginService,
     plugins: pluginService,
-    telemetry,
     terminalSessions,
   };
   const providerModelCatalogPrewarm =
@@ -422,22 +383,18 @@ export async function runServer(serverConfig: ServerConfig): Promise<void> {
     });
   }
 
-  if (!isLoopbackHostname(serverConfig.BB_SERVER_BIND_HOST)) {
-    logger.warn(
-      { bindHost: serverConfig.BB_SERVER_BIND_HOST },
-      "SECURITY WARNING: The public API is unauthenticated and permits command execution and file reads. Wildcard server binding must only be used behind a trusted network boundary.",
-    );
-  }
-
-  const server = startHttpListener({
+  const servers = startHttpListeners({
     fetch: app.fetch,
     serverConfig,
+    logger,
   });
-  injectWebSocket(server);
+  for (const server of servers) {
+    injectWebSocket(server);
+  }
 
   logger.info(
     {
-      bindHost: serverConfig.BB_SERVER_BIND_HOST,
+      bindAddresses: [BB_LOOPBACK_HOST, ...serverConfig.BB_SERVER_BIND_HOST],
       port: serverConfig.BB_SERVER_PORT,
       dataDir: serverConfig.BB_DATA_DIR,
     },
@@ -448,7 +405,6 @@ export async function runServer(serverConfig: ServerConfig): Promise<void> {
   });
   let sweepInterval: ReturnType<typeof setInterval> | null = null;
   if (pendingServerMove === null) {
-    telemetry.capture({ name: "app_started" });
     if (serverMoveRun?.kind === "completed") {
       logger.info(
         { moveId: serverMoveRun.run.status.moveId },
@@ -457,7 +413,6 @@ export async function runServer(serverConfig: ServerConfig): Promise<void> {
       providerRegistry.markRegistrationsSettled();
     } else {
       void startServerPlugins({
-        dataDir: serverConfig.BB_DATA_DIR,
         logger,
         pluginService,
         providerRegistry,
@@ -487,7 +442,6 @@ export async function runServer(serverConfig: ServerConfig): Promise<void> {
     shutdownPromise = (async () => {
       hub.stopClientChangeNotifications();
       serverMove.dispose();
-      appUpdate.dispose();
       providerModelCatalogPrewarm?.stop();
       eventLoopStallMonitor.stop();
       await performanceDiagnostics.stop();
@@ -502,18 +456,9 @@ export async function runServer(serverConfig: ServerConfig): Promise<void> {
           logger.warn({ err: error }, "Plugin shutdown failed");
         });
       }
-      const closeServer = new Promise<void>((resolve, reject) => {
-        server.close((error) => {
-          if (error) {
-            reject(error);
-            return;
-          }
-          resolve();
-        });
-      });
-      await tunnelIngress.closeAll();
+      const closeServers = Promise.all(servers.map(closeHttpListener));
       await closeWebSockets();
-      await closeServer;
+      await closeServers;
     })();
     return shutdownPromise;
   };

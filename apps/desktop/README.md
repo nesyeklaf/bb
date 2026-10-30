@@ -79,10 +79,7 @@ notification behavior but cannot forward activation tokens.
 Electron downloads its development runtime lazily; the desktop test command
 installs it before starting parallel workers.
 
-The macOS bundle declares macOS 13 as its minimum. The release feed generator
-writes the corresponding Darwin kernel minimum, 22.0.0, into both JSON and YAML
-update feeds. Run it before publishing release artifacts so older Macs reject
-incompatible updates.
+The macOS bundle declares macOS 13 as its minimum.
 
 ## Window state
 
@@ -183,7 +180,7 @@ pnpm exec turbo run smoke:packaged --filter=@bb/desktop
 
 `desktop:build:win` writes `release/bb-<version>-x64.exe`, a one-click per-user
 NSIS installer that installs to `%LOCALAPPDATA%\Programs\bb` (`bb-nightly` on
-the nightly channel) without elevation, plus `latest.yml` for electron-updater.
+the nightly channel) without elevation.
 Without a signing certificate the installer is unsigned, so Windows SmartScreen
 warns before running it. electron-builder signs it when `WIN_CSC_LINK` (a
 base64 `.pfx`) and `WIN_CSC_KEY_PASSWORD` are set; the release workflows pass
@@ -193,11 +190,6 @@ secrets.
 `afterPack` copies `@parcel/watcher-win32-x64` into the package when
 electron-builder leaves it out and loads it with the packaged Electron; without
 it the file watcher cannot start.
-
-Windows builds check `desktop-version-windows.json` for new versions and
-install them with electron-updater from `latest.yml` (`nightly.yml` on the
-nightly channel). The update downloads in the background and the installer runs
-silently when the app quits or when the user chooses Relaunch.
 
 ### Linux (AppImage, x64)
 
@@ -244,26 +236,8 @@ CI builds Linux artifacts on the pinned `ubuntu-22.04` runner. The AppImage
 links against the build machine's glibc, so that pin sets the oldest
 distribution that can run a published build. Raise it deliberately.
 
-Linux gets both update paths, but they are not equivalent:
-
-- The JSON version feed (`desktop-version-linux.json`) is polled on every Linux
-  install and reports that a newer release exists.
-- Self-installing auto-update runs only inside an AppImage whose directory the
-  app can write to. electron-updater detects the AppImage through the `APPIMAGE`
-  environment variable, and its install step unlinks the running file _before_
-  moving the replacement in — so a read-only directory would delete the app and
-  leave nothing behind. Both the startup check and the install handler verify
-  write and search access on the parent directory first.
-- Everything else — an extracted directory, a distribution package, or an
-  AppImage in a read-only location — reports new versions without installing
-  them.
-
-The Linux AppImage is unsigned, and electron-updater performs no signature
-check on Linux: it verifies only the SHA-512 recorded in the update metadata
-that ships beside it. macOS installs through Squirrel, which additionally
-requires the replacement to satisfy the running app's code-signing
-requirement. Write access to the release assets is therefore sufficient to
-push code to Linux clients. Treat the release token accordingly.
+The Linux AppImage is unsigned. The desktop app never checks for or installs
+updates; install a new build by hand.
 
 ## Releasing
 
@@ -291,17 +265,9 @@ immutable releases and `desktop-latest` for the moving pointer.
 `build-desktop.yml` builds macOS, Linux, and Windows in parallel jobs, then
 publishes all three from one job. The moving release resets all of its assets
 on each publish, so a single publisher is what keeps one platform from deleting
-another's binaries. Each platform has its own update feed file inside the same release
-tag:
+another's binaries.
 
-| Platform | Artifacts              | electron-updater metadata | Version feed                   |
-| -------- | ---------------------- | ------------------------- | ------------------------------ |
-| macOS    | `.dmg`, `.zip` (arm64) | `latest-mac.yml`          | `desktop-version.json`         |
-| Linux    | `.AppImage` (x64)      | `latest-linux.yml`        | `desktop-version-linux.json`   |
-| Windows  | `.exe` installer (x64) | `latest.yml`              | `desktop-version-windows.json` |
-
-macOS keeps the unsuffixed feed name because released macOS builds already
-request it. Linux artifacts are unsigned, and the Windows installer is unsigned
+Linux artifacts are unsigned, and the Windows installer is unsigned
 unless the Windows certificate secrets are configured; only the macOS binaries
 wait on the Apple signing secrets.
 
@@ -327,11 +293,8 @@ The nightly desktop is a separate installation:
 - product name: `bb Nightly`
 - bundle identifier: `dev.bb.desktop.nightly`
 - Linux binary name: `bb-nightly`, so it never shadows stable `bb` on PATH
-- app/update release: `desktop-nightly`
+- release: `desktop-nightly`
 - Windows install directory: `%LOCALAPPDATA%\Programs\bb-nightly`
-- update metadata: `nightly-mac.yml`, `nightly-linux.yml`, and `nightly.yml`
-  (Windows)
-- version feeds: `desktop-version.json` (macOS),
   `desktop-version-linux.json` (Linux), and `desktop-version-windows.json`
   (Windows)
 - icon: `assets/icon-nightly.icns` and `assets/icon-nightly.png`
@@ -352,7 +315,7 @@ overridden.
 
 Nightly builds set `BB_DESKTOP_RELEASE_CHANNEL=nightly` at build time. The value
 is baked into the Electron main/preload bundles and selects the nightly product
-identity, yellow icon, and update URLs. Omit the variable (or set it to
+identity and yellow icon. Omit the variable (or set it to
 `latest`) for stable and local builds.
 
 ## About panel
@@ -401,20 +364,9 @@ binaries from `desktop-latest`. If only some required signing secrets are set,
 the workflow fails before packaging so a misconfigured release cannot silently
 produce unsigned or signed-but-not-notarized artifacts.
 
-## Auto-update
+## Nightly signing
 
-The renderer update toast keeps using `desktop-version.json` as the lightweight
-feature surface. The installer path uses `electron-updater` against the same
-`desktop-latest` release asset directory and reads `latest-mac.yml`. These
-checks run in parallel on launch, hourly, and when the app becomes active: the
-JSON feed can show "update available" even when CI has published metadata only,
-while the Electron updater only flips the toast to "ready to install" after a
-signed update has actually downloaded. Local dev builds skip Electron auto-update
-unless `BB_DESKTOP_AUTO_UPDATE=1` is set.
-
-`bb Nightly` follows the equivalent isolated `desktop-nightly` release and
-`nightly-mac.yml`; it never reads or moves the stable feed. The scheduled
-workflow requires the complete signing/notarization secret set before
+The scheduled workflow requires the complete signing/notarization secret set before
 publishing nightly desktop assets.
 
 To verify a downloaded or unpacked build:
@@ -439,7 +391,7 @@ desktop:worktree` sets it. The bundle's own icon in Finder is unchanged.
 
 Desktop main-process logs are written immediately to `desktop.log` under
 `~/.bb/logs/` or `$BB_DATA_DIR/logs/` when `BB_DATA_DIR` is set, including
-updater, Connect, and startup failures from launches without a terminal.
+updater and startup failures from launches without a terminal.
 Logs append across launches and rotate at 10 MiB into `desktop.1.log` through
 `desktop.4.log`. When bb-app exits, its captured output is saved
 with the error. Logging failures fall back to stderr without interrupting
@@ -477,13 +429,12 @@ selects it without creating a duplicate. **This Mac** on macOS or **This
 Computer** on Linux switches back to the built-in server without removing
 saved entries.
 
-**Edit Server…** edits the currently selected custom or Connect server and is
-disabled for **This Mac** / **This Computer**. For a Connect server it changes
-only the name; the address comes from the bb account and is read-only. For a
-custom server, clearing its URL removes
+**Edit Server…** edits the currently selected saved server and is disabled for
+**This Mac** / **This Computer**. Clearing its URL removes
 that entry and, with Show This Mac/Computer checked, switches an active custom
 target to the built-in server. Other
-saved servers and Connect discovery remain available. Existing single-server preferences are
+saved servers remain available. A saved bb connect choice from an older build
+opens the built-in server instead. Existing single-server preferences are
 loaded automatically into the saved list in `<userData>/server-target.json`.
 
 Changing only the name refreshes the menu without switching servers or reloading
@@ -502,37 +453,12 @@ builds with strict parsing can reject the added field on rollback. Invalid names
 do not discard saved URLs, and names for absent URLs are ignored and pruned on
 the next save.
 
-Connect servers owned by your bb account appear in the menu by name, or by
-URL hostname when unnamed, like custom servers. Their names are stored in `server-target.json` as
-`connectServerNames`, keyed by handle, and are kept while discovery is
-unavailable. A saved custom URL that is an account server's address is replaced
-by that account server at startup, after discovery, and after Add/Edit Server.
-Its name moves to the account server unless that server is already named. If
-the replaced URL was selected, the app switches to the account server and
-reloads its windows once.
-
-Connect discovery tries the built-in server, then a stored machine credential,
-then the bb account sign-in. When none of these load the servers and the app
-has no credential or account sign-in, the Server menu offers **Sign in to bb
-Connect…** above **Add Server…**. If bb Connect rejected the credentials, the
-item is **Sign in to bb Connect again…**. Other failures add no menu row; the
-menu keeps the servers from the last successful load, and the app logs the
-reason as `connect server sync skipped (<reason>)`. The sign-in item opens
-bb account sign-in in a desktop window, the same window as **Reconnect** below,
-from any selected server, including **This Mac** / **This Computer**. Once the
-new account session arrives, the window closes and the app reloads the
-account's servers into the menu. Without a known Connect server, the app signs
-in at `https://getbb.app`. Development builds use `BB_DEV_CONNECT_BASE_URL`
-when it is valid.
-
 The app command palette lists **Switch to <server>** for each inactive choice
-from this same Server menu, including Connect discovery. Palette list requests
-use the menu's discovery refresh policy (at most once per minute, with the
-existing ten-minute background refresh). The optional `window.bbDesktop`
+from this same Server menu. The optional `window.bbDesktop`
 `getServerChoices`, `onServerChoicesChange`, and `selectServer` methods expose
 only `{id, name, active}`; custom server IDs are opaque hashes. Selection is
-validated against native choices and runs the menu's existing authentication,
-window navigation, and runtime lifecycle. Older desktop shells omit these actions.
+validated against native choices and runs the menu's existing window
+navigation and runtime lifecycle. Older desktop shells omit these actions.
 
 Desktop Settings → Server → **Show This Mac** (or **Show This Computer** off macOS)
 defaults to checked and is disabled while This Mac/Computer is selected.
@@ -549,9 +475,8 @@ may drop it on save; older strict readers can reject the whole file, so keep a
 backup before rolling back to a build predating the tolerant-reader fix #5286.
 
 When a custom URL is removed while the built-in server is hidden, an active
-custom target switches to the first remaining custom URL in saved order, then
-the saved Connect server, then a discovered Connect server in handle order,
-and finally the built-in server if no alternative exists. With the checkbox
+custom target switches to the first remaining custom URL in saved order, or
+to the built-in server if no alternative exists. With the checkbox
 checked, removing an active custom target still switches to the built-in server.
 The native menus, renderer Server popup, and app palette use the same choices.
 
@@ -569,20 +494,15 @@ committed move. A move is committed when the local server address answers
 launcher process is alive. The app checks once when it starts or loads the
 built-in server. When a move finishes while the app is open, the app checks every
 second for up to 120 seconds. It stops if the lock disappears. The first time the app
-sees a committed lock for a `moveId`, it switches the server target once:
-
-- `mode: "connect"` selects `connectHandle` with `serverUrl`.
-- `mode: "direct"` sets the custom server URL. When a move finishes while
-  the app is open, the app waits up to 60 seconds for the new `/health`
-  endpoint before it switches the window.
+sees a committed lock for a `moveId`, it switches the server target once to
+the custom server URL `serverUrl`. When a move finishes while the app is open,
+the app waits up to 60 seconds for the new `/health` endpoint before it
+switches the window.
 
 The app shows "Your bb server moved to <toHostName>" once for each `moveId`
 (`<userData>/server-move-notice.json`). It still starts its own `bb-app`
 launcher unless another bb process answers the local server port. The launcher
-runs this computer as a regular machine, and quitting the app stops it. If the
-app has no stored bb Connect credential, it signs in to a connect target with
-the `x-bb-connect-machine` header that the move wrote to the data dir's
-`config.json`. The app logs a warning and ignores an invalid lock.
+runs this computer as a regular machine, and quitting the app stops it. The app logs a warning and ignores an invalid lock.
 
 On startup, a saved built-in server choice also switches to the moved server;
 it never starts the old copy automatically. A different saved remote server
@@ -594,12 +514,6 @@ its background machine service.
 
 Startup error screens list their actions as buttons. Any screen where
 retrying can help shows **Try again**. **Choose server…** opens the Server menu,
-where the user can select the built-in server if needed. A bb Connect
-`unauthorized` error has no **Try again**, because the same credential fails
-the same way. **Reconnect** opens account sign-in in a desktop
-window. The app clears its old account sign-in, waits for a new session, then
-retries the selected server. A valid account session can mint and renew the
-desktop session when a machine credential is rejected. Closing the sign-in
-window leaves the error screen available. Fatal errors have no buttons. The renderer sends the chosen
+where the user can select the built-in server if needed. Fatal errors have no buttons. The renderer sends the chosen
 action on `bb-desktop:startup-action`. The main process accepts only actions
 from the error page that is currently loaded in an app window's main frame.

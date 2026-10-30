@@ -53,8 +53,6 @@ function createMovedFile(overrides: Partial<ServerMovedFile>): ServerMovedFile {
     toHostId: "host-desk",
     toHostName: "desk",
     serverUrl: "https://desk.example.com",
-    mode: "direct",
-    connectHandle: null,
     oldCopyEntries: ["bb.db"],
     ...overrides,
   };
@@ -63,7 +61,7 @@ function createMovedFile(overrides: Partial<ServerMovedFile>): ServerMovedFile {
 async function listen(movedFile: ServerMovedFile): Promise<number> {
   const errors: Error[] = [];
   const responder = await startMovedResponder({
-    bindHost: "127.0.0.1",
+    bindAddresses: ["127.0.0.1"],
     movedFile,
     onError: (error) => {
       errors.push(error);
@@ -140,7 +138,7 @@ describe("moved responder", () => {
     },
   );
 
-  it("redirects browser navigations to the new address with the path and query in direct mode", async () => {
+  it("redirects browser navigations to the new address with the path and query", async () => {
     const port = await listen(createMovedFile({}));
 
     const response = await sendRequest({
@@ -221,39 +219,6 @@ describe("moved responder", () => {
     );
   });
 
-  it("serves an escaped page linking to the connect address in connect mode", async () => {
-    const port = await listen(
-      createMovedFile({
-        connectHandle: "desk-handle",
-        mode: "connect",
-        serverUrl: 'https://bb.example.com/?handle=desk&next="x"<y>',
-        toHostName: "<img src=x onerror=alert(1)>",
-      }),
-    );
-
-    const response = await sendRequest({
-      headers: { accept: HTML_ACCEPT },
-      method: "GET",
-      path: "/threads/thr-1",
-      port,
-    });
-
-    expect(response.status).toBe(410);
-    expect(response.headers.location).toBeUndefined();
-    expect(response.headers["content-type"]).toBe("text/html; charset=utf-8");
-    expect(response.headers["content-security-policy"]).toBe(
-      "default-src 'none'",
-    );
-    expect(response.body).toContain(
-      "<h1>This bb server moved to &lt;img src=x onerror=alert(1)&gt;</h1>",
-    );
-    expect(response.body).toContain(
-      '<a href="https://bb.example.com/?handle=desk&amp;next=%22x%22%3Cy%3E">',
-    );
-    expect(response.body).not.toContain("<img");
-    expect(response.body).not.toContain('"x"');
-  });
-
   it("reports a busy port without throwing", async () => {
     const occupied = createServer();
     await new Promise<void>((resolvePromise) => {
@@ -266,7 +231,7 @@ describe("moved responder", () => {
     const errors: Error[] = [];
     try {
       const responder = await startMovedResponder({
-        bindHost: "127.0.0.1",
+        bindAddresses: ["127.0.0.1"],
         movedFile: createMovedFile({}),
         onError: (error) => {
           errors.push(error);
@@ -282,5 +247,43 @@ describe("moved responder", () => {
         occupied.close((error) => (error ? reject(error) : resolvePromise()));
       });
     }
+  });
+  it.runIf(process.platform === "linux")(
+    "answers on every bind address with the loopback port",
+    async () => {
+      const responder = await startMovedResponder({
+        bindAddresses: ["127.0.0.1", "127.0.0.2"],
+        movedFile: createMovedFile({}),
+        onError: () => undefined,
+        port: 0,
+      });
+      if (responder === null) {
+        throw new Error("Responder did not listen");
+      }
+      responders.push(responder);
+
+      const response = await sendRequest({
+        method: "GET",
+        path: "/api/v1/threads",
+        port: responder.port,
+      });
+      expect(response.status).toBe(410);
+    },
+  );
+
+  it("releases already bound addresses when a later address fails", async () => {
+    const errors: Error[] = [];
+    const responder = await startMovedResponder({
+      bindAddresses: ["127.0.0.1", "192.0.2.123"],
+      movedFile: createMovedFile({}),
+      onError: (error) => {
+        errors.push(error);
+      },
+      port: 0,
+    });
+
+    expect(responder).toBeNull();
+    expect(errors).toHaveLength(1);
+    expect(errors[0]).toMatchObject({ code: "EADDRNOTAVAIL" });
   });
 });

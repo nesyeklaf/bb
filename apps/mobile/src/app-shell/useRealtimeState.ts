@@ -34,7 +34,6 @@ export function useConnectionBanner(): ConnectionBannerKind {
 
   if (!connection) return "hidden";
   return deriveConnectionBanner({
-    session: connection.session,
     realtime: realtimeState,
     suspended: connection.client.realtime.isSuspended(),
     connectingForMs:

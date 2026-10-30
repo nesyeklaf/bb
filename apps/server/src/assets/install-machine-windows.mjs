@@ -400,11 +400,12 @@ async function downloadPackage({ bootstrap, dataDir, npmPrefix }) {
     return;
   }
   if (response.status === 404) {
-    warn("The server does not provide its bb-app package");
-    step("Installing bb-app from the npm registry");
-    await installPackage({ dataDir, npmPrefix, source: "bb-app" });
-    done("Installed bb-app from the npm registry");
-    return;
+    throw new InstallError(
+      "The server does not provide its bb-app package, so this machine cannot be installed from it.",
+      [
+        "Install the bb-app package of this server on the machine, or use a server build that ships it.",
+      ],
+    );
   }
   if (!response.ok) {
     const details = [];

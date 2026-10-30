@@ -41,9 +41,8 @@ apply. Do not push a commit or tag, and do not run npm publish, before approval.
 
 ## Select one source
 
-Prefer a Git semantic-version range for a public Git repository. Use npm when
-the author already distributes a complete npm package. Use an exact Git ref only
-when the author wants a fixed release.
+Prefer a Git semantic-version range for a public Git repository. Use an exact
+Git ref only when the author wants a fixed release.
 
 ### Git semantic-version release
 

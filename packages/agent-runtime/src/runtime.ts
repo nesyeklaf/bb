@@ -11,7 +11,6 @@ import {
   BRIDGE_JSON_RPC_ERRORS,
   commandListResultSchema,
   providerHealthResultSchema,
-  providerInstallationRunResultSchema,
   providerInstallationStatusSchema,
   providerUsageResultSchema,
   ThreadEventGrammar,
@@ -2468,7 +2467,6 @@ export function createAgentRuntime(options: AgentRuntimeOptions): AgentRuntime {
       bridgeLaunch,
       cwd,
       requirement,
-      checkUpdates = true,
     }) {
       await runtime.ensureProvider({ providerId, bridgeLaunch });
       const proc = providerProcesses.requireProviderProcess({
@@ -2479,7 +2477,6 @@ export function createAgentRuntime(options: AgentRuntimeOptions): AgentRuntime {
         commandType: "provider/installation/status",
         plan: proc.adapter.buildCommandPlan({
           type: "provider/installation/status",
-          checkUpdates,
           ...(cwd !== undefined ? { cwd } : {}),
           ...(requirement !== undefined ? { requirement } : {}),
         }),
@@ -2489,28 +2486,6 @@ export function createAgentRuntime(options: AgentRuntimeOptions): AgentRuntime {
         proc,
         message: plan,
         resultSchema: providerInstallationStatusSchema,
-      });
-    },
-
-    async providerInstallationRun({ providerId, bridgeLaunch, cwd, action }) {
-      await runtime.ensureProvider({ providerId, bridgeLaunch });
-      const proc = providerProcesses.requireProviderProcess({
-        processKey: resolveProviderProcessKey({ bridgeLaunch, providerId }),
-        providerId,
-      });
-      const plan = requireProviderRequestPlan({
-        commandType: "provider/installation/run",
-        plan: proc.adapter.buildCommandPlan({
-          type: "provider/installation/run",
-          action,
-          ...(cwd !== undefined ? { cwd } : {}),
-        }),
-        providerId,
-      });
-      return await sendCommand({
-        proc,
-        message: plan,
-        resultSchema: providerInstallationRunResultSchema,
       });
     },
 

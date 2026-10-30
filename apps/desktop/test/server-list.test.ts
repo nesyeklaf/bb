@@ -22,24 +22,16 @@ function createStore() {
 }
 
 describe("buildDesktopServerChoices", () => {
-  it("lists each account server once by hostname after adopting saved custom URLs", async () => {
+  it("lists the built-in server and each saved server by name or hostname", async () => {
     const store = createStore();
-    const servers = [
-      { handle: "brsbl", name: "default", url: "https://brsbl.getbb.app" },
-      {
-        handle: "brsbl-bbox",
-        name: "brsbl-bbox",
-        url: "https://brsbl-bbox.getbb.app",
-      },
-    ];
-    await store.setConnectServer(servers[0]);
-    await store.setCustomServerUrl("https://brsbl.getbb.app");
-    await store.setCustomServerUrl("https://brsbl-bbox.getbb.app");
-    await store.setCustomServerUrl("https://bb.example.com/team");
+    await store.setCustomServerUrl("https://work.example.test", {
+      name: "Devbox",
+    });
+    await store.setCustomServerUrl("https://bb.example.com/team", {
+      name: null,
+    });
 
-    await store.adoptConnectServers(servers);
-
-    expect(buildDesktopServerChoices(store, servers, LOCAL_URL)).toEqual([
+    expect(buildDesktopServerChoices(store, LOCAL_URL)).toEqual([
       {
         id: "builtin",
         name: BUILTIN_SERVER_NAME,
@@ -48,17 +40,10 @@ describe("buildDesktopServerChoices", () => {
         active: false,
       },
       {
-        id: "connect:brsbl",
-        name: "brsbl.getbb.app",
-        origin: "https://brsbl.getbb.app",
-        kind: "account",
-        active: false,
-      },
-      {
-        id: "connect:brsbl-bbox",
-        name: "brsbl-bbox.getbb.app",
-        origin: "https://brsbl-bbox.getbb.app",
-        kind: "account",
+        id: customServerId("https://work.example.test"),
+        name: "Devbox",
+        origin: "https://work.example.test",
+        kind: "custom",
         active: false,
       },
       {
@@ -71,54 +56,15 @@ describe("buildDesktopServerChoices", () => {
     ]);
   });
 
-  it("labels account servers by their saved name, keeping a renamed custom URL's name", async () => {
+  it("hides the built-in server only while another server is saved", async () => {
     const store = createStore();
-    const servers = [
-      { handle: "brsbl", name: "default", url: "https://brsbl.getbb.app" },
-      {
-        handle: "brsbl-bbox",
-        name: "brsbl-bbox",
-        url: "https://brsbl-bbox.getbb.app",
-      },
-    ];
-    await store.setCustomServerUrl("https://brsbl-bbox.getbb.app", {
-      name: "Devbox",
-    });
-    await store.setConnectServerName("brsbl", "  Studio   Mac ");
-
-    await store.adoptConnectServers(servers);
-
-    expect(buildDesktopServerChoices(store, servers, LOCAL_URL)).toEqual([
-      {
-        id: "builtin",
-        name: BUILTIN_SERVER_NAME,
-        origin: LOCAL_URL,
-        kind: "local",
-        active: false,
-      },
-      {
-        id: "connect:brsbl",
-        name: "Studio Mac",
-        origin: "https://brsbl.getbb.app",
-        kind: "account",
-        active: false,
-      },
-      {
-        id: "connect:brsbl-bbox",
-        name: "Devbox",
-        origin: "https://brsbl-bbox.getbb.app",
-        kind: "account",
-        active: true,
-      },
-    ]);
-
-    await store.setConnectServerName("brsbl-bbox", null);
-    expect(buildDesktopServerChoices(store, servers, LOCAL_URL)[2]).toEqual({
-      id: "connect:brsbl-bbox",
-      name: "brsbl-bbox.getbb.app",
-      origin: "https://brsbl-bbox.getbb.app",
-      kind: "account",
-      active: true,
-    });
+    await store.setShowBuiltinServer(false);
+    expect(buildDesktopServerChoices(store, LOCAL_URL).map((c) => c.id)).toEqual(
+      ["builtin"],
+    );
+    await store.setCustomServerUrl("https://work.example.test");
+    expect(buildDesktopServerChoices(store, LOCAL_URL).map((c) => c.id)).toEqual(
+      [customServerId("https://work.example.test")],
+    );
   });
 });

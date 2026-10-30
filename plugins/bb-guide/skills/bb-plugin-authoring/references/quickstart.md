@@ -116,7 +116,7 @@ the current engine values and the entries for its generated surfaces.
   enforcing it and annotate that on check results.
 - `engines.bbPluginSdk` — optional SDK compatibility range. The scaffold uses
   the repository SDK version. Absent means a legacy manifest. Managed
-  (`git:`/`npm:`) installs refuse a plugin that needs a newer SDK than the
+  (`git:`) installs refuse a plugin that needs a newer SDK than the
   host provides, or one pinned to a different major; path installs surface it
   as `incompatible` at load. Updates select only candidates that satisfy both
   ranges (see distribution.md).
@@ -136,8 +136,8 @@ namespaces routes, storage, settings, and CLI commands.
 - Path installs load `bb.server` as TypeScript directly. `bb plugin build`
   also emits `dist/server.js` + `server.js.map` + `server.meta.json`; the
   server bundle externalizes the SDK and `better-sqlite3` (use
-  `bb.storage.database()` for plugin-owned SQLite). Builtin, official, git,
-  and npm installs whose `dist/server.js` was built for the running SDK major
+  `bb.storage.database()` for plugin-owned SQLite). Builtin, official, and git
+  installs whose `dist/server.js` was built for the running SDK major
   load that bundle instead of the TypeScript source.
 - `bb plugin build` compiles `bb.app` into minified `dist/app.js`, `app.css`,
   and `app.meta.json` (`bb plugin dev` keeps them readable) and bundles
@@ -150,9 +150,7 @@ namespaces routes, storage, settings, and CLI commands.
   `npm install --omit=dev --omit=optional --ignore-scripts` (lifecycle scripts
   never run), keep node_modules (bundling cannot inline data files read at
   runtime), then build declared app, server, and host source and validate its
-  metadata. An npm plugin must publish `dist/app.js` + `dist/app.meta.json`
-  when it declares `bb.app`, and its host bundle and metadata when it declares
-  `bb.host`.
+  metadata.
 - `bb plugin build` stamps every declared artifact's `dist/*.meta.json` with
   `sdkMajor`, `sdkVersion`, `artifactFormatVersion` (currently `1`),
   `pluginId`, `pluginVersion`, and `builtWith: { bbVersion, pluginSdkVersion }`.

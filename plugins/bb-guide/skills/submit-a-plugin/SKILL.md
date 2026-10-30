@@ -6,7 +6,7 @@ description: "Prepare and submit a BB plugin to the Community marketplace when p
 # Submit a plugin
 
 Submit a public plugin to the BB Community marketplace. The marketplace stores
-plugin metadata. The plugin code stays in its Git repository or npm package.
+plugin metadata. The plugin code stays in its Git repository.
 
 ## Choose the task
 
