@@ -7,11 +7,11 @@ import {
   type ProcFs,
 } from "./sampler.js";
 
-function stat(pid: number, ppid: number, comm: string): string {
+function stat(pid: number, ppid: number, comm: string, state = "S"): string {
   const rest = Array.from({ length: 50 }, () => "0");
   rest[0] = String(ppid);
   rest[18] = String(pid * 100);
-  return `${pid} (${comm}) S ${rest.join(" ")}`;
+  return `${pid} (${comm}) ${state} ${rest.join(" ")}`;
 }
 
 const HEADER =
@@ -26,12 +26,17 @@ function tcpLine(
   return `   0: ${local} ${remote} ${state} 00000000:00000000 00:00000000 00000000  1000        0 ${inode} 1 0 20 4 0 10 -1\n`;
 }
 
-function fakeFs(state: { tcp: string; fds: Record<number, number[]> }): ProcFs {
+function fakeFs(state: {
+  tcp: string;
+  fds: Record<number, number[]>;
+  extra?: Record<number, string>;
+}): ProcFs {
   const procs: Record<number, string> = {
     1: stat(1, 0, "init"),
     10: stat(10, 1, "node"),
     11: stat(11, 10, "claude"),
     20: stat(20, 1, "other"),
+    ...state.extra,
   };
   return {
     async readdir(path) {
@@ -47,7 +52,11 @@ function fakeFs(state: { tcp: string; fds: Record<number, number[]> }): ProcFs {
       return HEADER;
     },
     async readlink(path) {
-      if (path.endsWith("/ns/net")) return "net:[1]";
+      if (path.endsWith("/ns/net")) {
+        const pid = Number(/\/proc\/(\d+)\//.exec(path)?.[1]);
+        if (state.extra?.[pid]?.includes(" Z ")) throw new Error("ENOENT");
+        return "net:[1]";
+      }
       const match = /\/proc\/(\d+)\/fd\/(\d+)/.exec(path)!;
       return `socket:[${state.fds[Number(match[1])]![Number(match[2])]}]`;
     },
@@ -105,6 +114,19 @@ describe("createSampler", () => {
     expect(second.reset).toBe(false);
     expect(second.rows).toHaveLength(1);
     expect(second.rows[0]!.continued).toBe(true);
+  });
+
+  it("does not count zombie children as unreadable", async () => {
+    const sampler = createSampler({
+      fs: fakeFs({
+        tcp: OUT,
+        fds: { 10: [], 11: [501] },
+        extra: { 12: stat(12, 10, "sh", "Z") },
+      }),
+      rootPid: 10,
+      generation: "g1",
+    });
+    expect(await sampler.tick()).toEqual({ treeSize: 3, unreadablePids: 0 });
   });
 
   it("marks sockets of listening ports as incoming and counts unreadable pids", async () => {

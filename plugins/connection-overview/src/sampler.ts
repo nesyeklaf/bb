@@ -98,6 +98,15 @@ export function createSampler(options: {
     }
   }
 
+  async function holdsNoSockets(fs: ProcFs, pid: number): Promise<boolean> {
+    try {
+      const text = await fs.readFile(`/proc/${pid}/stat`);
+      return text.slice(text.lastIndexOf(")") + 2).startsWith("Z");
+    } catch {
+      return true;
+    }
+  }
+
   async function tick(): Promise<TickResult> {
     const startedAt = now();
     if (sampledAt !== null && startedAt - sampledAt > STALL_GAP_MS)
@@ -128,6 +137,7 @@ export function createSampler(options: {
             }),
           );
         } catch {
+          if (await holdsNoSockets(options.fs, proc.pid)) return;
           unreadablePids += 1;
         }
       }),
