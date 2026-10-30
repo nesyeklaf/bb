@@ -55,8 +55,8 @@ push registration. Pair it from Settings → Mobile → **Add mobile device**.
   Serve HTTPS.
 - **bb connect** mode pairs the phone as a connect machine; see
   [multiple-devices.md](multiple-devices.md#use-the-bb-mobile-app).
-- Push notifications need the server to reach `exp.host` and a bb connect or
-  HTTPS profile; a plain-HTTP direct profile cannot register.
+- The mobile app receives no push notifications; web and desktop clients get
+  them while open.
 - Phones have no host daemon, so local editor integration, "Open in …", and
   the native folder picker are unavailable; the remote path browser works.
   Provider sign-in still needs a terminal on the host.

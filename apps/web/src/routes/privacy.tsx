@@ -112,41 +112,10 @@ function PrivacyRoute() {
           <h3>Push notifications</h3>
 
           <p>
-            Push notifications are optional. When you enable them, the mobile
-            app registers with Expo and the platform notification service. It
-            sends an Expo push token, the platform (iOS or Android), and a
-            device label to your bb server. Your server stores that subscription
-            so it can send notifications to your device. A push token identifies
-            an app installation for delivery; it is not your phone number.
-          </p>
-
-          <p>
-            Your server sends notifications through Expo Push Service, which
-            forwards them to Apple Push Notification service on iOS or Firebase
-            Cloud Messaging on Android. The payload includes the push token,
-            thread title, notification text, project and thread identifiers,
-            and, when available, your server URL so tapping the notification
-            opens the right conversation. Notification text can include a short
-            preview of an agent question, a command awaiting approval, or an
-            error. Those providers process the payload to deliver it, so push
-            notifications are not end-to-end encrypted between your server and
-            phone.
-          </p>
-
-          <p>
-            You can turn notifications off in the app&rsquo;s device settings or
-            your phone&rsquo;s notification settings. Turning them off in the
-            app requests removal of the subscription from your server; the
-            server must be reachable for that request to succeed. See{" "}
-            <a href="https://expo.dev/privacy">Expo&rsquo;s privacy policy</a>,{" "}
-            <a href="https://www.apple.com/legal/privacy/">
-              Apple&rsquo;s privacy policy
-            </a>
-            , and{" "}
-            <a href="https://policies.google.com/privacy">
-              Google&rsquo;s privacy policy
-            </a>{" "}
-            for their data handling practices.
+            The iOS and Android apps do not register for push notifications and
+            send no push token, device label, or notification text to any push
+            service. Your bb server shows notifications only in web browsers
+            and the desktop app that are connected to it.
           </p>
 
           <h2>2. bb connect</h2>

@@ -1039,9 +1039,8 @@ all-or-selected host list, set on its autosaving plugin page or with
 
 ### Push notifications
 
-The builtin Push notifications plugin's `mobileEnabled`, `webEnabled`, and
-`desktopEnabled` booleans default to `true`. `expoPushUrl` (default
-`https://exp.host/--/api/v2/push/send`) is the relay URL, read on every send.
+The builtin Push notifications plugin's `webEnabled` and `desktopEnabled`
+booleans default to `true`.
 `defaultLevel` (default `all`) and `childLevel` (default `input-only`) set
 top-level and child thread levels. Set them with
 `bb plugin config push-notifications set <key> <value>`. Web and desktop
@@ -1207,7 +1206,7 @@ in and the `share-server-links` skill for `bb connect` and port shares.
 `http://bb.localhost:<port>` in a development build).
 
 Settings → Mobile pairs the bb mobile app (`bb connect machine-code`, see `bb guide machines`). Mobile
-builds, the optional `GOOGLE_SERVICES_JSON` Firebase config, and publishing
+builds, and publishing
 are documented in [`apps/mobile/README.md`](../apps/mobile/README.md).
 
 ### Connect next (beta)
@@ -1288,8 +1287,7 @@ with orange icons and package `app.getbb.mobile.dev`. Output is
 `apps/mobile/build-output/bb-dev.apk`; append `-- x86_64` for an Intel emulator.
 The build command sets `BB_MOBILE_VARIANT=dev` for Expo configuration. Direct
 Expo commands accept `BB_MOBILE_VARIANT=production` (the default) or `dev`;
-other values fail validation. The dev variant omits production Firebase and
-HTTPS app-link registration. See [mobile build instructions](../apps/mobile/README.md#android-local-apk-and-verification).
+other values fail validation. The dev variant omits HTTPS app-link registration. See [mobile build instructions](../apps/mobile/README.md#android-local-apk-and-verification).
 
 For source development only, `pnpm dev`, `pnpm start:worktree`,
 `pnpm start:worktree-remote`, and `pnpm start` load the repo-root

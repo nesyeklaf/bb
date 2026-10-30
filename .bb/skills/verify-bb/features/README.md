@@ -76,7 +76,7 @@ were excluded. See the [audit](../MAINTENANCE.md) and
 | [Pi provider](plugin-provider-pi.md) | 5 | 2 passed, 3 partial/blocked |
 | [Automatic provider retry](plugin-provider-retry.md) | 5 | 5 partial/blocked |
 | [Provider usage limits](plugin-provider-usage.md) | 3 | 2 passed, 1 partial/blocked |
-| [Web, desktop, and mobile notifications](plugin-push-notifications.md) | 6 | 1 passed, 5 partial/blocked |
+| [Web and desktop notifications](plugin-push-notifications.md) | 5 | 1 passed, 5 partial/blocked |
 | [Scheduled messages](plugin-scheduled-send.md) | 5 | 2 passed, 3 partial/blocked |
 | [Secure credential requests](plugin-secrets.md) | 5 | 4 passed, 1 partial/blocked |
 | [Side chats](plugin-side-chat.md) | 4 | 3 passed, 1 partial/blocked |

@@ -30,8 +30,8 @@ Do these steps in order and run each check. If a check fails, stop and tell me w
 3. Only if "Keep this computer awake" is yes: run \`bb keep-awake enable\`, then \`bb keep-awake status\`.
    Check: it shows Keep Awake enabled. If the command isn't found, run \`bb plugin enable keep-awake\` and try again.
 
-4. Set up the phone app: tell me to open Settings → Mobile in bb on this computer, install the app for my phone (TestFlight for iPhone, the Android download for Android), choose Add mobile device, and scan the code in the app. If Notifications is yes, tell me to allow them when the app asks. Wait until I say "done", then run \`bb push-notifications list\`.
-   Check: my phone shows up in the list.
+4. Set up the phone app: tell me to open Settings → Mobile in bb on this computer, install the app for my phone (TestFlight for iPhone, the Android download for Android), choose Add mobile device, and scan the code in the app. Wait until I say "done".
+   Check: I confirm my phone is connected.
 
 Reply with my getbb.app address (I can also open it in any browser), whether my phone is connected, and whether Keep Awake is on. Remind me that closing a laptop's lid still puts it to sleep.`,
 );
@@ -138,10 +138,10 @@ export const guide: Guide = {
     {
       id: "step-4",
       title: "Get notified",
-      lead: "Know when an agent finishes or needs you, even with the app closed.",
+      lead: "Know when an agent finishes or needs you while bb is open in a browser or the desktop app.",
       body: (
         <Substeps>
-          <li>When the app asks, allow notifications.</li>
+          <li>When the browser asks, allow notifications.</li>
           <li>
             Choose what reaches you in{" "}
             <Ui icon="settings">Settings → Push notifications</Ui>.
@@ -150,7 +150,7 @@ export const guide: Guide = {
       ),
       shot: {
         src: "/guides/run-an-agent-on-a-schedule/window-notify.webp",
-        alt: "bb's Push notifications settings, with mobile, web, and desktop notifications on and an Allow notifications button",
+        alt: "bb's Push notifications settings, with web and desktop notifications on and an Allow notifications button",
         width: 2048,
         height: 1280,
       },

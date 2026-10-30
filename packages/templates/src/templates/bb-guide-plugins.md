@@ -155,9 +155,9 @@ Each bundled plugin documents its commands and behavior in its own skill.
 - Thread list (builtin): owns the sidebar's layout preferences, synced to
   every window. `bb thread-list prefs list|get|set|reset`; see the
   `thread-list` skill.
-- Push notifications (builtin): notifies mobile, web, and desktop clients
+- Push notifications (builtin): notifies web and desktop clients
   when a thread needs attention.
-  `bb push-notifications status|list|add|remove|test|thread`; see the
+  `bb push-notifications status|test|thread`; see the
   `push-notifications` skill.
 - Secrets (builtin): `bb secret request <NAME...> --write-env <path>` collects
   credentials through a secure form into a dotenv file without exposing them

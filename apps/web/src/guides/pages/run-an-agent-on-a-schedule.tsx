@@ -181,18 +181,13 @@ export const guide: Guide = {
             <strong>Allow notifications</strong>.
           </li>
           <li>
-            For your phone, keep <strong>Mobile notifications</strong> on and
-            pair the bb app in <Ui icon="settings">Settings → Mobile</Ui>. See{" "}
-            <a href="/guides/work-from-anywhere">Work from anywhere</a>.
-          </li>
-          <li>
             Check that a notification arrives the next time a run finishes.
           </li>
         </Substeps>
       ),
       shot: {
         src: "/guides/run-an-agent-on-a-schedule/window-notify.webp",
-        alt: "bb's Push notifications settings, with mobile, web, and desktop notifications on and an Allow notifications button",
+        alt: "bb's Push notifications settings, with web and desktop notifications on and an Allow notifications button",
         width: 2048,
         height: 1280,
       },
@@ -287,10 +282,6 @@ export const guide: Guide = {
           <li>
             Check the browser's notification permission and your device's Focus
             settings.
-          </li>
-          <li>
-            For notifications with the app closed, pair the bb mobile app in{" "}
-            <Ui icon="settings">Settings → Mobile</Ui>.
           </li>
         </ol>
       ),
