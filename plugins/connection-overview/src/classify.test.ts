@@ -169,7 +169,7 @@ describe("classify, first match wins", () => {
     ).toMatchObject({ direction: "undetermined", state: "undetermined" });
   });
 
-  it("treats incoming loopback as unverifiable and external peers as red", () => {
+  it("allows incoming peers only from loopback, the tailnet and bind interfaces", () => {
     const incoming = (ip: string) => ({
       ...out(ip, 51000),
       localListening: true,
@@ -181,11 +181,25 @@ describe("classify, first match wins", () => {
     expect(classify(incoming("100.70.1.1"), null, context())).toMatchObject({
       direction: "in",
       state: "allowed",
+      reason: "tailnet peer",
     });
-    expect(classify(incoming("198.51.100.7"), null, context())).toMatchObject({
-      direction: "in",
-      state: "red",
-    });
+    expect(
+      classify(incoming("fd7a:115c:a1e0::9"), null, context()),
+    ).toMatchObject({ direction: "in", state: "allowed" });
+    expect(
+      classify(
+        incoming("198.18.7.20"),
+        null,
+        context({}, { bindSubnets: [parseCidr("198.18.7.0/24")!] }),
+      ),
+    ).toMatchObject({ state: "allowed", reason: "bind interface peer" });
+    for (const ip of ["198.51.100.7", "192.168.1.20", "10.0.0.5", "fe80::1"]) {
+      expect(classify(incoming(ip), null, context())).toMatchObject({
+        direction: "in",
+        state: "red",
+        reason: "external peer",
+      });
+    }
   });
 });
 

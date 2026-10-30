@@ -49,7 +49,6 @@ async function harness() {
           method: "GET",
           status: 200,
           websocket: false,
-          tunnelIngress: false,
           ...peer,
         })),
       ),
@@ -65,7 +64,7 @@ describe("request peer collector", () => {
       { address: "fd7a:115c:a1e0::1" },
       { address: "192.168.1.20" },
       { address: "203.0.113.9" },
-      { address: "127.0.0.1", localPort: 41_000, tunnelIngress: true },
+      { address: "10.0.0.5" },
     ]);
     expect(collector.pull()).toBe(6);
     const rows = store.list({ since: 0, direction: "in" });
@@ -76,14 +75,14 @@ describe("request peer collector", () => {
     expect(byIp.get("127.0.0.1|3000")?.state).toBe("unverifiable");
     expect(byIp.get("100.101.102.103|3000")?.state).toBe("allowed");
     expect(byIp.get("fd7a:115c:a1e0::1|3000")?.state).toBe("allowed");
-    expect(byIp.get("192.168.1.20|3000")?.state).toBe("allowed");
-    expect(byIp.get("203.0.113.9|3000")).toMatchObject({
+    expect(byIp.get("192.168.1.20|3000")).toMatchObject({
       state: "red",
       reason: "external peer",
     });
-    expect(byIp.get("127.0.0.1|41000")).toMatchObject({
+    expect(byIp.get("10.0.0.5|3000")?.state).toBe("red");
+    expect(byIp.get("203.0.113.9|3000")).toMatchObject({
       state: "red",
-      reason: "tunnel ingress",
+      reason: "external peer",
     });
   });
 
@@ -163,7 +162,7 @@ describe("bb connections incoming", () => {
       health: () => [],
       now: () => 1_000_000 + 60_000,
     });
-    add([{ address: "203.0.113.9" }, { address: "10.1.2.3" }]);
+    add([{ address: "203.0.113.9" }, { address: "100.80.1.2" }]);
     collector.pull();
     const incoming = await host.harness.runCli(["incoming", "--json"]);
     expect(incoming.exitCode).toBe(0);
