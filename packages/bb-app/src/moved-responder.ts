@@ -86,40 +86,11 @@ function isPageRequest(request: IncomingMessage): boolean {
   );
 }
 
-function escapeHtml(value: string): string {
-  return value
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;")
-    .replaceAll("'", "&#39;");
-}
-
 function resolveMovedRedirectUrl(serverUrl: URL, requestUrl: URL): string {
   const target = new URL(serverUrl.href);
   target.pathname = `${target.pathname.replace(/\/+$/u, "")}${requestUrl.pathname}`;
   target.search = requestUrl.search;
   return target.href;
-}
-
-function renderMovedPage(movedFile: ServerMovedFile, serverUrl: URL): string {
-  const hostName = escapeHtml(movedFile.toHostName);
-  const href = escapeHtml(serverUrl.href);
-  return [
-    "<!doctype html>",
-    '<html lang="en">',
-    "<head>",
-    '<meta charset="utf-8">',
-    '<meta name="viewport" content="width=device-width, initial-scale=1">',
-    "<title>bb moved</title>",
-    "</head>",
-    "<body>",
-    `<h1>This bb server moved to ${hostName}</h1>`,
-    `<p><a href="${href}">Open bb at ${href}</a></p>`,
-    "</body>",
-    "</html>",
-    "",
-  ].join("\n");
 }
 
 function writeMovedError(
@@ -134,17 +105,6 @@ function writeMovedError(
     "x-content-type-options": "nosniff",
   });
   response.end(text);
-}
-
-function writeMovedPage(response: ServerResponse, html: string): void {
-  response.writeHead(MOVED_STATUS, {
-    "cache-control": "no-store",
-    "content-length": Buffer.byteLength(html),
-    "content-security-policy": "default-src 'none'",
-    "content-type": "text/html; charset=utf-8",
-    "x-content-type-options": "nosniff",
-  });
-  response.end(html);
 }
 
 function createMovedRequestHandler(
@@ -163,15 +123,11 @@ function createMovedRequestHandler(
       writeMovedError(response, errorBody);
       return;
     }
-    if (movedFile.mode === "direct") {
-      response.writeHead(REDIRECT_STATUS, {
-        "cache-control": "no-store",
-        location: resolveMovedRedirectUrl(serverUrl, requestUrl),
-      });
-      response.end();
-      return;
-    }
-    writeMovedPage(response, renderMovedPage(movedFile, serverUrl));
+    response.writeHead(REDIRECT_STATUS, {
+      "cache-control": "no-store",
+      location: resolveMovedRedirectUrl(serverUrl, requestUrl),
+    });
+    response.end();
   };
 }
 

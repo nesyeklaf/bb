@@ -114,8 +114,6 @@ function createMovedFile(overrides: Partial<ServerMovedFile>): ServerMovedFile {
     toHostId: "host-desk",
     toHostName: "desk",
     serverUrl: "https://desk.example.com",
-    mode: "direct",
-    connectHandle: null,
     oldCopyEntries: ["bb.db"],
     ...overrides,
   };
@@ -644,8 +642,6 @@ describe("bb-app start after the server moved", () => {
   it("builds the managed daemon env from the rewritten config on every start", async () => {
     const dataDir = scratchDir();
     const movedFile = createMovedFile({
-      connectHandle: "desk-handle",
-      mode: "connect",
       serverUrl: "https://bb.example.com/desk",
     });
     const options = parseLauncherArgs([

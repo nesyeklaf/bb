@@ -41,7 +41,6 @@ import {
   setServerMoveFrozen,
   setServerMoveSnapshotFence,
 } from "./freeze-state.js";
-import type { ServerMoveModeResolution } from "./mode.js";
 import type { RestoredServerMoveRun } from "./reconcile.js";
 import {
   removeServerMoveRunFile,
@@ -68,7 +67,7 @@ export interface ServerMovePluginControl {
   resumeSuspended(): Promise<void>;
   setSchedulesPaused(paused: boolean): void;
   stop(): Promise<void>;
-  suspendAllButConnect(): Promise<void>;
+  suspendAll(): Promise<void>;
 }
 
 export interface ServerMoveTimings {
@@ -104,11 +103,6 @@ export interface ServerMoveEnvironment {
   now(): number;
   plugins: ServerMovePluginControl;
   readServerDiskFreeBytes(): Promise<number | null>;
-  resolveMode(): Promise<ServerMoveModeResolution>;
-  resolveServerHostGrant(
-    hostId: string,
-    signal: AbortSignal,
-  ): Promise<ServerMoveGrant>;
   resumeDeferredWork(): void;
   retireProcess(): void;
   serverAppSurface: AppSurface;
@@ -167,7 +161,6 @@ interface MoveRun {
   archiveExistingTargetServerData: boolean;
   bbApp: FullBbAppArtifact | null;
   configBackup: OldServerDaemonConfigBackup | null;
-  connectHandle: string | null;
   finished: boolean;
   frozen: boolean;
   grant: ServerMoveGrant | null;
@@ -301,7 +294,6 @@ function moveFromRunFile(run: ServerMoveRunFile): MoveRun {
     archiveExistingTargetServerData: run.archiveExistingTargetServerData,
     bbApp: null,
     configBackup: run.configBackup,
-    connectHandle: run.connectHandle,
     finished: true,
     frozen: false,
     grant: run.grant,
@@ -323,7 +315,6 @@ export function createServerMoveCoordinator(
     fullArtifact: environment.fullArtifact,
     inspectTimeoutMs: timings.inspectTimeoutMs,
     readServerDiskFreeBytes: () => environment.readServerDiskFreeBytes(),
-    resolveMode: () => environment.resolveMode(),
     serverAppSurface: environment.serverAppSurface,
     serverTimeZone: environment.serverTimeZone,
     targetServerPort: () => environment.targetServerPort(),
@@ -345,7 +336,6 @@ export function createServerMoveCoordinator(
       activationToken: move.activationToken,
       archiveExistingTargetServerData: move.archiveExistingTargetServerData,
       sourceServerHost: { ...move.sourceServerHost },
-      connectHandle: move.connectHandle,
       workDir: move.workDir,
       grant:
         move.grant === null
@@ -490,7 +480,7 @@ export function createServerMoveCoordinator(
       await settlePluginWork(
         move,
         "suspension",
-        environment.plugins.suspendAllButConnect(),
+        environment.plugins.suspendAll(),
       );
     });
   }
@@ -543,16 +533,7 @@ export function createServerMoveCoordinator(
 
   async function runStopWork(move: MoveRun): Promise<void> {
     setStep(move, "stop-work", "running", "Resolving server access");
-    move.grant =
-      move.status.mode === "connect"
-        ? await untilCancelled(
-            move,
-            environment.resolveServerHostGrant(
-              move.sourceServerHost.id,
-              move.abort.signal,
-            ),
-          )
-        : { serverUrl: move.status.serverUrl, headers: {} };
+    move.grant = { serverUrl: move.status.serverUrl, headers: {} };
     assertNotCancelled(move);
     move.frozen = true;
     setServerMoveFrozen(deps.db, true);
@@ -720,15 +701,6 @@ export function createServerMoveCoordinator(
 
   async function runVerifyAddress(move: MoveRun): Promise<void> {
     const serverUrl = move.status.serverUrl;
-    if (move.status.mode === "connect") {
-      setStep(
-        move,
-        "verify-address",
-        "skipped",
-        `Machines keep using ${serverUrl}`,
-      );
-      return;
-    }
     setStep(
       move,
       "verify-address",
@@ -894,7 +866,6 @@ export function createServerMoveCoordinator(
     );
     const targets = listServerMovedTargets({
       connectedHosts,
-      mode: move.status.mode,
       sourceServerHostId: move.sourceServerHost.id,
       targetHostId: move.status.targetHostId,
     });
@@ -933,9 +904,7 @@ export function createServerMoveCoordinator(
         toHostId: move.status.targetHostId,
         toHostName: targetName,
         serverUrl: move.status.serverUrl,
-        mode: move.status.mode,
-        connectHandle: move.connectHandle,
-        oldCopyEntries: archive.oldCopyEntries,
+          oldCopyEntries: archive.oldCopyEntries,
       });
       await validateOldServerDaemonConfig({
         dataDir: deps.config.dataDir,
@@ -1473,12 +1442,11 @@ export function createServerMoveCoordinator(
               { details: { items: blockers } },
             );
           }
-          const { mode, serverUrl, sourceServerHost, targetHost } = check;
+          const { serverUrl, sourceServerHost, targetHost } = check;
           if (
             sourceServerHost === null ||
             targetHost === null ||
-            serverUrl === null ||
-            mode.mode === "unavailable"
+            serverUrl === null
           ) {
             throw new Error(
               "Server move check passed without a server machine, target, and address",
@@ -1495,7 +1463,6 @@ export function createServerMoveCoordinator(
               request.archiveExistingTargetServerData,
             bbApp: null,
             configBackup: null,
-            connectHandle: mode.mode === "connect" ? mode.connectHandle : null,
             finished: false,
             frozen: false,
             grant: null,
@@ -1508,14 +1475,10 @@ export function createServerMoveCoordinator(
             status: {
               moveId,
               state: "preparing",
-              mode: mode.mode,
               targetHostId: targetHost.id,
               targetHostName: targetHost.name,
               serverUrl,
-              destinationStatusUrl:
-                mode.mode === "direct"
-                  ? serverMoveDestinationStatusUrl(serverUrl)
-                  : null,
+              destinationStatusUrl: serverMoveDestinationStatusUrl(serverUrl),
               startedAt: environment.now(),
               finishedAt: null,
               error: null,

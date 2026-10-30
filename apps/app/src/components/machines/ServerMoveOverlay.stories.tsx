@@ -33,7 +33,6 @@ function move(overrides: Partial<ServerMoveStatus> = {}): ServerMoveStatus {
   return {
     moveId: "move_1",
     state: "preparing",
-    mode: "connect",
     targetHostId: "host_desk",
     targetHostName: "desk",
     serverUrl: "https://michael.getbb.app",
@@ -46,16 +45,6 @@ function move(overrides: Partial<ServerMoveStatus> = {}): ServerMoveStatus {
     ...overrides,
   };
 }
-
-const DONE_THROUGH_SWITCH = steps({
-  "stop-work": "done",
-  "update-target": "done",
-  export: "done",
-  transfer: "done",
-  "start-target": "done",
-  "verify-address": "skipped",
-  switch: "done",
-});
 
 function Overlay(overrides: Partial<ServerMoveOverlayViewProps>) {
   return (
@@ -142,7 +131,6 @@ export function Progress() {
             kind: "progress",
             move: move({
               state: "switching",
-              mode: "direct",
               serverUrl: "https://desk.example.com",
               cancellable: false,
               steps: steps({
@@ -192,15 +180,8 @@ export function Progress() {
 }
 
 export function Finished() {
-  const completedConnect = move({
-    state: "completed",
-    cancellable: false,
-    finishedAt: now,
-    steps: DONE_THROUGH_SWITCH,
-  });
   const completedDirect = move({
     state: "completed",
-    mode: "direct",
     serverUrl: "https://desk.example.com",
     cancellable: false,
     finishedAt: now,
@@ -216,12 +197,6 @@ export function Finished() {
   });
   return (
     <StoryCard labelWidth="220px">
-      <StoryRow
-        label="bb connect, reconnecting"
-        hint="the address stays the same, so the app waits for the new server to answer with this move, then toasts"
-      >
-        <Overlay content={{ kind: "reconnecting", move: completedConnect }} />
-      </StoryRow>
       <StoryRow
         label="direct address, waiting"
         hint="the old server stopped answering; the app follows the new server's /health and opens it only once it reports ready"

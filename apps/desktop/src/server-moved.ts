@@ -256,19 +256,7 @@ export function resolveServerMovedTarget(
       reason: `serverUrl ${JSON.stringify(file.serverUrl)} is not an http(s) URL`,
     };
   }
-  if (file.mode === "direct") {
-    return { ok: true, target: { kind: "custom", url } };
-  }
-  if (file.connectHandle === null) {
-    return { ok: false, reason: "a bb Connect move has no connectHandle" };
-  }
-  return {
-    ok: true,
-    target: {
-      kind: "connect",
-      server: { handle: file.connectHandle, name: file.toHostName, url },
-    },
-  };
+  return { ok: true, target: { kind: "custom", url } };
 }
 
 export async function readServerMovedLock(

@@ -109,23 +109,14 @@ describe("server moved targets", () => {
     { id: "host-sandbox", type: "ephemeral" as const },
   ];
 
-  it("tells only the old server's own machine in connect mode", () => {
+  it("tells every connected persistent machine except the target", () => {
     expect(
       listServerMovedTargets({
         connectedHosts,
-        mode: "connect",
         sourceServerHostId: "host-old",
         targetHostId: "host-new",
       }),
-    ).toEqual(["host-old"]);
-    expect(
-      listServerMovedTargets({
-        connectedHosts: connectedHosts.slice(1),
-        mode: "connect",
-        sourceServerHostId: "host-old",
-        targetHostId: "host-new",
-      }),
-    ).toEqual([]);
+    ).toEqual(["host-old", "host-worker"]);
   });
 });
 
@@ -155,8 +146,6 @@ describe("old copy entries", () => {
         toHostId: "host-new",
         toHostName: "Desktop",
         serverUrl: "https://desktop.example.test",
-        mode: "direct",
-        connectHandle: null,
         oldCopyEntries: entries,
       }).oldCopyEntries,
     ).toEqual(entries);

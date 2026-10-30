@@ -106,7 +106,6 @@ function runFile(
     status: {
       moveId: MOVE_ID,
       state,
-      mode: "direct",
       targetHostId: NEW,
       targetHostName: "Desktop",
       serverUrl: DIRECT_URL,
@@ -124,7 +123,6 @@ function runFile(
     activationToken: "activation-token-0123456789",
     archiveExistingTargetServerData: false,
     sourceServerHost: { id: OLD, name: "Laptop" },
-    connectHandle: null,
     workDir: join(harness.config.dataDir, "server-move", MOVE_ID),
     grant: { serverUrl: DIRECT_URL, headers: {} },
     configBackup: null,
@@ -144,8 +142,6 @@ async function lockDataDir(harness: TestAppHarness): Promise<void> {
     toHostId: NEW,
     toHostName: "Desktop",
     serverUrl: DIRECT_URL,
-    mode: "direct",
-    connectHandle: null,
     oldCopyEntries: ["bb.db"],
   });
 }

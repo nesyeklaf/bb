@@ -170,8 +170,6 @@ describe("server move routes", () => {
       });
       expect(check.status).toBe(200);
       expect(await readJson(check)).toMatchObject({
-        mode: "direct",
-        requiresServerUrl: true,
         canMove: true,
       });
 

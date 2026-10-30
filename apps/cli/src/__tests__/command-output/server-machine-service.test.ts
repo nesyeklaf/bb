@@ -66,8 +66,6 @@ function movedLock(): ServerMovedFile {
     toHostId: "host-desktop",
     toHostName: "desktop",
     serverUrl: "https://me.getbb.app",
-    mode: "connect",
-    connectHandle: "me",
     oldCopyEntries: ["bb.db"],
   };
 }

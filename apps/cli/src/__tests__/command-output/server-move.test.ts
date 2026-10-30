@@ -46,9 +46,7 @@ function check(
   return {
     targetHostId: desktop.id,
     targetHostName: desktop.name,
-    mode: "connect",
     serverUrl: null,
-    requiresServerUrl: false,
     targetDataDir: "/home/me/.bb-machines/laptop",
     existingTargetServerData: null,
     items: [
@@ -89,7 +87,6 @@ function moveStatus(
   return {
     moveId: "move-1",
     state,
-    mode: "connect",
     targetHostId: desktop.id,
     targetHostName: desktop.name,
     serverUrl: "https://me.getbb.app",
@@ -179,16 +176,16 @@ describe("bb server move", () => {
     });
 
     await runCommand(
-      ["server", "move", "--to", "desktop", "--check"],
+      ["server", "move", "--to", "desktop", "--address", "https://me.getbb.app", "--check"],
       register,
     );
 
     expect(checkMove).toHaveBeenCalledWith({
-      json: { targetHostId: desktop.id, serverUrl: null },
+      json: { targetHostId: desktop.id, serverUrl: "https://me.getbb.app" },
     });
     expect(startMove).not.toHaveBeenCalled();
     expect(collectLogPayloads(vi.mocked(console.log))).toEqual([
-      "Moving the bb server to desktop (bb connect)",
+      "Moving the bb server to desktop",
       "Target data directory: /home/me/.bb-machines/laptop",
       "",
       "Warnings",
@@ -221,7 +218,7 @@ describe("bb server move", () => {
     });
 
     await expect(
-      runCommand(["server", "move", "--to", "desktop", "--check"], register),
+      runCommand(["server", "move", "--to", "desktop", "--address", "https://me.getbb.app", "--check"], register),
     ).rejects.toThrow("process.exit:1");
 
     expect(collectLogPayloads(vi.mocked(console.log))).toContain(
@@ -241,7 +238,7 @@ describe("bb server move", () => {
 
     await expect(
       runCommand(
-        ["server", "move", "--to", "desktop", "--check", "--json"],
+        ["server", "move", "--to", "desktop", "--address", "https://me.getbb.app", "--check", "--json"],
         register,
       ),
     ).rejects.toThrow("process.exit:1");
@@ -256,7 +253,7 @@ describe("bb server move", () => {
     stubServerApi({
       "v1.hosts.$get": vi.fn(async () => [desktop]),
       "v1.server.move.check.$post": vi.fn(async () =>
-        check({ mode: "direct", requiresServerUrl: true, canMove: false }),
+        check({ canMove: false }),
       ),
       "v1.server.move.$post": startMove,
     });
@@ -267,7 +264,7 @@ describe("bb server move", () => {
 
     expect(startMove).not.toHaveBeenCalled();
     expect(collectLogPayloads(vi.mocked(console.error))).toEqual([
-      "Error: This bb server uses a direct address, so the new server needs one too. Re-run with --address <url>: the URL every machine and app will use to reach bb on desktop, such as a Tailscale Serve URL.",
+      "Error: The new server needs a direct address. Re-run with --address <url>: the URL every machine and app will use to reach bb on desktop, such as a Tailscale Serve URL.",
     ]);
   });
 
@@ -287,7 +284,7 @@ describe("bb server move", () => {
     });
 
     await expect(
-      runCommand(["server", "move", "--to", "desktop", "--yes"], register),
+      runCommand(["server", "move", "--to", "desktop", "--address", "https://me.getbb.app", "--yes"], register),
     ).rejects.toThrow("process.exit:1");
 
     expect(startMove).not.toHaveBeenCalled();
@@ -298,7 +295,6 @@ describe("bb server move", () => {
 
   it("starts with the archive flag and address, follows step changes, and reports the new server", async () => {
     const direct = {
-      mode: "direct" as const,
       serverUrl: "https://desk.ts.net",
     };
     const startMove = vi.fn(async () =>
@@ -359,8 +355,6 @@ describe("bb server move", () => {
       "v1.hosts.$get": vi.fn(async () => [desktop]),
       "v1.server.move.check.$post": vi.fn(async () =>
         check({
-          mode: "direct",
-          requiresServerUrl: true,
           serverUrl: direct.serverUrl,
           existingTargetServerData: { path: "/home/me/.bb", sizeBytes: 10 },
         }),
@@ -423,7 +417,7 @@ describe("bb server move", () => {
     });
     readlineMocks.question.mockResolvedValue("n");
 
-    await runCommand(["server", "move", "--to", "desktop"], register);
+    await runCommand(["server", "move", "--to", "desktop", "--address", "https://me.getbb.app"], register);
 
     expect(startMove).not.toHaveBeenCalled();
   });
@@ -441,7 +435,7 @@ describe("bb server move", () => {
     });
 
     await expect(
-      runCommand(["server", "move", "--to", "desktop"], register),
+      runCommand(["server", "move", "--to", "desktop", "--address", "https://me.getbb.app"], register),
     ).rejects.toThrow("process.exit:1");
 
     expect(startMove).not.toHaveBeenCalled();
@@ -471,7 +465,7 @@ describe("bb server move", () => {
     });
 
     await runCommand(
-      ["server", "move", "--to", "desktop", "--yes", "--json"],
+      ["server", "move", "--to", "desktop", "--address", "https://me.getbb.app", "--yes", "--json"],
       register,
     );
 
@@ -507,7 +501,7 @@ describe("bb server move", () => {
       "v1.server.move.$get": getStatus,
     });
 
-    await runCommand(["server", "move", "--to", "desktop", "--yes"], register);
+    await runCommand(["server", "move", "--to", "desktop", "--address", "https://me.getbb.app", "--yes"], register);
 
     expect(collectLogPayloads(vi.mocked(console.log)).at(-1)).toBe(
       "The server moved to desktop: https://me.getbb.app",
@@ -532,7 +526,7 @@ describe("bb server move", () => {
       ),
     });
 
-    await runCommand(["server", "move", "--to", "desktop", "--yes"], register);
+    await runCommand(["server", "move", "--to", "desktop", "--address", "https://me.getbb.app", "--yes"], register);
 
     expect(collectLogPayloads(vi.mocked(console.log)).at(-1)).toBe(
       "The server moved to desktop: https://me.getbb.app",
@@ -559,7 +553,7 @@ describe("bb server move", () => {
     });
 
     await expect(
-      runCommand(["server", "move", "--to", "desktop", "--yes"], register),
+      runCommand(["server", "move", "--to", "desktop", "--address", "https://me.getbb.app", "--yes"], register),
     ).rejects.toThrow("process.exit:1");
 
     expect(collectLogPayloads(vi.mocked(console.error)).at(-1)).toBe(
@@ -587,7 +581,7 @@ describe("bb server move", () => {
     });
 
     await expect(
-      runCommand(["server", "move", "--to", "desktop", "--yes"], register),
+      runCommand(["server", "move", "--to", "desktop", "--address", "https://me.getbb.app", "--yes"], register),
     ).rejects.toThrow("process.exit:1");
 
     expect(collectLogPayloads(vi.mocked(console.error)).at(-1)).toBe(
@@ -604,7 +598,7 @@ describe("bb server move", () => {
     });
 
     await expect(
-      runCommand(["server", "move", "--to", "desktop", "--yes"], register),
+      runCommand(["server", "move", "--to", "desktop", "--address", "https://me.getbb.app", "--yes"], register),
     ).rejects.toThrow("process.exit:2");
 
     expect(collectLogPayloads(vi.mocked(console.log)).slice(-4)).toEqual(
@@ -624,7 +618,7 @@ describe("bb server move", () => {
     });
 
     await expect(
-      runCommand(["server", "move", "--to", "desktop", "--yes"], register),
+      runCommand(["server", "move", "--to", "desktop", "--address", "https://me.getbb.app", "--yes"], register),
     ).rejects.toThrow("process.exit:1");
 
     expect(collectLogPayloads(vi.mocked(console.error)).at(-1)).toBe(
@@ -644,7 +638,7 @@ describe("bb server move", () => {
     });
 
     await expect(
-      runCommand(["server", "move", "--to", "desktop", "--yes"], register),
+      runCommand(["server", "move", "--to", "desktop", "--address", "https://me.getbb.app", "--yes"], register),
     ).rejects.toThrow("process.exit:1");
 
     expect(getStatus).toHaveBeenCalledTimes(5);
@@ -676,7 +670,7 @@ describe("bb server move", () => {
     });
 
     await expect(
-      runCommand(["server", "move", "--to", "desktop", "--yes"], register),
+      runCommand(["server", "move", "--to", "desktop", "--address", "https://me.getbb.app", "--yes"], register),
     ).rejects.toThrow("process.exit:1");
 
     expect(collectLogPayloads(vi.mocked(console.log))).toContain(
@@ -702,7 +696,7 @@ describe("bb server move", () => {
 
       await expect(
         runCommand(
-          ["server", "move", "--to", "desktop", "--yes", ...extraArgs],
+          ["server", "move", "--to", "desktop", "--address", "https://me.getbb.app", "--yes", ...extraArgs],
           register,
         ),
       ).rejects.toThrow("process.exit:1");
@@ -879,7 +873,7 @@ describe("bb server move status and cancel", () => {
     );
     expect(collectLogPayloads(vi.mocked(console.error))).toEqual([
       "The move to desktop wasn't confirmed. Abandoning rolls back the switch and keeps the server on this computer.",
-      "If desktop already took over, two servers will run with the same data and bb connect credential. Stop the server on desktop first.",
+      "If desktop already took over, two servers will run with the same data. Stop the server on desktop first.",
     ]);
   });
 

@@ -13,11 +13,8 @@ import {
 } from "@bb/server-archive";
 import type { ServerMoveStatus } from "@bb/server-contract";
 import { createDeferredPromise } from "@bb/test-helpers";
-import { Hono } from "hono";
 import { describe, expect, it, vi } from "vitest";
-import { createServerErrorHandler } from "../../src/errors.js";
 import { createServerMoveCoordinator } from "../../src/services/server-move/coordinator.js";
-import { serverMoveFreezeMiddleware } from "../../src/services/server-move/freeze.js";
 import {
   isServerMoveFrozen,
   isServerMoveSnapshotFenced,
@@ -36,7 +33,6 @@ import {
 } from "../helpers/server-move.js";
 import { seedHost, seedPrimaryHost } from "../helpers/seed.js";
 import {
-  testLogger,
   withTestHarness,
   type TestAppHarness,
 } from "../helpers/test-app.js";
@@ -47,7 +43,6 @@ const WORKER = "host-worker";
 const SANDBOX = "host-sandbox";
 const OFFLINE = "host-offline";
 const DIRECT_URL = "https://desktop.example.test";
-const CONNECT_URL = "https://laptop.getbb.test";
 
 const START_DIRECT = {
   targetHostId: NEW,
@@ -240,7 +235,6 @@ describe("server move coordinator", () => {
 
       expect(started).toMatchObject({
         state: "preparing",
-        mode: "direct",
         targetHostId: NEW,
         targetHostName: "Desktop",
         serverUrl: DIRECT_URL,
@@ -377,8 +371,6 @@ describe("server move coordinator", () => {
         toHostId: NEW,
         toHostName: "Desktop",
         serverUrl: DIRECT_URL,
-        mode: "direct",
-        connectHandle: null,
       });
       expect(moved?.oldCopyEntries).toEqual(["auth-secret", "bb.db"]);
       expect(JSON.parse(await readFile(config.path, "utf8"))).toEqual({
@@ -559,108 +551,6 @@ describe("server move coordinator", () => {
       await retired;
     }));
 
-  it("moves a bb connect server whose source grant requires a writable account RPC", () =>
-    withTestHarness(async (harness) => {
-      seedTopology(harness);
-      const base = createTestServerMoveEnvironment(harness);
-      const { events, retired } = base;
-      const grantHeaders = { "x-bb-machine-access": "bbcm_laptop" };
-      const accountRpcStatuses: number[] = [];
-      const accountRpcPath =
-        "/api/v1/plugins/bb-account/rpc/bb-account.v1.fetch";
-      const accountRpc = new Hono();
-      accountRpc.onError(createServerErrorHandler(testLogger));
-      accountRpc.use(
-        "/api/v1/*",
-        serverMoveFreezeMiddleware({ isFrozen: () => coordinator.isFrozen() }),
-      );
-      accountRpc.post(accountRpcPath, (context) => context.json({ ok: true }));
-      const coordinator = createServerMoveCoordinator({
-        ...base.environment,
-        resolveMode: async () => ({
-          mode: "connect",
-          connectHandle: "laptop",
-          serverUrl: CONNECT_URL,
-        }),
-        resolveServerHostGrant: async (hostId) => {
-          events.push(`grant:${hostId}`);
-          const response = await accountRpc.request(accountRpcPath, {
-            method: "POST",
-          });
-          accountRpcStatuses.push(response.status);
-          if (!response.ok) {
-            throw new Error(await response.text());
-          }
-          return { serverUrl: CONNECT_URL, headers: grantHeaders };
-        },
-      });
-      const old = registerFakeDaemon(harness, {
-        events,
-        hostId: OLD,
-        handle: probeReply,
-      });
-      const worker = registerFakeDaemon(harness, {
-        events,
-        hostId: WORKER,
-        handle: probeReply,
-      });
-      const target = registerFakeDaemon(harness, {
-        events,
-        hostId: NEW,
-        handle: targetReply,
-      });
-
-      const started = await coordinator.start({
-        ...START_DIRECT,
-        serverUrl: null,
-      });
-      expect(started).toMatchObject({
-        mode: "connect",
-        serverUrl: CONNECT_URL,
-        destinationStatusUrl: null,
-      });
-      await expect.poll(() => accountRpcStatuses).toEqual([200]);
-      await retired;
-
-      expect(events).toEqual([
-        `${NEW}:server_move.inspect`,
-        `${OLD}:server_move.inspect`,
-        `grant:${OLD}`,
-        "schedules:paused",
-        "stop-work",
-        "plugins:suspend",
-        `${NEW}:server_move.inspect`,
-        "export",
-        `${NEW}:server_move.prepare`,
-        `${NEW}:server_move.activate`,
-        "plugins:stop",
-        `server.moved:${OLD}`,
-        "retire",
-      ]);
-      expect(coordinator.getStatus()?.steps[5]).toMatchObject({
-        id: "verify-address",
-        status: "skipped",
-      });
-      expect(old.movedMessages).toEqual([
-        { type: "server.moved", serverUrl: CONNECT_URL, headers: grantHeaders },
-      ]);
-      expect(worker.movedMessages).toEqual([]);
-      expect(target.movedMessages).toEqual([]);
-      expect(
-        requireCommand(target.requests, "server_move.prepare"),
-      ).toMatchObject({ serverUrl: CONNECT_URL });
-      expect(await readServerMovedFile(harness.config.dataDir)).toMatchObject({
-        mode: "connect",
-        connectHandle: "laptop",
-        serverUrl: CONNECT_URL,
-      });
-      expect(
-        JSON.parse(
-          await readFile(join(harness.config.dataDir, "config.json"), "utf8"),
-        ),
-      ).toEqual({ serverUrl: CONNECT_URL, serverHeaders: grantHeaders });
-    }));
-
   it.each([
     {
       name: "the target inspect during update-target",
@@ -799,7 +689,7 @@ describe("server move coordinator", () => {
   );
 
   it.each([
-    { hung: "suspendAllButConnect" as const, warning: "suspension" },
+    { hung: "suspendAll" as const, warning: "suspension" },
     { hung: "stop" as const, warning: "shutdown" },
   ])(
     "keeps moving when plugin $warning outlives its time box",
@@ -1218,98 +1108,6 @@ describe("server move coordinator", () => {
       }
     }));
 
-  it("keeps a bb connect move in recovery_required with the tunnel up and retries activation when the target reconnects", () =>
-    withTestHarness(async (harness) => {
-      seedTopology(harness);
-      const base = createTestServerMoveEnvironment(harness, {
-        timings: RECOVERY_TIMINGS,
-      });
-      const { events, plugins, retired } = base;
-      const grantHeaders = { "x-bb-machine-access": "bbcm_laptop" };
-      const coordinator = createServerMoveCoordinator({
-        ...base.environment,
-        resolveMode: async () => ({
-          mode: "connect",
-          connectHandle: "laptop",
-          serverUrl: CONNECT_URL,
-        }),
-        resolveServerHostGrant: async () => ({
-          serverUrl: CONNECT_URL,
-          headers: grantHeaders,
-        }),
-      });
-      const old = registerFakeDaemon(harness, {
-        events,
-        hostId: OLD,
-        handle: (request) =>
-          request.command.type === "server_move.probe"
-            ? ok({
-                reachable: false,
-                message: `${CONNECT_URL} answered for a different server move`,
-                state: null,
-              })
-            : probeReply(request),
-      });
-      registerFakeDaemon(harness, {
-        events,
-        hostId: WORKER,
-        handle: probeReply,
-      });
-      let activations = 0;
-      const drop = dropOnActivation(harness);
-      const targetHandler = (
-        request: HostDaemonOnlineRpcRequestMessage,
-      ): FakeDaemonReply | Promise<FakeDaemonReply> => {
-        if (request.command.type !== "server_move.activate") {
-          return targetReply(request);
-        }
-        activations += 1;
-        return activations === 1 ? drop(request) : ok({ ok: true });
-      };
-      registerFakeDaemon(harness, {
-        events,
-        hostId: NEW,
-        handle: targetHandler,
-      });
-
-      try {
-        await coordinator.start({ ...START_DIRECT, serverUrl: null });
-        await expect
-          .poll(() => coordinator.getStatus()?.state)
-          .toBe("recovery_required");
-        await expect
-          .poll(() => countEvents(events, `${OLD}:server_move.probe`))
-          .toBeGreaterThan(1);
-
-        expect(coordinator.isFrozen()).toBe(true);
-        expect(coordinator.movedTo()).toBeNull();
-        expect(plugins).toMatchObject({ stops: 0, resumes: 0, suspends: 1 });
-        expect(old.movedMessages).toEqual([]);
-        expect(events).not.toContain("retire");
-
-        registerFakeDaemon(harness, {
-          events,
-          hostId: NEW,
-          handle: targetHandler,
-        });
-        await retired;
-
-        expect(activations).toBe(2);
-        expect(coordinator.getStatus()?.state).toBe("completed");
-        expect(old.movedMessages).toEqual([
-          {
-            type: "server.moved",
-            serverUrl: CONNECT_URL,
-            headers: grantHeaders,
-          },
-        ]);
-        expect(plugins).toMatchObject({ stops: 1, resumes: 0 });
-        expect(events).not.toContain(`${NEW}:server_move.abort`);
-      } finally {
-        coordinator.dispose();
-      }
-    }));
-
   it("abandons a move in recovery_required on cancel and never finishes it later", () =>
     withTestHarness(async (harness) => {
       seedTopology(harness);
@@ -1531,9 +1329,9 @@ describe("server move coordinator", () => {
         ...base.environment,
         plugins: {
           ...base.environment.plugins,
-          suspendAllButConnect: async () => {
+          suspendAll: async () => {
             suspensions += 1;
-            await base.environment.plugins.suspendAllButConnect();
+            await base.environment.plugins.suspendAll();
             if (suspensions === 1) {
               await firstSuspension.promise;
             }

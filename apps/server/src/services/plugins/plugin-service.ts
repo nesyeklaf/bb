@@ -165,7 +165,6 @@ import { createPluginRegistration } from "./plugin-registration.js";
 import {
   createPluginRuntime,
   forgetMutableRoot,
-  type PluginLoadHold,
 } from "./plugin-runtime.js";
 import {
   nextCronRunAt,
@@ -239,10 +238,6 @@ export function superviseBuiltinPluginSourceWatcher(args: {
   });
 }
 
-export interface PluginStartOptions {
-  hold: PluginLoadHold;
-}
-
 export interface PluginService {
   isBuiltin(id: string): boolean;
   events: PluginThreadEventEmitter;
@@ -256,7 +251,7 @@ export interface PluginService {
    * listener is up, before start(): bb.sdk throws until this runs.
    */
   bindSdk(args: { baseUrl: string }): void;
-  start(options?: PluginStartOptions): Promise<void>;
+  start(): Promise<void>;
   stop(): Promise<void>;
   handleUncaughtException(error: unknown): boolean;
   list(): InstalledPlugin[];
@@ -452,9 +447,7 @@ export interface PluginService {
   }): Promise<PluginMentionResolveResult>;
   readLogTail(id: string, tail: number): Promise<string[] | undefined>;
   setSchedulesPaused(paused: boolean): void;
-  suspendPlugins(args: {
-    keep(plugin: InstalledPluginRow): boolean;
-  }): Promise<string[]>;
+  suspendPlugins(): Promise<string[]>;
   resumeSuspendedPlugins(): Promise<string[]>;
   sweepDueSchedules(now: number): Promise<void>;
 }
@@ -678,7 +671,6 @@ export function createPluginService(deps: PluginServiceDeps): PluginService {
     brandingAssets,
     safeModeActivationRefusal,
     setDevBuildProblem,
-    setLoadHold,
     setStatus,
     sourceKind,
     stabilizingPluginIds,
@@ -1487,8 +1479,7 @@ export function createPluginService(deps: PluginServiceDeps): PluginService {
 
     bindSdk: bindRuntimeSdk,
 
-    async start(options) {
-      setLoadHold(options?.hold ?? null);
+    async start() {
       loadPassActive = true;
       try {
         const retired = removeRetiredOutgoingConnectionState(deps.db);
@@ -2639,14 +2630,14 @@ export function createPluginService(deps: PluginServiceDeps): PluginService {
       schedulesPaused = paused;
     },
 
-    async suspendPlugins(args) {
+    async suspendPlugins() {
       return withPluginOperationLock(REGISTRATION_MUTATION_KEY, async () => {
         const suspended: string[] = [];
         const rows = listInstalledPlugins(deps.db).sort((left, right) =>
           left.id.localeCompare(right.id),
         );
         for (const row of rows) {
-          if (!loaded.has(row.id) || args.keep(row)) continue;
+          if (!loaded.has(row.id)) continue;
           await withLifecycleLock(row.id, async () => {
             await disposeOne(row.id);
             setStatus(

@@ -23,14 +23,12 @@ import {
   vi,
 } from "vitest";
 import {
-  readServerConnectHoldFile,
   readServerImportFile,
   readServerMovedFile,
   SERVER_IMPORT_FILE_NAME,
   SERVER_MOVED_FILE_NAME,
   type ServerMovedFile,
   writeServerArchive,
-  writeServerConnectHoldFile,
   writeServerImportFile,
   writeServerMovedFile,
 } from "@bb/server-archive";
@@ -185,8 +183,6 @@ function movedLock(overrides: Partial<ServerMovedFile> = {}): ServerMovedFile {
     toHostId: "host-desktop",
     toHostName: "desktop",
     serverUrl: "https://me.getbb.app",
-    mode: "connect",
-    connectHandle: "me",
     oldCopyEntries: ["bb.db", "attachments", "plugins/tasks/data.db"],
     ...overrides,
   };
@@ -275,19 +271,13 @@ describe("bb server import", () => {
       createdAt: 1_700_000_500_000,
       fixupsAppliedAt: null,
     });
-    expect(await readServerConnectHoldFile(dataDir)).toEqual({
-      version: 1,
-      reason: "manual-import",
-      createdAt: 1_700_000_500_000,
-    });
     expect(await readdir(parent)).toEqual(["bb-data"]);
     const output = collectLogPayloads(vi.mocked(console.log));
     expect(output[0]).toBe(
       `Imported the bb server into ${dataDir} (5 files from /home/old/.bb, exported by bb 0.50.0).`,
     );
     expect(output.slice(2)).toEqual([
-      "Stop the original bb server before you start this one. Two servers holding the same bb connect credential take each other's tunnel.",
-      `bb connect stays off in this copy until you run bb server allow-connect --data-dir ${dataDir}.`,
+      "Stop the original bb server before you start this one. Two servers running from the same data split your threads, machines, and settings between them.",
       `Then start it with npx bb-app --data-dir ${dataDir}.`,
     ]);
   });
@@ -488,7 +478,6 @@ describe("bb server import", () => {
       "config.json",
       "host-id",
       "plugins",
-      "server-connect-hold.json",
       "server-import.json",
     ]);
     expect(
@@ -532,11 +521,6 @@ describe("bb server import", () => {
       createdAt: 1_700_000_000_000,
       fixupsAppliedAt: null,
     });
-    await writeServerConnectHoldFile(dataDir, {
-      version: 1,
-      reason: "manual-import",
-      createdAt: 1_700_000_000_000,
-    });
 
     await expect(
       runCommand(
@@ -561,7 +545,6 @@ describe("bb server import", () => {
       kind: "manual",
       importedEntries,
     });
-    expect(await readServerConnectHoldFile(dataDir)).not.toBeNull();
   });
 
   it("removes the pre-import config backups once the import is marked", async () => {
@@ -665,7 +648,7 @@ describe("bb server unlock", () => {
       expect.objectContaining({ signal: expect.any(AbortSignal) }),
     );
     expect(collectLogPayloads(vi.mocked(console.error))).toEqual([
-      "Error: The server at https://me.getbb.app is running. Unlocking now would run two servers with the same data and bb connect credential. Stop it first, or pass --force.",
+      "Error: The server at https://me.getbb.app is running. Unlocking now would run two servers with the same data. Stop it first, or pass --force.",
     ]);
     expect(await readServerMovedFile(dataDir)).not.toBeNull();
     expect(JSON.parse(await readFile(configPath, "utf8"))).toEqual({
@@ -743,160 +726,6 @@ describe("bb server unlock", () => {
     expect(await readServerMovedFile(dataDir)).toBeNull();
   });
 
-  const connectGrantConfig = {
-    config: { BB_LOG_LEVEL: "debug" },
-    serverUrl: "https://me.getbb.app",
-    serverHeaders: { "x-bb-machine-access": "grant-secret" },
-  };
-
-  async function writeConnectLockWithGrant(): Promise<{
-    dataDir: string;
-    configPath: string;
-  }> {
-    const dataDir = await makeTempDir("bb-cli-server-lock-");
-    await writeServerMovedFile(dataDir, movedLock({ mode: "connect" }));
-    const configPath = await writeDataFile(
-      dataDir,
-      "config.json",
-      JSON.stringify(connectGrantConfig),
-    );
-    return { dataDir, configPath };
-  }
-
-  it("probes a connect-mode server through the machine grant and refuses when it answers", async () => {
-    const { dataDir, configPath } = await writeConnectLockWithGrant();
-    vi.mocked(globalThis.fetch).mockResolvedValue(
-      healthResponse(200, { version: "0.50.0" }),
-    );
-
-    await expect(
-      runCommand(
-        ["server", "unlock", "--data-dir", dataDir, "--yes"],
-        register,
-      ),
-    ).rejects.toThrow("process.exit:1");
-
-    expect(vi.mocked(globalThis.fetch)).toHaveBeenCalledOnce();
-    expect(vi.mocked(globalThis.fetch)).toHaveBeenCalledWith(
-      "https://me.getbb.app/api/v1/system/version",
-      expect.objectContaining({
-        headers: { "x-bb-machine-access": "grant-secret" },
-        signal: expect.any(AbortSignal),
-      }),
-    );
-    expect(collectLogPayloads(vi.mocked(console.error))).toEqual([
-      "Error: The server at https://me.getbb.app is running. Unlocking now would run two servers with the same data and bb connect credential. Stop it first, or pass --force.",
-    ]);
-    expect(await readServerMovedFile(dataDir)).not.toBeNull();
-    expect(JSON.parse(await readFile(configPath, "utf8"))).toEqual(
-      connectGrantConfig,
-    );
-  });
-
-  it.each([
-    [
-      "the gate reports the tunnel offline",
-      () =>
-        Promise.resolve(
-          new Response("bb connect: tunnel offline\n", {
-            status: 503,
-            headers: { "x-bb-tunnel-offline": "1" },
-          }),
-        ),
-    ],
-    [
-      "the connection is refused",
-      () => Promise.reject(new TypeError("fetch failed")),
-    ],
-    [
-      "the grant probe times out",
-      () =>
-        Promise.reject(
-          new DOMException(
-            "The operation was aborted due to timeout",
-            "TimeoutError",
-          ),
-        ),
-    ],
-  ])(
-    "unlocks a connect-mode copy without a note when %s, then drops the grant",
-    async (_label, respond) => {
-      const { dataDir, configPath } = await writeConnectLockWithGrant();
-      vi.mocked(globalThis.fetch).mockImplementation(respond);
-
-      await runCommand(
-        ["server", "unlock", "--data-dir", dataDir, "--yes"],
-        register,
-      );
-
-      expect(vi.mocked(globalThis.fetch)).toHaveBeenCalledWith(
-        "https://me.getbb.app/api/v1/system/version",
-        expect.anything(),
-      );
-      expect(await readServerMovedFile(dataDir)).toBeNull();
-      expect(JSON.parse(await readFile(configPath, "utf8"))).toEqual({
-        config: { BB_LOG_LEVEL: "debug" },
-      });
-      expect(
-        collectLogPayloads(vi.mocked(console.error)).filter((line) =>
-          line.startsWith("Couldn't confirm"),
-        ),
-      ).toEqual([]);
-    },
-  );
-
-  it.each([401, 403])(
-    "unlocks a connect-mode copy with a note when the grant probe gets HTTP %i",
-    async (status) => {
-      const { dataDir } = await writeConnectLockWithGrant();
-      vi.mocked(globalThis.fetch).mockResolvedValue(
-        new Response("bb connect: machine not authorized\n", { status }),
-      );
-
-      await runCommand(
-        ["server", "unlock", "--data-dir", dataDir, "--yes"],
-        register,
-      );
-
-      expect(await readServerMovedFile(dataDir)).toBeNull();
-      expect(collectLogPayloads(vi.mocked(console.error))[0]).toBe(
-        `Couldn't confirm whether the server at https://me.getbb.app is running (HTTP ${String(status)}). Make sure it is stopped before this old copy starts.`,
-      );
-    },
-  );
-
-  it("probes /health without headers for a direct-mode copy even when config.json has headers", async () => {
-    const dataDir = await makeTempDir("bb-cli-server-lock-");
-    await writeServerMovedFile(
-      dataDir,
-      movedLock({
-        mode: "direct",
-        serverUrl: "https://desk.ts.net/",
-        connectHandle: null,
-      }),
-    );
-    await writeDataFile(
-      dataDir,
-      "config.json",
-      JSON.stringify(connectGrantConfig),
-    );
-    vi.mocked(globalThis.fetch).mockResolvedValue(
-      healthResponse(200, { ok: true }),
-    );
-
-    await expect(
-      runCommand(
-        ["server", "unlock", "--data-dir", dataDir, "--yes"],
-        register,
-      ),
-    ).rejects.toThrow("process.exit:1");
-
-    expect(vi.mocked(globalThis.fetch)).toHaveBeenCalledWith(
-      "https://desk.ts.net/health",
-      { signal: expect.any(AbortSignal) },
-    );
-  });
-
   it("warns, confirms, and removes the lock", async () => {
     const dataDir = await makeTempDir("bb-cli-server-lock-");
     await writeDataFile(dataDir, "bb.db", "old server");
@@ -913,7 +742,7 @@ describe("bb server unlock", () => {
     );
     expect(warnings.slice(1)).toEqual([
       "Unlocking starts this old copy again. Everything since the move is lost here: threads, settings, and plugin data changed on desktop stay there.",
-      "Stop the bb server on desktop first. Two servers holding the same bb connect credential take each other's tunnel.",
+      "Stop the bb server on desktop first. Two servers running from the same data split your threads, machines, and settings between them.",
     ]);
     expect(collectLogPayloads(vi.mocked(console.log))).toEqual([
       `Unlocked ${dataDir}. bb on this computer starts the old server again within a few seconds; if bb isn't running, start it with npx bb-app --data-dir ${dataDir}.`,
@@ -1071,88 +900,6 @@ describe("bb server unlock", () => {
     await runCommand(["server", "unlock", "--yes"], register);
 
     expect(await readServerMovedFile(dataDir)).toBeNull();
-  });
-});
-
-describe("bb server allow-connect", () => {
-  setupCommandOutputTestEnvironment();
-
-  function hold() {
-    return {
-      version: 1 as const,
-      reason: "manual-import" as const,
-      createdAt: 1_700_000_000_000,
-    };
-  }
-
-  it("warns, confirms, and removes the bb connect hold", async () => {
-    const dataDir = await makeTempDir("bb-cli-server-hold-");
-    await writeDataFile(dataDir, "bb.db", "imported server");
-    await writeServerConnectHoldFile(dataDir, hold());
-    readlineMocks.question.mockResolvedValue("yes");
-
-    await runCommand(
-      ["server", "allow-connect", "--data-dir", dataDir],
-      register,
-    );
-
-    expect(await readServerConnectHoldFile(dataDir)).toBeNull();
-    expect(await readFile(join(dataDir, "bb.db"), "utf8")).toBe(
-      "imported server",
-    );
-    expect(collectLogPayloads(vi.mocked(console.error))).toEqual([
-      "Stop the original bb server first. Two servers holding the same bb account credential take each other's tunnel and spend the same hosted quota.",
-    ]);
-    expect(collectLogPayloads(vi.mocked(console.log))).toEqual([
-      `Removed the bb connect hold from ${dataDir}. bb account and bb connect start the next time this server starts; restart bb if it's already running.`,
-    ]);
-  });
-
-  it("keeps the hold when the confirmation is declined", async () => {
-    const dataDir = await makeTempDir("bb-cli-server-hold-");
-    await writeServerConnectHoldFile(dataDir, hold());
-    readlineMocks.question.mockResolvedValue("n");
-
-    await runCommand(
-      ["server", "allow-connect", "--data-dir", dataDir],
-      register,
-    );
-
-    expect(await readServerConnectHoldFile(dataDir)).toEqual(hold());
-  });
-
-  it("removes the hold with --yes and reports it as JSON", async () => {
-    const dataDir = await makeTempDir("bb-cli-server-hold-");
-    await writeServerConnectHoldFile(dataDir, hold());
-
-    await runCommand(
-      ["server", "allow-connect", "--data-dir", dataDir, "--yes", "--json"],
-      register,
-    );
-
-    expect(await readServerConnectHoldFile(dataDir)).toBeNull();
-    expect(JSON.parse(collectLogPayloads(vi.mocked(console.log))[0]!)).toEqual({
-      dataDir,
-      connectHoldRemoved: true,
-    });
-  });
-
-  it("reports a data directory without a hold", async () => {
-    const dataDir = await makeTempDir("bb-cli-server-hold-");
-
-    await runCommand(
-      ["server", "allow-connect", "--data-dir", dataDir],
-      register,
-    );
-    await runCommand(
-      ["server", "allow-connect", "--data-dir", dataDir, "--json"],
-      register,
-    );
-
-    expect(collectLogPayloads(vi.mocked(console.log))).toEqual([
-      `${dataDir} has no bb connect hold.`,
-      JSON.stringify({ dataDir, connectHoldRemoved: false }, null, 2),
-    ]);
   });
 });
 

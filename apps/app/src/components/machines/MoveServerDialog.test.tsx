@@ -38,9 +38,7 @@ function checkResponse(
   return {
     targetHostId: TARGET.id,
     targetHostName: TARGET.name,
-    mode: "connect",
     serverUrl: null,
-    requiresServerUrl: false,
     targetDataDir: "/home/sawyer/.bb-machines/laptop",
     existingTargetServerData: null,
     items: [],
@@ -53,7 +51,6 @@ function startedMove(): ServerMoveStatus {
   return {
     moveId: "move_1",
     state: "preparing",
-    mode: "connect",
     targetHostId: TARGET.id,
     targetHostName: TARGET.name,
     serverUrl: "https://sawyer.getbb.app",
@@ -79,6 +76,13 @@ function renderDialog() {
   return { onOpenChange };
 }
 
+function checkAddress(): void {
+  fireEvent.change(screen.getByLabelText("New server address"), {
+    target: { value: "https://desk.example.com" },
+  });
+  fireEvent.click(screen.getByRole("button", { name: "Check address" }));
+}
+
 function startButton(): HTMLElement {
   return screen.getByRole("button", { name: "Stop all and move" });
 }
@@ -89,7 +93,7 @@ afterEach(() => {
 });
 
 describe("MoveServerDialog", () => {
-  it("checks the machine, groups the results by severity, and starts a bb connect move", async () => {
+  it("checks the machine, groups the results by severity, and starts the move at the checked address", async () => {
     vi.mocked(sdk.experimental_server.checkMove).mockResolvedValue(
       checkResponse({
         items: [
@@ -128,15 +132,16 @@ describe("MoveServerDialog", () => {
     expect(screen.queryByRole("region", { name: "Fix before moving" })).toBe(
       null,
     );
-    expect(screen.queryByLabelText("New server address")).toBeNull();
-    expect(vi.mocked(sdk.experimental_server.checkMove)).toHaveBeenCalledTimes(
-      1,
-    );
     expect(vi.mocked(sdk.experimental_server.checkMove)).toHaveBeenCalledWith({
       targetHostId: TARGET.id,
       serverUrl: null,
     });
+    expect(startButton().hasAttribute("disabled")).toBe(true);
 
+    checkAddress();
+    await waitFor(() => {
+      expect(startButton().hasAttribute("disabled")).toBe(false);
+    });
     fireEvent.click(startButton());
 
     await waitFor(() => {
@@ -144,18 +149,16 @@ describe("MoveServerDialog", () => {
     });
     expect(vi.mocked(sdk.experimental_server.startMove)).toHaveBeenCalledWith({
       targetHostId: TARGET.id,
-      serverUrl: null,
+      serverUrl: "https://desk.example.com",
       stopRunningWork: true,
       archiveExistingTargetServerData: false,
     });
   });
 
-  it("asks for the new address when the server has no bb connect handle and re-checks with it", async () => {
+  it("asks for the new address and re-checks with it", async () => {
     vi.mocked(sdk.experimental_server.checkMove)
       .mockResolvedValueOnce(
         checkResponse({
-          mode: "direct",
-          requiresServerUrl: true,
           canMove: false,
           items: [
             {
@@ -169,8 +172,6 @@ describe("MoveServerDialog", () => {
       )
       .mockResolvedValue(
         checkResponse({
-          mode: "direct",
-          requiresServerUrl: true,
           serverUrl: "https://desk.example.com",
         }),
       );
@@ -263,7 +264,7 @@ describe("MoveServerDialog", () => {
     fireEvent.click(startButton());
     expect(vi.mocked(sdk.experimental_server.startMove)).not.toHaveBeenCalled();
 
-    fireEvent.click(screen.getByRole("button", { name: "Check again" }));
+    checkAddress();
 
     await waitFor(() => {
       expect(startButton().hasAttribute("disabled")).toBe(false);
@@ -273,7 +274,10 @@ describe("MoveServerDialog", () => {
     );
     expect(
       vi.mocked(sdk.experimental_server.checkMove),
-    ).toHaveBeenLastCalledWith({ targetHostId: TARGET.id, serverUrl: null });
+    ).toHaveBeenLastCalledWith({
+      targetHostId: TARGET.id,
+      serverUrl: "https://desk.example.com",
+    });
   });
 
   it("requires confirming that the existing bb data on the machine gets archived", async () => {
@@ -302,6 +306,12 @@ describe("MoveServerDialog", () => {
       name: /Archive the existing bb data at \/Users\/sawyer\/\.bb/u,
     });
     expect(screen.getByText(/^5\.0 MB\./u)).toBeDefined();
+    checkAddress();
+    await waitFor(() => {
+      expect(vi.mocked(sdk.experimental_server.checkMove)).toHaveBeenCalledTimes(
+        2,
+      );
+    });
     expect(startButton().hasAttribute("disabled")).toBe(true);
 
     fireEvent.click(confirmation);
@@ -312,7 +322,7 @@ describe("MoveServerDialog", () => {
       expect(vi.mocked(sdk.experimental_server.startMove)).toHaveBeenCalledWith(
         {
           targetHostId: TARGET.id,
-          serverUrl: null,
+          serverUrl: "https://desk.example.com",
           stopRunningWork: true,
           archiveExistingTargetServerData: true,
         },
@@ -341,7 +351,7 @@ describe("MoveServerDialog", () => {
     );
     expect(startButton().hasAttribute("disabled")).toBe(true);
 
-    fireEvent.click(screen.getByRole("button", { name: "Check again" }));
+    checkAddress();
 
     await waitFor(() => {
       expect(startButton().hasAttribute("disabled")).toBe(false);
@@ -379,6 +389,8 @@ describe("MoveServerDialog", () => {
     );
     const { onOpenChange } = renderDialog();
 
+    await screen.findByText("Nothing needs attention before the move.");
+    checkAddress();
     await waitFor(() => {
       expect(startButton().hasAttribute("disabled")).toBe(false);
     });

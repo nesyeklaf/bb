@@ -310,8 +310,6 @@ export async function writeLauncherMovedMode(args: {
     toHostId: "host-other",
     toHostName: "other",
     serverUrl: "http://other.example.test:38886",
-    mode: "direct",
-    connectHandle: null,
     oldCopyEntries: args.oldCopyEntries ?? [],
   });
   await writeBbAppRuntime({

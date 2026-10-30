@@ -131,10 +131,10 @@ describe("plugin background services", () => {
     expect(reloaded?.services).toEqual([{ name: "conn", state: "running" }]);
   });
 
-  it("suspends every plugin but the kept ones without disabling them, then resumes them", async () => {
+  it("suspends every loaded plugin without disabling it, then resumes them", async () => {
     globals.__suspendStarts = {};
     globals.__suspendAborts = {};
-    for (const name of ["bb-plugin-suspended", "bb-plugin-kept"]) {
+    for (const name of ["bb-plugin-suspended", "bb-plugin-paused"]) {
       const rootDir = await writePlugin(workDir, {
         name,
         serverSource: `
@@ -159,16 +159,16 @@ describe("plugin background services", () => {
       await service.installPath(rootDir);
     }
 
-    const suspended = await service.suspendPlugins({
-      keep: (plugin) => plugin.id === "kept",
-    });
+    const suspended = await service.suspendPlugins();
 
-    expect(suspended).toEqual(["suspended"]);
+    expect(suspended).toEqual(["paused", "suspended"]);
     expect(service.getApi("suspended")).toBeUndefined();
-    expect(service.getApi("kept")).toBeDefined();
+    expect(service.getApi("paused")).toBeUndefined();
     expect(service.isPluginExpectedToRun("suspended")).toBe(true);
-    expect(service.isPluginExpectedToRun("kept")).toBe(true);
-    expect(globals.__suspendAborts).toEqual({ "bb-plugin-suspended": 1 });
+    expect(globals.__suspendAborts).toEqual({
+      "bb-plugin-suspended": 1,
+      "bb-plugin-paused": 1,
+    });
     expect(getInstalledPlugin(db, "suspended")?.enabled).toBe(true);
     expect(
       service.list().find((plugin) => plugin.id === "suspended"),
@@ -177,12 +177,15 @@ describe("plugin background services", () => {
       statusDetail: "Paused while the server moves to another machine",
     });
 
-    expect(await service.resumeSuspendedPlugins()).toEqual(["suspended"]);
+    expect(await service.resumeSuspendedPlugins()).toEqual([
+      "paused",
+      "suspended",
+    ]);
     expect(service.getApi("suspended")).toBeDefined();
     expect(service.isPluginExpectedToRun("suspended")).toBe(true);
     expect(globals.__suspendStarts).toEqual({
       "bb-plugin-suspended": 2,
-      "bb-plugin-kept": 1,
+      "bb-plugin-paused": 2,
     });
     expect(await service.resumeSuspendedPlugins()).toEqual([]);
   });

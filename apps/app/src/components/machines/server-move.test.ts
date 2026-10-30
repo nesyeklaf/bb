@@ -18,7 +18,6 @@ function move(overrides: Partial<ServerMoveStatus> = {}): ServerMoveStatus {
   return {
     moveId: "move_1",
     state: "preparing",
-    mode: "connect",
     targetHostId: "host_desk",
     targetHostName: "desk",
     serverUrl: "https://sawyer.getbb.app",
@@ -253,7 +252,6 @@ describe("resolveServerMoveOverlay", () => {
   it("waits for a direct move's destination to report ready before redirecting once the old server stops answering", () => {
     const switching = move({
       state: "switching",
-      mode: "direct",
       serverUrl: "https://desk.example.com",
       destinationStatusUrl: "https://desk.example.com/health",
       cancellable: false,
@@ -377,7 +375,7 @@ describe("resolveServerMoveOverlay", () => {
     ).toBe(500);
   });
 
-  it("polls while switching or reconnecting, and while preparing only without realtime", () => {
+  it("polls while switching or waiting, and while preparing only without realtime", () => {
     const progress = { kind: "progress" as const, move: move() };
     expect(
       serverMoveOverlayPollIntervalMs({
@@ -405,7 +403,11 @@ describe("resolveServerMoveOverlay", () => {
     ).toBe(500);
     expect(
       serverMoveOverlayPollIntervalMs({
-        content: { kind: "reconnecting", move: move({ state: "completed" }) },
+        content: {
+          kind: "waiting",
+          move: move({ state: "completed" }),
+          destinationState: null,
+        },
         realtimeConnected: true,
         intervalMs: 500,
       }),

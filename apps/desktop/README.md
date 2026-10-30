@@ -521,12 +521,10 @@ committed move. A move is committed when the local server address answers
 launcher process is alive. The app checks once when it starts or loads the
 built-in server. When a move finishes while the app is open, the app checks every
 second for up to 120 seconds. It stops if the lock disappears. The first time the app
-sees a committed lock for a `moveId`, it switches the server target once:
-
-- `mode: "connect"` selects `connectHandle` with `serverUrl`.
-- `mode: "direct"` sets the custom server URL. When a move finishes while
-  the app is open, the app waits up to 60 seconds for the new `/health`
-  endpoint before it switches the window.
+sees a committed lock for a `moveId`, it switches the server target once to
+the custom server URL `serverUrl`. When a move finishes while the app is open,
+the app waits up to 60 seconds for the new `/health` endpoint before it
+switches the window.
 
 The app shows "Your bb server moved to <toHostName>" once for each `moveId`
 (`<userData>/server-move-notice.json`). It still starts its own `bb-app`

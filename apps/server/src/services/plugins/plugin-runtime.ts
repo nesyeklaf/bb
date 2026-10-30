@@ -374,12 +374,6 @@ export interface SafeModeActivationRefusalArgs {
 
 const PLUGIN_SAFE_MODE_DETAIL = "safe mode is on";
 
-export interface PluginLoadHold {
-  sources: readonly string[];
-  detail: string;
-  isActive(): Promise<boolean>;
-}
-
 export function createPluginRuntime(context: PluginRuntimeContext) {
   const { deps } = context;
   const settingsChanged = context.settingsChanged ?? (() => {});
@@ -437,7 +431,6 @@ export function createPluginRuntime(context: PluginRuntimeContext) {
   let boundSdk: BbSdk | undefined;
   let boundLoopbackBaseUrl: string | undefined;
   const rpcCallers = createPluginRpcCallerRegistry();
-  let loadHold: PluginLoadHold | null = null;
 
   function publishStatus(
     id: string,
@@ -1604,18 +1597,6 @@ export function createPluginRuntime(context: PluginRuntimeContext) {
     candidate.handle.invalidate();
   }
 
-  function setLoadHold(hold: PluginLoadHold | null): void {
-    loadHold = hold;
-  }
-
-  async function heldDetail(row: InstalledPluginRow): Promise<string | null> {
-    const hold = loadHold;
-    if (hold === null || !row.enabled || !hold.sources.includes(row.source)) {
-      return null;
-    }
-    return (await hold.isActive()) ? hold.detail : null;
-  }
-
   function isSafeModeExempt(args: {
     provenance: InstalledPluginRow["provenance"];
     builtinName: string | null;
@@ -1658,14 +1639,6 @@ export function createPluginRuntime(context: PluginRuntimeContext) {
   }
 
   async function loadOne(row: InstalledPluginRow): Promise<string | null> {
-    const held = await heldDetail(row);
-    if (held !== null) {
-      await disposeOne(row.id);
-      await populateIdentity(row);
-      setStatus(row.id, "disabled", held);
-      logger.warn(`plugin ${row.id} not loaded (held): ${held}`);
-      return null;
-    }
     if (isSuppressedBySafeMode(row)) {
       await disposeOne(row.id);
       await populateIdentity(row);
@@ -2225,7 +2198,6 @@ export function createPluginRuntime(context: PluginRuntimeContext) {
     brandingAssets,
     safeModeActivationRefusal,
     setDevBuildProblem,
-    setLoadHold,
     setStatus,
     sourceKind,
     stabilizingPluginIds,

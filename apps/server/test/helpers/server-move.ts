@@ -200,16 +200,12 @@ export function createTestServerMoveEnvironment(
         plugins.stops += 1;
         events.push("plugins:stop");
       },
-      async suspendAllButConnect() {
+      async suspendAll() {
         plugins.suspends += 1;
         events.push("plugins:suspend");
       },
     },
     readServerDiskFreeBytes: async () => null,
-    resolveMode: async () => ({ mode: "direct" }),
-    resolveServerHostGrant: async () => {
-      throw new Error("Direct moves don't resolve a server access grant");
-    },
     resumeDeferredWork() {
       events.push("deferred-work:resumed");
     },

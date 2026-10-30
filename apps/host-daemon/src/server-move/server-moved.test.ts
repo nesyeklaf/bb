@@ -272,8 +272,6 @@ describe("ServerMoveService.handleServerMoved", () => {
       toHostId: "host-target",
       toHostName: "studio",
       serverUrl: "http://studio.example.test:38886",
-      mode: "direct",
-      connectHandle: null,
       oldCopyEntries: ["bb.db"],
     });
 

@@ -47,7 +47,6 @@ import {
   refuseInterruptedServerImport,
   repairLastServerMoveHostName,
 } from "./services/server-move/pending-boot.js";
-import { createConnectHold } from "./services/server-move/connect-hold.js";
 import { isServerMoveFrozen } from "./services/server-move/freeze-state.js";
 import { reconcileServerMoveRunAtBoot } from "./services/server-move/reconcile.js";
 import {
@@ -73,8 +72,7 @@ export function startHttpListener(args: StartHttpListenerArgs) {
 }
 
 export interface StartServerPluginsArgs {
-  dataDir: string;
-  logger: Pick<ServerLogger, "error" | "warn">;
+  logger: Pick<ServerLogger, "error">;
   pluginService: Pick<PluginService, "start" | "startPeriodicUpdateChecks">;
   providerRegistry: Pick<ProviderRegistryService, "markRegistrationsSettled">;
 }
@@ -83,9 +81,7 @@ export function startServerPlugins(
   args: StartServerPluginsArgs,
 ): Promise<void> {
   return args.pluginService
-    .start({
-      hold: createConnectHold({ dataDir: args.dataDir, logger: args.logger }),
-    })
+    .start()
     .catch((error: unknown) => {
       args.logger.error({ err: error }, "Plugin startup failed");
     })
@@ -380,7 +376,6 @@ export async function runServer(serverConfig: ServerConfig): Promise<void> {
       providerRegistry.markRegistrationsSettled();
     } else {
       void startServerPlugins({
-        dataDir: serverConfig.BB_DATA_DIR,
         logger,
         pluginService,
         providerRegistry,
