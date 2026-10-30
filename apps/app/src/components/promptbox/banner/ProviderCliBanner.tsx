@@ -1,5 +1,3 @@
-import { Button } from "@bb/shared-ui/button";
-import { Icon } from "@bb/shared-ui/icon";
 import { ProviderRequirementBanner } from "./ProviderRequirementBanner";
 
 interface ProviderCliBannerProps {
@@ -7,9 +5,6 @@ interface ProviderCliBannerProps {
   installed: boolean;
   currentVersion: string | null;
   minimumSupportedVersion: string | null;
-  canRunAction: boolean;
-  actionRunning: boolean;
-  onAction: () => void;
 }
 
 function versionRequirementCopy(
@@ -43,9 +38,6 @@ export function ProviderCliBanner({
   installed,
   currentVersion,
   minimumSupportedVersion,
-  canRunAction,
-  actionRunning,
-  onAction,
 }: ProviderCliBannerProps) {
   const blockedReason = providerCliBlockedReason({ displayName, installed });
   return (
@@ -64,26 +56,6 @@ export function ProviderCliBanner({
         ) : (
           blockedReason
         )
-      }
-      action={
-        canRunAction ? (
-          <Button
-            type="button"
-            size="sm"
-            className="h-8 shrink-0 px-3"
-            disabled={actionRunning}
-            onClick={onAction}
-          >
-            {actionRunning ? (
-              <>
-                <Icon name="Spinner" className="animate-spin" />
-                {installed ? "Updating…" : "Installing…"}
-              </>
-            ) : (
-              `${installed ? "Update" : "Install"} ${displayName}`
-            )}
-          </Button>
-        ) : null
       }
     />
   );

@@ -78,7 +78,6 @@ import {
 import { AppCommandProvider } from "./components/commands/AppCommandProvider";
 import { WindowFindHost } from "./components/layout/WindowFindHost";
 import { DesktopZoomIndicator } from "./components/layout/DesktopZoomIndicator";
-import { ProviderCliInstallLogDialogHost } from "./components/provider-cli/provider-cli-install";
 import { ServerMoveOverlay } from "./components/machines/ServerMoveOverlay";
 import { OnboardingGate } from "./components/onboarding/OnboardingGate";
 import { PluginInstallJobsHost } from "./components/plugin/PluginInstallJobsHost";
@@ -504,7 +503,6 @@ export function App() {
               </Routes>
               <WindowFindHost />
               <DesktopZoomIndicator />
-              <ProviderCliInstallLogDialogHost />
               <ServerMoveOverlay />
               <PluginInstallJobsHost />
               <PluginUpdateJobsHost />

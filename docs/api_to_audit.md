@@ -1312,43 +1312,30 @@ bridges need to say about a rejection (installation was deliberately left to
 runtime should bound the `rateLimited` ladder from the hint rather than from
 a constant.
 
-## Provider maintenance toolkit (`experimental_resolveExecutablePath`, `experimental_readCliVersion`, `experimental_commandOutput`, `experimental_versionFrom`, `experimental_compareVersions`, `experimental_formatCommand`, `experimental_npmCommand`, `experimental_npmGlobalInstallCommand`, `experimental_npmLatestVersion`, `experimental_probeNpmGlobalPackage`, `experimental_npmGlobalInstallSource`, `experimental_installationVerification`, `experimental_downloadedInstallerCommand`, `experimental_clampPercent`) (`@get-bb/plugin-sdk/provider-bridge`)
+## Provider maintenance toolkit (`experimental_resolveExecutablePath`, `experimental_readCliVersion`, `experimental_commandOutput`, `experimental_versionFrom`, `experimental_compareVersions`, `experimental_formatCommand`, `experimental_clampPercent`) (`@get-bb/plugin-sdk/provider-bridge`)
 
-These are the host-local probes and install commands behind a bridge's
-`provider/health`, `provider/usage` and `provider/installation/*` answers for
-a user-installed CLI.
+These are the host-local probes behind a bridge's `provider/health`,
+`provider/usage` and `provider/installation/status` answers for a
+user-installed CLI. They only inspect the host; none contacts a registry or
+installs anything.
 
 - Probes: `resolveExecutablePath` returns an absolute path or null, and on
   Windows prefers a PATHEXT match such as an npm `.cmd` launcher.
   `readCliVersion` runs `--version` with stdin closed and returns the first
   valid SemVer token or null. `commandOutput` returns trimmed stdout+stderr
-  or null. The others are `versionFrom`, `npmLatestVersion` and
-  `probeNpmGlobalPackage`.
+  or null. `versionFrom` extracts the SemVer token from text.
 - Decisions: `compareVersions` uses SemVer precedence and throws `TypeError`
-  on invalid input. `npmGlobalInstallSource` returns `npmGlobal`, `external`
-  or `notInstalled`. `installationVerification` passes an install on
-  existence, and an update on reaching the latest version (or any change
-  when the registry was unreachable).
-- Actions: `npmGlobalInstallCommand`; `downloadedInstallerCommand`, which runs
-  a vendor script from a temp file and, given `powershellUrl` on Windows,
-  returns `irm <url> | iex`; `npmCommand`; `formatCommand`; and
-  `clampPercent`.
+  on invalid input.
+- Formatting: `formatCommand` and `clampPercent`.
 
 **Audit before stabilizing.**
 
-1. **Timeouts are fixed.** 5 s for `which`/`--version` and 15 s for npm and
-   self-diagnostics, so a bridge whose CLI is slow to start (a JVM, a
-   first-run download) cannot lengthen them. Decide whether the budgets
-   become arguments before the signatures are a promise.
+1. **Timeouts are fixed.** 5 s for `which`/`--version`, so a bridge whose CLI
+   is slow to start (a JVM, a first-run download) cannot lengthen them.
+   Decide whether the budgets become arguments before the signatures are a
+   promise.
 2. **`compareVersions` throws.** Confirm the throwing contract for invalid
    inputs before stabilization.
-3. **The npm helpers assume a global install.** `probeNpmGlobalPackage` and
-   `npmGlobalInstallSource` model npm's global prefix only; pnpm, volta and
-   corepack shims read as `external`. Decide whether the source enum should
-   grow before it is relied on.
-4. **`downloadedInstallerCommand` without `powershellUrl` is POSIX.** On win32
-   it still returns `sh -c` with `mktemp`, `curl` and `bash`. Decide whether it
-   should refuse there rather than hand the daemon a command that cannot run.
 
 ## Presentation builders (`experimental_presentationTitle`, `experimental_presentationDetail`, `experimental_withTitle`, `experimental_presentationFileName`, `experimental_COMPACTION_PRESENTATION`, `experimental_REASONING_PRESENTATION`, `experimental_fileReadPresentation`, `experimental_searchPresentation`, `experimental_webSearchPresentation`, `experimental_webFetchPresentation`, `experimental_planStepsPresentation`, `experimental_toolPresentation`) (`@get-bb/plugin-sdk/provider-bridge`)
 

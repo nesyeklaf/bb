@@ -42,8 +42,6 @@ it("reports ready with the installed version after the get_state probe", async (
       status: "ready",
       installedVersion: "0.84.0",
       minimumSupportedVersion: "0.84.0",
-      canInstall: true,
-      canUpdate: true,
       loginCommand: "pi",
     },
   });
@@ -118,7 +116,7 @@ it("reports not_installed when the launch command is missing", async () => {
     cwd: harness.workspaceDir,
   });
   expect(health.result).toMatchObject({
-    health: { status: "not_installed", canInstall: true, canUpdate: false },
+    health: { status: "not_installed" },
   });
   const models = await harness.request(nextRequestId(), "model/list", {
     cwd: harness.workspaceDir,
@@ -140,10 +138,7 @@ it("fails closed when pi cannot report its version, with install guidance", asyn
       status: "unknown",
       installedVersion: null,
       statusMessage: expect.stringMatching(
-        new RegExp(
-          `^Could not determine the pi version: \`.*--version\` exited with 1\\. Install @earendil-works/pi-coding-agent 0\\.84\\.0 or newer: ${process.platform === "win32" ? "npm\\.cmd" : "npm"} install -g @earendil-works/pi-coding-agent@latest$`,
-          "u",
-        ),
+        /^Could not determine the pi version: `.*--version` exited with 1\. Install @earendil-works\/pi-coding-agent 0\.84\.0 or newer$/u,
       ),
     },
   });

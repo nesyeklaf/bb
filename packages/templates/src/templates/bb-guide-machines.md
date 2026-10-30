@@ -51,8 +51,6 @@ does not prove reachability.
                                           environment cleanup failed; the provider's
                                           removal still runs
   bb machine provider-cli status <machine>
-  bb machine provider-cli install <machine> <provider-id>
-    --action <install|update>
 
 `bb machine show` includes `threadStorageRootPath` from the latest daemon
 session without waking the machine (null before the first session).

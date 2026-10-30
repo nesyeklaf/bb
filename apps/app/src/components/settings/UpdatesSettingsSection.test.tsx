@@ -13,20 +13,8 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { Host } from "@bb/domain";
 import { makeHost as makeHostFixture } from "@bb/test-helpers/domain-fixtures";
-import {
-  HOST_DAEMON_PROTOCOL_VERSION,
-  type ProviderCliKey,
-} from "@bb/host-daemon-contract";
+import { HOST_DAEMON_PROTOCOL_VERSION } from "@bb/host-daemon-contract";
 import { TooltipProvider } from "@bb/shared-ui/tooltip";
-import type {
-  ProviderCliIssue,
-  ProviderCliActionableIssue,
-} from "@/components/provider-cli/provider-cli-install";
-import { useProviderCliInstallRunner } from "@/components/provider-cli/provider-cli-install";
-import {
-  getProviderCliInstallSnapshot,
-  resetProviderCliInstallStoreForTests,
-} from "@/components/provider-cli/provider-cli-install-store";
 import { appToast } from "@/components/ui/app-toast";
 import { makePluginListItem } from "@/test/fixtures/plugins";
 import { buildUpdateInventoryPlugins } from "@/hooks/useUpdateInventory";
@@ -52,7 +40,6 @@ vi.mock("@/components/ui/app-toast", () => ({
 }));
 
 vi.mock("@/lib/sdk", async () => {
-  const { makeProviderInfo } = await import("@bb/test-helpers/domain-fixtures");
   const { makeSystemConfig } = await import("@/test/fixtures/system-config");
   return {
     sdk: {
@@ -60,13 +47,6 @@ vi.mock("@/lib/sdk", async () => {
         config: vi.fn(async () =>
           makeSystemConfig({ primaryHostId: "host_primary" }),
         ),
-      },
-      providers: {
-        list: vi.fn(async () => [
-          makeProviderInfo({ id: "codex", displayName: "Codex" }),
-          makeProviderInfo({ id: "claude-code", displayName: "Claude Code" }),
-          makeProviderInfo({ id: "acp-cursor", displayName: "Cursor" }),
-        ]),
       },
     },
   };
@@ -91,12 +71,6 @@ vi.mock("@/hooks/useHostDaemon", () => ({
   }),
 }));
 
-const openUrlInExternalBrowserMock = vi.hoisted(() => vi.fn());
-
-vi.mock("@/lib/url-open-routing", () => ({
-  openUrlInExternalBrowser: openUrlInExternalBrowserMock,
-}));
-
 const retryHostUpdateMutateMock = vi.hoisted(() => vi.fn());
 
 vi.mock("@/hooks/mutations/host-mutations", () => ({
@@ -106,8 +80,6 @@ vi.mock("@/hooks/mutations/host-mutations", () => ({
     variables: undefined,
   }),
 }));
-
-const startInstallMock = vi.fn();
 
 const startPluginUpdateMock = vi.hoisted(() => vi.fn());
 const pluginUpdateJobs = vi.hoisted(() => ({
@@ -126,22 +98,6 @@ vi.mock("@/hooks/queries/plugin-update-job-queries", async (original) => ({
   usePluginUpdateJobs: () => ({ data: pluginUpdateJobs.current }),
 }));
 
-vi.mock("@/components/provider-cli/provider-cli-install", async (original) => {
-  const actual =
-    await original<
-      typeof import("@/components/provider-cli/provider-cli-install")
-    >();
-  return {
-    ...actual,
-    useProviderCliInstallRunner: vi.fn(() => ({
-      failuresByJobKey: new Map(),
-      queuedJobKeys: new Set<string>(),
-      runningJobKey: null,
-      startInstall: startInstallMock,
-    })),
-  };
-});
-
 function makeHost(overrides: Partial<Host> & Pick<Host, "id" | "name">): Host {
   return makeHostFixture({
     lastSeenAt: Date.now(),
@@ -151,107 +107,14 @@ function makeHost(overrides: Partial<Host> & Pick<Host, "id" | "name">): Host {
   });
 }
 
-function makeUpdateIssue(args: {
-  provider: ProviderCliKey;
-}): ProviderCliActionableIssue {
-  const identity =
-    args.provider === "codex"
-      ? { displayName: "Codex", executableName: "codex" }
-      : args.provider === "claude-code"
-        ? { displayName: "Claude Code", executableName: "claude" }
-        : { displayName: "Cursor", executableName: "agent" };
-  const { displayName, executableName } = identity;
-  const action = {
-    kind: "update" as const,
-    label: "Update" as const,
-    command: `${executableName} update`,
-  };
-  return {
-    provider: args.provider,
-    status: {
-      displayName,
-      executableName,
-      executablePath: `/usr/local/bin/${executableName}`,
-      installed: true,
-      installSource: "npmGlobal",
-      currentVersion: "1.0.0",
-      latestVersion: "1.0.1",
-      minimumSupportedVersion: null,
-      npmPackageName: null,
-      npmGlobalPackageVersion: null,
-      installAction: action,
-      needsUpdate: true,
-      versionUnsupported: false,
-    },
-    action,
-    title: `${displayName} update available`,
-    description: "1.0.0 -> 1.0.1",
-    fingerprint: `${args.provider}:outdated`,
-  };
-}
-
-function makeManualUpdateIssue(args: {
-  provider: "codex" | "claude-code";
-}): ProviderCliIssue {
-  const issue = makeUpdateIssue(args);
-  return {
-    ...issue,
-    action: null,
-    status: {
-      ...issue.status,
-      installSource: "external",
-      installAction: null,
-    },
-  };
-}
-
 function makeMachine(args: {
   host: Host;
-  issues?: ProviderCliIssue[];
   isPrimary?: boolean;
-  statusPending?: boolean;
-  statusError?: boolean;
   canRetryDaemonUpdate?: boolean;
 }): UpdateInventoryMachine {
-  const issues = args.issues ?? [];
-  const upToDate = (provider: ProviderCliKey) => {
-    const issue = issues.find((entry) => entry.provider === provider);
-    if (issue !== undefined) {
-      return issue.status;
-    }
-    const base = makeUpdateIssue({ provider }).status;
-    return {
-      ...base,
-      latestVersion: base.currentVersion,
-      needsUpdate: false,
-    };
-  };
-  const cursorIssue = issues.find((entry) => entry.provider === "acp-cursor");
-  const cursorStatus =
-    cursorIssue?.status ??
-    ({
-      ...makeUpdateIssue({ provider: "acp-cursor" }).status,
-      installed: false,
-      currentVersion: null,
-      latestVersion: null,
-      needsUpdate: false,
-      installAction: null,
-    } as const);
   return {
     host: args.host,
     isPrimary: args.isPrimary ?? false,
-    providerStatus:
-      args.host.status === "connected"
-        ? {
-            codex: upToDate("codex"),
-            "claude-code": upToDate("claude-code"),
-            "acp-cursor": cursorStatus,
-          }
-        : null,
-    statusPending: args.statusPending ?? false,
-    statusFetching: args.statusPending ?? false,
-    statusError: args.statusError ?? false,
-    issues,
     canRetryDaemonUpdate: args.canRetryDaemonUpdate ?? false,
   };
 }
@@ -269,7 +132,6 @@ function makeInventory(overrides: Partial<UpdateInventory>): UpdateInventory {
     pluginAttentionCount: 0,
     actionableCount: 0,
     hasAttention: false,
-    lastCheckedAt: null,
     ...overrides,
   };
 }
@@ -291,7 +153,6 @@ function renderSection(): void {
 }
 
 const useUpdateInventoryMock = vi.mocked(useUpdateInventory);
-const useProviderCliInstallRunnerMock = vi.mocked(useProviderCliInstallRunner);
 
 function useWebApp(): void {
   useUpdateInventoryMock.mockReturnValue(makeInventory({}));
@@ -300,96 +161,17 @@ function useWebApp(): void {
 beforeEach(() => {
   hostDaemon.localDaemonHostId = null;
   pluginUpdateJobs.current = [];
-  useProviderCliInstallRunnerMock.mockReturnValue({
-    failuresByJobKey: new Map(),
-    queuedJobKeys: new Set<string>(),
-    runningJobKey: null,
-    startInstall: startInstallMock,
-  });
 });
 
 afterEach(() => {
   vi.useRealTimers();
   cleanup();
   window.localStorage.clear();
-  resetProviderCliInstallStoreForTests();
   vi.clearAllMocks();
   vi.unstubAllGlobals();
 });
 
 describe("UpdatesSettingsSection", () => {
-  it("places fleet-wide Update all beside the Provider CLIs heading", () => {
-    useUpdateInventoryMock.mockReturnValue(
-      makeInventory({
-        machines: [
-          makeMachine({
-            host: makeHost({ id: "host_1", name: "workstation" }),
-            issues: [makeUpdateIssue({ provider: "codex" })],
-          }),
-          makeMachine({
-            host: makeHost({ id: "host_2", name: "homelab" }),
-            issues: [makeUpdateIssue({ provider: "claude-code" })],
-          }),
-        ],
-      }),
-    );
-
-    renderSection();
-
-    const bulkActions = screen.getByRole("toolbar", {
-      name: "Bulk update actions",
-    });
-    const updateAll = bulkActions.querySelector(
-      '[aria-label="Update all 2 CLI tools"]',
-    );
-    expect(updateAll).not.toBeNull();
-    expect(updateAll?.className).toContain("bg-foreground");
-    expect(updateAll?.className).toContain("text-background");
-    expect(updateAll?.textContent).toBe("Update all");
-    expect(updateAll?.firstElementChild?.getAttribute("data-icon")).toBe(
-      "Download",
-    );
-    const fleetSection = screen
-      .getByRole("heading", { name: "Provider CLIs" })
-      .closest("section");
-    const fleetHeader = fleetSection?.firstElementChild;
-    const fleetBody = fleetSection?.children.item(1);
-    const machineRows = document.querySelectorAll("[data-updates-machine]");
-    expect(machineRows).toHaveLength(2);
-    expect(fleetHeader?.contains(bulkActions)).toBe(true);
-    for (const row of machineRows) {
-      expect(fleetBody?.contains(row)).toBe(true);
-      expect(row.contains(bulkActions)).toBe(false);
-    }
-    expect(screen.queryByRole("heading", { name: "workstation" })).toBeNull();
-    expect(
-      screen.queryByRole("heading", { name: "Machine updates" }),
-    ).toBeNull();
-  });
-
-  it("does not claim up to date when the latest version is unknown", async () => {
-    const machine = makeMachine({
-      host: makeHost({ id: "host_1", name: "workstation" }),
-      isPrimary: true,
-    });
-    const codex = machine.providerStatus!.codex;
-    machine.providerStatus!.codex = { ...codex, latestVersion: null };
-    useUpdateInventoryMock.mockReturnValue(
-      makeInventory({ lastCheckedAt: Date.now(), machines: [machine] }),
-    );
-
-    renderSection();
-
-    expect(screen.getByText("Nothing to update on workstation.")).toBeDefined();
-    fireEvent.click(screen.getByRole("button", { name: "Show machines" }));
-    fireEvent.click(screen.getByRole("button", { name: "workstation" }));
-    const codexRow = document.querySelector('[data-provider-row="codex"]');
-    expect(codexRow?.textContent).toContain("Latest unknown");
-    expect(
-      codexRow?.querySelector('[data-update-state="up-to-date"]'),
-    ).toBeNull();
-  });
-
   it("does not call an offline fleet all in sync", async () => {
     useUpdateInventoryMock.mockReturnValue(
       makeInventory({
@@ -631,131 +413,6 @@ describe("UpdatesSettingsSection", () => {
     ).toBeDefined();
   });
 
-  it("shows one line per machine and its installed CLIs when expanded", async () => {
-    const host = makeHost({ id: "host_1", name: "workstation" });
-    const codexIssue = makeUpdateIssue({ provider: "codex" });
-    useUpdateInventoryMock.mockReturnValue(
-      makeInventory({
-        machines: [
-          makeMachine({ host, issues: [codexIssue], isPrimary: true }),
-        ],
-      }),
-    );
-
-    renderSection();
-
-    const row = document.querySelector<HTMLElement>(
-      '[data-updates-machine="host_1"]',
-    );
-    if (row === null) throw new Error("expected the machine row");
-    expect(screen.getAllByText("workstation")).toHaveLength(1);
-    expect(row.querySelector('[data-icon="Laptop"]')).not.toBeNull();
-    expect(
-      [...row.querySelectorAll("[data-provider-avatar]")].map((avatar) =>
-        avatar.getAttribute("data-provider-avatar"),
-      ),
-    ).toEqual(["codex"]);
-    expect(row.querySelector("[data-updates-machine-detail]")).toBeNull();
-    expect(screen.queryByText("Codex")).toBeNull();
-    expect(screen.queryByText(/^Update available/)).toBeNull();
-    expect(
-      screen.queryByRole("button", { name: /Update Codex on workstation/ }),
-    ).toBeNull();
-
-    const toggle = screen.getByRole("button", { name: "workstation" });
-    expect(toggle.getAttribute("aria-expanded")).toBe("false");
-    fireEvent.click(toggle);
-    expect(toggle.getAttribute("aria-expanded")).toBe("true");
-    const detail = row.querySelector<HTMLElement>(
-      "[data-updates-machine-detail]",
-    );
-    if (detail === null) throw new Error("expected the expanded detail");
-    expect(toggle.getAttribute("aria-controls")).toBe(detail.id);
-
-    expect(
-      [...detail.querySelectorAll("[data-provider-row]")].map((entry) =>
-        entry.getAttribute("data-provider-row"),
-      ),
-    ).toEqual(["codex", "claude-code"]);
-    expect(within(detail).queryByText("Cursor")).toBeNull();
-    const claudeRow = detail.querySelector('[data-provider-row="claude-code"]');
-    expect(
-      claudeRow?.querySelector('[data-update-state="up-to-date"]'),
-    ).not.toBeNull();
-    expect(claudeRow?.querySelector("[data-provider-updater]")).toBeNull();
-    const codexRow = detail.querySelector('[data-provider-row="codex"]');
-    expect(
-      codexRow?.querySelector("[data-provider-updater]")?.textContent,
-    ).toBe("Built-in updater");
-    await waitFor(() => {
-      expect(
-        codexRow?.querySelector(
-          '[data-provider-icon="codex"] [data-provider-logo]',
-        ),
-      ).not.toBeNull();
-    });
-    const versionMetadata = codexRow?.querySelector("[data-version-metadata]");
-    expect(versionMetadata?.className).toContain("text-2xs");
-    expect(versionMetadata?.className).not.toContain("font-mono");
-    const upgrade = versionMetadata?.querySelector(".text-version-upgrade");
-    expect(upgrade?.textContent).toBe("1.0.1");
-    expect(upgrade?.className).toContain("font-semibold");
-    expect(
-      claudeRow?.querySelector("[data-version-metadata]")?.textContent,
-    ).toBe("1.0.0");
-
-    fireEvent.click(screen.getByRole("button", { name: "Update workstation" }));
-    expect(startInstallMock).toHaveBeenCalledTimes(1);
-    expect(startInstallMock).toHaveBeenCalledWith({
-      hostId: "host_1",
-      issue: codexIssue,
-    });
-
-    fireEvent.click(toggle);
-    expect(row.querySelector("[data-updates-machine-detail]")).toBeNull();
-  });
-
-  it("names the updater from the command the machine reports", () => {
-    const host = makeHost({ id: "host_1", name: "workstation" });
-    const withCommand = (
-      provider: "codex" | "claude-code",
-      command: string,
-    ): ProviderCliActionableIssue => {
-      const issue = makeUpdateIssue({ provider });
-      const action = { ...issue.action, command };
-      return {
-        ...issue,
-        action,
-        status: { ...issue.status, installAction: action },
-      };
-    };
-    useUpdateInventoryMock.mockReturnValue(
-      makeInventory({
-        machines: [
-          makeMachine({
-            host,
-            issues: [
-              withCommand("codex", "mise upgrade npm:@openai/codex"),
-              withCommand(
-                "claude-code",
-                "/opt/homebrew/bin/brew upgrade claude-code",
-              ),
-            ],
-          }),
-        ],
-      }),
-    );
-
-    renderSection();
-    fireEvent.click(screen.getByRole("button", { name: "workstation" }));
-
-    expect(
-      [...document.querySelectorAll("[data-provider-updater]")].map(
-        (label) => label.textContent,
-      ),
-    ).toEqual(["mise", "Homebrew"]);
-  });
-
   it("badges the client-local daemon independently from the server machine", async () => {
     const primary = makeHost({ id: "host_primary", name: "workstation" });
     const local = makeHost({ id: "host_local", name: "studio-mac" });
@@ -765,18 +422,17 @@ describe("UpdatesSettingsSection", () => {
         machines: [
           makeMachine({
             host: primary,
-            issues: [makeUpdateIssue({ provider: "codex" })],
             isPrimary: true,
           }),
           makeMachine({
             host: local,
-            issues: [makeUpdateIssue({ provider: "claudeCode" })],
           }),
         ],
       }),
     );
 
     renderSection();
+    fireEvent.click(screen.getByRole("button", { name: "Show machines" }));
 
     const primaryHeading = document.querySelector<HTMLElement>(
       '[data-updates-machine="host_primary"]',
@@ -804,7 +460,6 @@ describe("UpdatesSettingsSection", () => {
         machines: [
           makeMachine({
             host: primary,
-            issues: [makeUpdateIssue({ provider: "codex" })],
             isPrimary: true,
           }),
         ],
@@ -812,6 +467,7 @@ describe("UpdatesSettingsSection", () => {
     );
 
     renderSection();
+    fireEvent.click(screen.getByRole("button", { name: "Show machines" }));
 
     const primaryHeading = document.querySelector<HTMLElement>(
       '[data-updates-machine="host_primary"]',
@@ -824,84 +480,6 @@ describe("UpdatesSettingsSection", () => {
       ).toBe(true);
     });
     expect(primaryHeading.textContent).not.toContain("This machine");
-  });
-
-  it("lists Cursor updates with the other provider CLIs", async () => {
-    const host = makeHost({ id: "host_1", name: "workstation" });
-    const cursorIssue = makeUpdateIssue({ provider: "acp-cursor" });
-    useUpdateInventoryMock.mockReturnValue(
-      makeInventory({
-        machines: [makeMachine({ host, issues: [cursorIssue] })],
-      }),
-    );
-
-    renderSection();
-
-    expect(
-      document.querySelector('[data-provider-avatar="acp-cursor"]'),
-    ).not.toBeNull();
-    fireEvent.click(screen.getByRole("button", { name: "workstation" }));
-    expect(
-      document.querySelector('[data-provider-row="acp-cursor"]')?.textContent,
-    ).toContain("Cursor");
-    fireEvent.click(screen.getByRole("button", { name: "Update workstation" }));
-    expect(startInstallMock).toHaveBeenCalledWith({
-      hostId: "host_1",
-      issue: cursorIssue,
-    });
-  });
-
-  it("piles every outdated CLI onto its machine's single line", () => {
-    const host = makeHost({ id: "host_1", name: "workstation" });
-    useUpdateInventoryMock.mockReturnValue(
-      makeInventory({
-        machines: [
-          makeMachine({
-            host,
-            issues: [
-              makeUpdateIssue({ provider: "codex" }),
-              makeUpdateIssue({ provider: "claude-code" }),
-            ],
-          }),
-        ],
-      }),
-    );
-
-    renderSection();
-
-    expect(screen.getAllByText("workstation")).toHaveLength(1);
-    const row = document.querySelector('[data-updates-machine="host_1"]');
-    expect(
-      [...(row?.querySelectorAll("[data-provider-avatar]") ?? [])].map(
-        (avatar) => avatar.getAttribute("data-provider-avatar"),
-      ),
-    ).toEqual(["codex", "claude-code"]);
-    expect(row?.querySelector("[data-provider-manual]")).toBeNull();
-    expect(row?.querySelector("[data-provider-activity]")).toBeNull();
-    fireEvent.click(
-      row?.querySelector('[data-provider-avatar="codex"]') as HTMLElement,
-    );
-    expect(
-      row?.querySelectorAll("[data-provider-row] [data-version-metadata]")
-        .length,
-    ).toBe(2);
-  });
-
-  it("shows one quiet line while provider checks are still running", async () => {
-    const host = makeHost({ id: "host_1", name: "workstation" });
-    useUpdateInventoryMock.mockReturnValue(
-      makeInventory({
-        machines: [makeMachine({ host, statusPending: true })],
-      }),
-    );
-
-    renderSection();
-
-    const summary = document.querySelector("[data-updates-summary]");
-    expect(summary?.textContent).toBe("Checking for updates…");
-    expect(summary?.querySelector('[data-icon="Loading"]')).not.toBeNull();
-    expect(screen.queryByText(/Nothing to update/)).toBeNull();
-    expect(document.querySelector("[data-updates-machine]")).toBeNull();
   });
 
   it("ignores repeat Retry clicks while the retry is running", () => {
@@ -922,272 +500,6 @@ describe("UpdatesSettingsSection", () => {
     );
 
     expect(onClick).not.toHaveBeenCalled();
-  });
-
-  it("keeps error red on the reason and off the recovery", () => {
-    const host = makeHost({ id: "host_1", name: "workstation" });
-    useUpdateInventoryMock.mockReturnValue(
-      makeInventory({
-        machines: [makeMachine({ host, statusError: true })],
-      }),
-    );
-
-    renderSection();
-
-    expect(screen.getByText("Couldn't check for updates").className).toContain(
-      "text-destructive",
-    );
-    const retry = screen.getByRole("button", {
-      name: /Check workstation's CLIs again/,
-    });
-    expect(retry.className).not.toContain("text-destructive");
-    expect(retry.hasAttribute("disabled")).toBe(false);
-  });
-
-  it("leaves never-installed CLIs off an update page", () => {
-    const host = makeHost({ id: "host_1", name: "workstation" });
-    const missingCodex = makeUpdateIssue({ provider: "codex" });
-    useUpdateInventoryMock.mockReturnValue(
-      makeInventory({
-        machines: [
-          makeMachine({
-            host,
-            issues: [
-              {
-                ...missingCodex,
-                status: {
-                  ...missingCodex.status,
-                  installed: false,
-                  currentVersion: null,
-                },
-              },
-              makeUpdateIssue({ provider: "claude-code" }),
-            ],
-          }),
-        ],
-      }),
-    );
-
-    renderSection();
-
-    expect(
-      [...document.querySelectorAll("[data-provider-avatar]")].map((avatar) =>
-        avatar.getAttribute("data-provider-avatar"),
-      ),
-    ).toEqual(["claude-code"]);
-    fireEvent.click(screen.getByRole("button", { name: "workstation" }));
-    expect(screen.getByText("Claude Code")).toBeDefined();
-    expect(screen.queryByText("Codex")).toBeNull();
-  });
-
-  it("swaps Update all for progress while every job is running or queued", () => {
-    const host = makeHost({ id: "host_1", name: "workstation" });
-    const codexIssue = makeUpdateIssue({ provider: "codex" });
-    const claudeIssue = makeUpdateIssue({ provider: "claude-code" });
-    useUpdateInventoryMock.mockReturnValue(
-      makeInventory({
-        machines: [makeMachine({ host, issues: [codexIssue, claudeIssue] })],
-      }),
-    );
-    useProviderCliInstallRunnerMock.mockReturnValue({
-      failuresByJobKey: new Map(),
-      queuedJobKeys: new Set(["host_1:claude-code"]),
-      runningJobKey: "host_1:codex",
-      startInstall: startInstallMock,
-    });
-
-    renderSection();
-
-    expect(screen.queryByRole("button", { name: /Update all/ })).toBeNull();
-    expect(document.querySelector("[data-updates-progress]")?.textContent).toBe(
-      "Updating 1 of 2",
-    );
-    expect(
-      document
-        .querySelector('[data-provider-avatar="codex"]')
-        ?.getAttribute("data-provider-activity"),
-    ).toBe("running");
-    expect(
-      document
-        .querySelector('[data-provider-avatar="claude-code"]')
-        ?.getAttribute("data-provider-activity"),
-    ).toBe("queued");
-
-    fireEvent.click(screen.getByRole("button", { name: "workstation" }));
-    expect(
-      document.querySelectorAll(
-        '[data-updates-machine="host_1"] [data-provider-row] [data-update-state="in-progress"]',
-      ).length,
-    ).toBe(2);
-    expect(
-      screen.queryByRole("button", { name: "Update workstation" }),
-    ).toBeNull();
-  });
-
-  it("counts progress through an Update all batch", () => {
-    const host = makeHost({ id: "host_1", name: "workstation" });
-    useUpdateInventoryMock.mockReturnValue(
-      makeInventory({
-        machines: [
-          makeMachine({
-            host,
-            issues: [
-              makeUpdateIssue({ provider: "codex" }),
-              makeUpdateIssue({ provider: "claude-code" }),
-              makeUpdateIssue({ provider: "acp-cursor" }),
-            ],
-          }),
-        ],
-      }),
-    );
-    const runner = (runningJobKey: string | null, queued: string[]) => ({
-      failuresByJobKey: new Map(),
-      queuedJobKeys: new Set(queued),
-      runningJobKey,
-      startInstall: startInstallMock,
-    });
-    const queryClient = new QueryClient();
-    const tree = () => (
-      <MemoryRouter>
-        <TooltipProvider>
-          <QueryClientProvider client={queryClient}>
-            <UpdatesSettingsSection />
-          </QueryClientProvider>
-        </TooltipProvider>
-      </MemoryRouter>
-    );
-    const progress = () =>
-      document.querySelector("[data-updates-progress]")?.textContent ?? null;
-
-    useProviderCliInstallRunnerMock.mockReturnValue(
-      runner("host_1:codex", ["host_1:claude-code", "host_1:acp-cursor"]),
-    );
-    const view = render(tree());
-    expect(progress()).toBe("Updating 1 of 3");
-
-    useProviderCliInstallRunnerMock.mockReturnValue(
-      runner("host_1:claude-code", ["host_1:acp-cursor"]),
-    );
-    view.rerender(tree());
-    expect(progress()).toBe("Updating 2 of 3");
-
-    useProviderCliInstallRunnerMock.mockReturnValue(
-      runner("host_1:acp-cursor", []),
-    );
-    view.rerender(tree());
-    expect(progress()).toBe("Updating 3 of 3");
-
-    useProviderCliInstallRunnerMock.mockReturnValue(runner(null, []));
-    view.rerender(tree());
-    expect(progress()).toBeNull();
-    expect(
-      screen.getByRole("button", { name: "Update all 3 CLI tools" }),
-    ).toBeDefined();
-  });
-
-  it("keeps a provider update failure and its command log on the machine", () => {
-    const host = makeHost({ id: "host_1", name: "workstation" });
-    const issue = makeUpdateIssue({ provider: "claude-code" });
-    const logDialogState = {
-      displayName: "Claude Code",
-      log: "$ claude update\npermission denied\n",
-      message: "Command exited with code 1",
-      title: "Claude Code update log",
-    };
-    useUpdateInventoryMock.mockReturnValue(
-      makeInventory({
-        machines: [makeMachine({ host, issues: [issue] })],
-      }),
-    );
-    useProviderCliInstallRunnerMock.mockReturnValue({
-      failuresByJobKey: new Map([
-        [
-          "host_1:claude-code",
-          {
-            issueFingerprint: issue.fingerprint,
-            kind: "interrupted",
-            logDialogState,
-          },
-        ],
-      ]),
-      queuedJobKeys: new Set(),
-      runningJobKey: null,
-      startInstall: startInstallMock,
-    });
-
-    renderSection();
-
-    expect(screen.getByText("Claude Code failed").className).toContain(
-      "text-destructive",
-    );
-    expect(
-      document
-        .querySelector('[data-provider-avatar="claude-code"]')
-        ?.getAttribute("data-provider-activity"),
-    ).toBe("failed");
-    fireEvent.click(
-      screen.getByRole("button", {
-        name: "Failed · Retry failed updates on workstation",
-      }),
-    );
-    expect(startInstallMock).toHaveBeenCalledWith({ hostId: "host_1", issue });
-
-    fireEvent.click(screen.getByRole("button", { name: "workstation" }));
-    expect(
-      screen.getByText("Connection lost during update").className,
-    ).toContain("sr-only");
-    expect(screen.queryByText("Command exited with code 1")).toBeNull();
-    expect(
-      screen.getByRole("button", {
-        name: "Failed · Retry Claude Code on workstation",
-      }),
-    ).toBeDefined();
-    fireEvent.click(
-      screen.getByRole("button", { name: "View Claude Code update log" }),
-    );
-    expect(getProviderCliInstallSnapshot().logDialogState).toEqual(
-      logDialogState,
-    );
-  });
-
-  it("runs every actionable provider update across machines from Update all", async () => {
-    const laptop = makeHost({ id: "host_1", name: "laptop" });
-    const homelab = makeHost({ id: "host_2", name: "homelab" });
-    const laptopIssue = makeUpdateIssue({ provider: "codex" });
-    const homelabIssue = makeUpdateIssue({ provider: "claude-code" });
-    useUpdateInventoryMock.mockReturnValue(
-      makeInventory({
-        machines: [
-          makeMachine({ host: laptop, issues: [laptopIssue] }),
-          makeMachine({ host: homelab, issues: [homelabIssue] }),
-        ],
-        actionableCount: 2,
-        hasAttention: true,
-      }),
-    );
-
-    renderSection();
-    expect(useProviderCliInstallRunnerMock).toHaveBeenCalled();
-    expect(screen.getByRole("button", { name: "laptop" })).toBeDefined();
-    expect(screen.getByRole("button", { name: "homelab" })).toBeDefined();
-    const updateAll = screen.getByRole("button", {
-      name: "Update all 2 CLI tools",
-    });
-    expect(updateAll.textContent).toBe("Update all");
-    expect(updateAll.firstElementChild?.getAttribute("data-icon")).toBe(
-      "Download",
-    );
-
-    fireEvent.click(updateAll);
-    expect(startInstallMock).toHaveBeenCalledTimes(2);
-    expect(startInstallMock).toHaveBeenNthCalledWith(1, {
-      hostId: "host_1",
-      issue: laptopIssue,
-    });
-    expect(startInstallMock).toHaveBeenNthCalledWith(2, {
-      hostId: "host_2",
-      issue: homelabIssue,
-    });
   });
 
   it("updates tracking plugins from the Plugins section and leaves blocked ones alone", async () => {
@@ -1384,37 +696,6 @@ describe("UpdatesSettingsSection", () => {
         description: "Notes — server move in progress",
       });
     });
-  });
-
-  it("shows an external Claude installation as a manual update without an update button", () => {
-    const host = makeHost({ id: "host_1", name: "workstation" });
-    const issue = makeManualUpdateIssue({ provider: "claude-code" });
-    useUpdateInventoryMock.mockReturnValue(
-      makeInventory({
-        machines: [makeMachine({ host, issues: [issue] })],
-        actionableCount: 1,
-        hasAttention: true,
-      }),
-    );
-
-    renderSection();
-
-    expect(screen.getByText("1 manual")).toBeDefined();
-    expect(
-      document
-        .querySelector('[data-provider-avatar="claude-code"]')
-        ?.hasAttribute("data-provider-manual"),
-    ).toBe(true);
-    expect(screen.queryByRole("button", { name: /Update all/ })).toBeNull();
-
-    fireEvent.click(screen.getByRole("button", { name: "workstation" }));
-    expect(
-      document.querySelector('[data-provider-row="claude-code"]')?.textContent,
-    ).toContain("Update in terminal");
-    expect(
-      screen.queryByRole("button", { name: "Update workstation" }),
-    ).toBeNull();
-    expect(screen.queryByRole("button", { name: "Update" })).toBeNull();
   });
 
   it("omits an empty machine container", async () => {

@@ -4,10 +4,7 @@ import path from "node:path";
 import { describe, expect, it } from "vitest";
 import {
   compareVersions,
-  downloadedInstallerCommand,
   formatCommand,
-  installationVerification,
-  npmGlobalInstallSource,
   readCliVersion,
   versionFrom,
 } from "./provider-maintenance-kit.js";
@@ -144,84 +141,5 @@ describe("provider maintenance kit", () => {
     expect(formatCommand("sh", ["-c", "echo 'hi' && ls"])).toBe(
       "sh -c 'echo '\\''hi'\\'' && ls'",
     );
-  });
-
-  it("attributes an executable inside npm's global bin to npm", () => {
-    const npmBin = path.join(path.sep, "usr", "local", "bin");
-    expect(
-      npmGlobalInstallSource({
-        installed: true,
-        executablePath: path.join(npmBin, "codex"),
-        npmBin,
-      }),
-    ).toBe("npmGlobal");
-    expect(
-      npmGlobalInstallSource({
-        installed: true,
-        executablePath: path.join(path.sep, "opt", "homebrew", "bin", "codex"),
-        npmBin,
-      }),
-    ).toBe("external");
-    expect(
-      npmGlobalInstallSource({ installed: true, executablePath: null, npmBin }),
-    ).toBe("external");
-    expect(
-      npmGlobalInstallSource({
-        installed: false,
-        executablePath: null,
-        npmBin: null,
-      }),
-    ).toBe("notInstalled");
-  });
-
-  it("verifies an update against the latest version, or a change when the registry was unreachable", () => {
-    expect(
-      installationVerification(
-        { currentVersion: "1.0.0", latestVersion: "1.1.0" },
-        "update",
-      ),
-    ).toEqual({ kind: "version_at_least", version: "1.1.0" });
-    expect(
-      installationVerification(
-        { currentVersion: "1.0.0", latestVersion: null },
-        "update",
-      ),
-    ).toEqual({ kind: "version_changed", previousVersion: "1.0.0" });
-    expect(
-      installationVerification(
-        { currentVersion: null, latestVersion: null },
-        "install",
-      ),
-    ).toEqual({ kind: "installed" });
-  });
-
-  it("runs a PowerShell installer on Windows only when one is published", () => {
-    expect(
-      downloadedInstallerCommand("https://example.test/install.sh", {
-        platform: "win32",
-        powershellUrl: "https://example.test/install.ps1",
-      }),
-    ).toEqual({
-      command: "powershell.exe",
-      args: [
-        "-NoProfile",
-        "-ExecutionPolicy",
-        "Bypass",
-        "-Command",
-        "irm https://example.test/install.ps1 | iex",
-      ],
-      displayCommand: "irm https://example.test/install.ps1 | iex",
-    });
-    expect(
-      downloadedInstallerCommand("https://example.test/install.sh", {
-        platform: "linux",
-        powershellUrl: "https://example.test/install.ps1",
-      }).command,
-    ).toBe("sh");
-    expect(
-      downloadedInstallerCommand("https://example.test/install.sh", {
-        platform: "win32",
-      }).command,
-    ).toBe("sh");
   });
 });

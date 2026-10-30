@@ -39,10 +39,6 @@ interface MachineRemoveCommandOptions extends MachineMutationCommandOptions {
   force?: boolean;
 }
 
-interface MachineProviderInstallOptions extends MachineListCommandOptions {
-  action?: "install" | "update";
-}
-
 const MACHINE_LIFECYCLE_TIMEOUT_MS = 15 * 60_000;
 const MACHINE_LIFECYCLE_POLL_MS = 500;
 
@@ -592,10 +588,10 @@ export function registerMachineCommands(
 
   const providerCli = machine
     .command("provider-cli")
-    .description("Inspect and install provider CLIs on a machine");
+    .description("Inspect provider CLIs on a machine");
   providerCli
     .command("status <id-or-name>")
-    .description("Show registered provider CLI installation/update status")
+    .description("Show registered provider CLI installation status")
     .option("--json", "Print machine-readable JSON output")
     .action(
       action(async (target: string, opts: MachineListCommandOptions) => {
@@ -608,36 +604,6 @@ export function registerMachineCommands(
         if (outputJson(opts, result)) return;
         console.log(JSON.stringify(result, null, 2));
       }),
-    );
-  providerCli
-    .command("install <id-or-name> <provider>")
-    .description("Install or update a registered provider CLI by provider ID")
-    .option("--action <action>", "Action: install or update", "install")
-    .option("--json", "Print machine-readable JSON output")
-    .action(
-      action(
-        async (
-          target: string,
-          provider: string,
-          opts: MachineProviderInstallOptions,
-        ) => {
-          if (opts.action !== "install" && opts.action !== "update") {
-            throw new Error("--action must be install or update.");
-          }
-          const sdk = createCliBbSdk(getUrl());
-          const hostId = await resolveMachineHostId({
-            serverUrl: getUrl(),
-            target,
-          });
-          const events = await sdk.hosts.installProviderCli({
-            hostId,
-            provider: parseProviderCliKey(provider),
-            actionKind: opts.action,
-          });
-          if (outputJson(opts, events)) return;
-          for (const event of events) console.log(JSON.stringify(event));
-        },
-      ),
     );
 }
 

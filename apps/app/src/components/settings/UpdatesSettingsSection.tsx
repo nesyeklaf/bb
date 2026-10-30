@@ -1,6 +1,5 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import type { ProviderInfo } from "@bb/domain";
 import {
   RETRY_ACTION_ICON,
   UPDATE_ACTION_ICON,
@@ -20,24 +19,8 @@ import {
   ResourceActionButton,
   ResourceListState,
 } from "@bb/shared-ui/resource-list";
-import {
-  hasProviderCliAction,
-  isProviderCliUpdateIssue,
-  providerCliEntries,
-  useProviderCliInstallRunner,
-  type ProviderCliActionableIssue,
-  type ProviderCliIssue,
-  type ProviderCliStatusEntry,
-} from "@/components/provider-cli/provider-cli-install";
-import {
-  openProviderCliInstallLog,
-  PROVIDER_CLI_FAILURE_SUMMARIES,
-  providerCliJobKey,
-  type ProviderCliInstallFailure,
-} from "@/components/provider-cli/provider-cli-install-store";
 import { appToast } from "@/components/ui/app-toast";
 import { SettingsSection } from "@/components/ui/settings-section";
-import { invalidateHostProviderCliStatus } from "@/hooks/cache-owners/provider-cli-status-cache-owner";
 import { useRetryHostUpdate } from "@/hooks/mutations/host-mutations";
 import {
   useUpdateInventory,
@@ -62,11 +45,7 @@ import {
   hostNeedsUpdate,
   hostUpdateIsStalled,
 } from "@/lib/host-update-status";
-import { ProviderIcon } from "@/components/plugin/ProviderIcon";
-import {
-  useSystemConfig,
-  useSystemProviders,
-} from "@/hooks/queries/system-queries";
+import { useSystemConfig } from "@/hooks/queries/system-queries";
 
 const BULK_RETRY_THRESHOLD = 1;
 
@@ -351,36 +330,6 @@ function RowActions({ children }: { children: ReactNode }) {
   );
 }
 
-function providerStatusIsVisible(machine: UpdateInventoryMachine): boolean {
-  return !(
-    machine.canRetryDaemonUpdate ||
-    machine.host.status !== "connected" ||
-    machine.statusError ||
-    machine.statusPending ||
-    machine.providerStatus === null
-  );
-}
-
-function visibleProviderUpdateIssues(
-  machine: UpdateInventoryMachine,
-): ProviderCliIssue[] {
-  if (!providerStatusIsVisible(machine)) {
-    return [];
-  }
-  return machine.issues.filter(isProviderCliUpdateIssue);
-}
-
-function visibleInstalledProviderEntries(
-  machine: UpdateInventoryMachine,
-): ProviderCliStatusEntry[] {
-  if (!providerStatusIsVisible(machine) || machine.providerStatus === null) {
-    return [];
-  }
-  return providerCliEntries(machine.providerStatus).filter(
-    (entry) => entry.status.installed,
-  );
-}
-
 type MachineDaemonState = "updating" | "stalled" | "ahead" | "offline";
 
 function machineDaemonState(
@@ -402,284 +351,27 @@ function machineNeedsAttention(
   now: number,
 ): boolean {
   const daemon = machineDaemonState(machine, now);
-  return (
-    (daemon !== null && daemon !== "offline") ||
-    machine.statusError ||
-    visibleProviderUpdateIssues(machine).length > 0
-  );
+  return daemon !== null && daemon !== "offline";
 }
 
-interface ProviderCliJobState {
-  runningJobKey: string | null;
-  queuedJobKeys: ReadonlySet<string>;
-  failuresByJobKey: ReadonlyMap<string, ProviderCliInstallFailure>;
-}
-
-interface MachineProviderItem {
-  provider: ProviderCliStatusEntry["provider"];
-  status: ProviderCliStatusEntry["status"];
-  issue: ProviderCliIssue | null;
-  activity: "running" | "queued" | null;
-  failure: ProviderCliInstallFailure | null;
-}
-
-function machineProviderItems(
-  machine: UpdateInventoryMachine,
-  jobs: ProviderCliJobState,
-): MachineProviderItem[] {
-  const issuesByProvider = new Map(
-    visibleProviderUpdateIssues(machine).map((issue) => [
-      issue.provider,
-      issue,
-    ]),
-  );
-  return visibleInstalledProviderEntries(machine).map(
-    ({ provider, status }) => {
-      const issue = issuesByProvider.get(provider) ?? null;
-      const jobKey = providerCliJobKey(machine.host.id, provider);
-      const storedFailure = jobs.failuresByJobKey.get(jobKey) ?? null;
-      return {
-        provider,
-        status,
-        issue,
-        activity:
-          jobs.runningJobKey === jobKey
-            ? "running"
-            : jobs.queuedJobKeys.has(jobKey)
-              ? "queued"
-              : null,
-        failure:
-          issue !== null &&
-          storedFailure?.issueFingerprint === issue.fingerprint
-            ? storedFailure
-            : null,
-      };
-    },
-  );
-}
-
-function itemIsStartable(
-  item: MachineProviderItem,
-): item is MachineProviderItem & {
-  issue: ProviderCliActionableIssue;
-} {
-  return (
-    item.issue !== null &&
-    hasProviderCliAction(item.issue) &&
-    item.activity === null
-  );
-}
-
-const UPDATER_NAMES: Record<string, string> = {
-  brew: "Homebrew",
-  bun: "Bun",
-  mise: "mise",
-  npm: "npm",
-  pnpm: "pnpm",
-};
-
-export function providerCliUpdaterName(
-  status: ProviderCliStatusEntry["status"],
-): string | null {
-  const command = status.installAction?.command.trim().split(/\s+/u)[0];
-  if (command === undefined || command.length === 0) {
-    return null;
-  }
-  const executable = (command.split(/[\\/]/u).pop() ?? command).replace(
-    /\.(?:exe|cmd|bat)$/iu,
-    "",
-  );
-  if (executable === status.executableName) {
-    return "Built-in updater";
-  }
-  return UPDATER_NAMES[executable] ?? executable;
-}
-
-function providerItemState(item: MachineProviderItem): UpdateState {
-  if (item.issue === null) {
-    return item.status.latestVersion === null ? "latest-unknown" : "up-to-date";
-  }
-  return item.issue.action === null ? "update-manually" : "update-available";
-}
-
-function ProviderAvatar({
-  item,
-  providerInfo,
-  onToggle,
-}: {
-  item: MachineProviderItem;
-  providerInfo: ProviderInfo | undefined;
-  onToggle: () => void;
-}) {
-  const manual = item.issue?.action === null;
-  return (
-    <Tooltip>
-      <TooltipTrigger asChild>
-        <span
-          data-provider-avatar={item.provider}
-          data-provider-activity={
-            item.failure !== null ? "failed" : (item.activity ?? undefined)
-          }
-          data-provider-manual={manual ? "" : undefined}
-          className={cn(
-            "relative z-10 -ml-1.5 flex size-6 shrink-0 cursor-pointer items-center justify-center rounded-full ring-2 ring-card first:ml-0",
-            manual
-              ? "bg-card outline-1 -outline-offset-1 outline-subtle-foreground outline-dashed"
-              : "bg-muted",
-          )}
-          onClick={onToggle}
-        >
-          <ProviderIcon
-            providerKind="agent"
-            provider={providerInfo ?? { id: item.provider }}
-            className={cn("size-3.5", manual && "opacity-60")}
-          />
-          {item.activity === "running" ? (
-            <span
-              aria-hidden
-              className="absolute -inset-0.5 animate-spin rounded-full border-2 border-transparent border-t-foreground motion-reduce:animate-none"
-            />
-          ) : null}
-          {item.failure !== null ? (
-            <span
-              aria-hidden
-              className="absolute -right-0.5 -bottom-0.5 size-2 rounded-full bg-destructive ring-2 ring-card"
-            />
-          ) : null}
-        </span>
-      </TooltipTrigger>
-      <TooltipContent>
-        {item.status.displayName}
-        {item.status.currentVersion === null
-          ? null
-          : ` ${item.status.currentVersion}`}
-        {item.status.latestVersion === null ||
-        item.status.latestVersion === item.status.currentVersion
-          ? null
-          : ` → ${item.status.latestVersion}`}
-      </TooltipContent>
-    </Tooltip>
-  );
-}
-
-function ProviderDetailRow({
-  hostName,
-  item,
-  providerInfo,
-  onStart,
-}: {
-  hostName: string;
-  item: MachineProviderItem;
-  providerInfo: ProviderInfo | undefined;
-  onStart: (issue: ProviderCliActionableIssue) => void;
-}) {
-  const { status, issue, failure } = item;
-  const state = providerItemState(item);
-  const updater = issue === null ? null : providerCliUpdaterName(status);
-  const retryIssue =
-    failure !== null && itemIsStartable(item) ? item.issue : null;
-  return (
-    <div
-      data-provider-row={item.provider}
-      className="grid min-h-8 min-w-0 grid-cols-[1rem_minmax(0,1fr)_auto] items-center gap-x-2.5 text-sm"
-    >
-      <span
-        data-provider-icon={item.provider}
-        aria-hidden
-        className="flex size-3.5 shrink-0 items-center justify-center"
-      >
-        <ProviderIcon
-          providerKind="agent"
-          provider={providerInfo ?? { id: item.provider }}
-          className="size-3.5 text-muted-foreground"
-        />
-      </span>
-      <span className="flex min-w-0 flex-wrap items-baseline gap-x-3 gap-y-0.5">
-        <span className="w-28 shrink-0 truncate text-foreground">
-          {status.displayName}
-        </span>
-        <RowVersions
-          current={status.currentVersion}
-          latest={issue !== null ? status.latestVersion : null}
-        />
-      </span>
-      <span className="flex shrink-0 items-center justify-end gap-1.5">
-        {state === "update-manually" ? (
-          <span className="text-xs text-subtle-foreground">
-            {UPDATE_STATE_PRESENTATION["update-manually"].label}
-          </span>
-        ) : updater === null || status.installAction === null ? null : (
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <span
-                data-provider-updater
-                tabIndex={0}
-                className="rounded-sm text-xs text-subtle-foreground focus-visible:ring-1 focus-visible:ring-ring focus-visible:outline-none"
-              >
-                {updater}
-              </span>
-            </TooltipTrigger>
-            <TooltipContent>
-              <code className="font-mono">{status.installAction.command}</code>
-            </TooltipContent>
-          </Tooltip>
-        )}
-        {failure === null ? null : (
-          <FailureIndicator
-            reason={PROVIDER_CLI_FAILURE_SUMMARIES[failure.kind]}
-            openLabel={`View ${status.displayName} update log`}
-            openTooltip="View log"
-            onOpen={() => openProviderCliInstallLog(failure.logDialogState)}
-          />
-        )}
-        {item.activity !== null ? (
-          <RowStateControl live state="in-progress" />
-        ) : retryIssue !== null ? (
-          <RowStateControl
-            state="failed"
-            actionIcon={RETRY_ACTION_ICON as IconName}
-            actionLabel={`Retry ${status.displayName} on ${hostName}`}
-            actionTooltip="Retry"
-            onClick={() => onStart(retryIssue)}
-          />
-        ) : state === "up-to-date" || state === "latest-unknown" ? (
-          <RowStateControl state={state} />
-        ) : null}
-      </span>
-    </div>
-  );
-}
-
-interface MachineUpdateRowProps extends ProviderCliJobState {
+interface MachineUpdateRowProps {
   machine: UpdateInventoryMachine;
   now: number;
   tags: readonly string[];
-  expanded: boolean;
   retryUpdatePending: boolean;
-  onToggle: () => void;
-  onStartInstall: (hostId: string, issue: ProviderCliActionableIssue) => void;
   onRetryDaemonUpdate: (hostId: string) => void;
-  onRecheckClis: (hostId: string) => void;
 }
 
 function MachineRowNote({
   machine,
   daemon,
-  items,
   retryUpdatePending,
-  onStartInstall,
   onRetryDaemonUpdate,
-  onRecheckClis,
 }: Pick<
   MachineUpdateRowProps,
-  | "machine"
-  | "retryUpdatePending"
-  | "onStartInstall"
-  | "onRetryDaemonUpdate"
-  | "onRecheckClis"
+  "machine" | "retryUpdatePending" | "onRetryDaemonUpdate"
 > & {
   daemon: MachineDaemonState | null;
-  items: MachineProviderItem[];
 }) {
   const { host } = machine;
   if (daemon === "updating") {
@@ -715,67 +407,6 @@ function MachineRowNote({
   if (daemon === "offline") {
     return <RowStateCaption state="offline">Offline</RowStateCaption>;
   }
-  if (machine.statusError) {
-    return (
-      <>
-        <RowStateCaption state="failed">
-          Couldn't check for updates
-        </RowStateCaption>
-        <RowStateControl
-          state="failed"
-          actionIcon={RETRY_ACTION_ICON as IconName}
-          actionTooltip="Retry"
-          actionLabel={`Check ${host.name}'s CLIs again`}
-          loading={machine.statusFetching}
-          onClick={() => onRecheckClis(host.id)}
-        />
-      </>
-    );
-  }
-  const failed = items.filter((item) => item.failure !== null);
-  if (failed.length > 0) {
-    const retryable = failed.filter(itemIsStartable);
-    return (
-      <>
-        <RowStateCaption state="failed">
-          {failed.length === 1
-            ? `${failed[0]?.status.displayName} failed`
-            : `${failed.length} failed`}
-        </RowStateCaption>
-        {retryable.length === 0 ? null : (
-          <RowStateControl
-            state="failed"
-            actionIcon={RETRY_ACTION_ICON as IconName}
-            actionTooltip="Retry"
-            actionLabel={`Retry failed updates on ${host.name}`}
-            onClick={() => {
-              for (const item of retryable) {
-                onStartInstall(host.id, item.issue);
-              }
-            }}
-          />
-        )}
-      </>
-    );
-  }
-  const manual = items.filter((item) => item.issue?.action === null).length;
-  if (manual > 0) {
-    return (
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <span
-            tabIndex={0}
-            className="rounded-sm text-xs text-subtle-foreground focus-visible:ring-1 focus-visible:ring-ring focus-visible:outline-none"
-          >
-            {manual} manual
-          </span>
-        </TooltipTrigger>
-        <TooltipContent>
-          {UPDATE_STATE_PRESENTATION["update-manually"].label}
-        </TooltipContent>
-      </Tooltip>
-    );
-  }
   return null;
 }
 
@@ -783,38 +414,14 @@ export function MachineUpdateRow({
   machine,
   now,
   tags,
-  expanded,
   retryUpdatePending,
-  runningJobKey,
-  queuedJobKeys,
-  failuresByJobKey,
-  onToggle,
-  onStartInstall,
   onRetryDaemonUpdate,
-  onRecheckClis,
 }: MachineUpdateRowProps) {
   const { host } = machine;
-  const providerRoster = useSystemProviders().data;
-  const items = machineProviderItems(machine, {
-    runningJobKey,
-    queuedJobKeys,
-    failuresByJobKey,
-  });
-  const outdated = items.filter((item) => item.issue !== null);
-  const startable = items.filter(itemIsStartable);
   const daemon = machineDaemonState(machine, now);
-  const expandable = items.length > 0;
-  const detailId = `updates-machine-detail-${host.id}`;
-  const providerInfoFor = (provider: string) =>
-    providerRoster?.find((candidate) => candidate.id === provider);
   return (
     <div data-updates-machine={host.id}>
-      <div
-        className={cn(
-          "relative grid min-h-12 min-w-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-3 px-4 py-2 text-sm",
-          expandable && "hover:bg-state-hover",
-        )}
-      >
+      <div className="relative grid min-h-12 min-w-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-3 px-4 py-2 text-sm">
         <span className="flex min-w-0 items-center gap-3">
           <span className="flex h-5 w-6 shrink-0 items-center justify-center">
             <Icon
@@ -824,21 +431,9 @@ export function MachineUpdateRow({
             />
           </span>
           <span className="flex min-w-0 items-baseline gap-2">
-            {expandable ? (
-              <button
-                type="button"
-                aria-expanded={expanded}
-                aria-controls={detailId}
-                className="min-w-0 cursor-pointer truncate rounded-sm text-left font-medium text-foreground after:absolute after:inset-0 focus-visible:ring-1 focus-visible:ring-ring focus-visible:outline-none"
-                onClick={onToggle}
-              >
-                {host.name}
-              </button>
-            ) : (
-              <span className="min-w-0 truncate font-medium text-foreground">
-                {host.name}
-              </span>
-            )}
+            <span className="min-w-0 truncate font-medium text-foreground">
+              {host.name}
+            </span>
             {tags.map((tag) => (
               <span
                 key={tag}
@@ -854,63 +449,11 @@ export function MachineUpdateRow({
           <MachineRowNote
             machine={machine}
             daemon={daemon}
-            items={items}
             retryUpdatePending={retryUpdatePending}
-            onStartInstall={onStartInstall}
             onRetryDaemonUpdate={onRetryDaemonUpdate}
-            onRecheckClis={onRecheckClis}
           />
-          {outdated.length === 0 ? null : (
-            <span
-              data-provider-pile
-              className="flex shrink-0 items-center pl-1"
-            >
-              {outdated.map((item) => (
-                <ProviderAvatar
-                  key={item.provider}
-                  item={item}
-                  providerInfo={providerInfoFor(item.provider)}
-                  onToggle={onToggle}
-                />
-              ))}
-            </span>
-          )}
         </span>
       </div>
-      {expanded && expandable ? (
-        <div
-          id={detailId}
-          data-updates-machine-detail
-          className="border-t border-border-seam bg-muted/25 py-2 pr-4 pl-[3.25rem]"
-        >
-          {items.map((item) => (
-            <ProviderDetailRow
-              key={item.provider}
-              hostName={host.name}
-              item={item}
-              providerInfo={providerInfoFor(item.provider)}
-              onStart={(issue) => onStartInstall(host.id, issue)}
-            />
-          ))}
-          {startable.length === 0 ? null : (
-            <div className="flex justify-end pt-1.5">
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                className="h-7 px-2.5 text-xs"
-                onClick={() => {
-                  for (const item of startable) {
-                    onStartInstall(host.id, item.issue);
-                  }
-                }}
-              >
-                Update {host.name}
-              </Button>
-            </div>
-          )}
-        </div>
-      ) : null}
     </div>
   );
 }
@@ -919,25 +462,17 @@ function pluralMachines(count: number): string {
   return `${count} machine${count === 1 ? "" : "s"}`;
 }
 
-function quietFleetSummary(machines: readonly UpdateInventoryMachine[]): {
-  message: string;
-  checking: boolean;
-} {
+function quietFleetSummary(
+  machines: readonly UpdateInventoryMachine[],
+): string {
   const connected = machines.filter(
     (machine) => machine.host.status === "connected",
   );
   const offline = machines.length - connected.length;
-  if (connected.some((machine) => machine.statusPending)) {
-    return { message: "Checking for updates…", checking: true };
-  }
   if (connected.length === 0) {
-    return {
-      message:
-        machines.length === 1
-          ? `${machines[0]?.host.name} is offline.`
-          : `All ${pluralMachines(machines.length)} are offline.`,
-      checking: false,
-    };
+    return machines.length === 1
+      ? `${machines[0]?.host.name} is offline.`
+      : `All ${pluralMachines(machines.length)} are offline.`;
   }
   const scope =
     machines.length === 1
@@ -945,10 +480,7 @@ function quietFleetSummary(machines: readonly UpdateInventoryMachine[]): {
       : offline === 0
         ? `on all ${pluralMachines(connected.length)}`
         : `on ${pluralMachines(connected.length)}`;
-  return {
-    message: `Nothing to update ${scope}.${offline === 0 ? "" : ` ${offline} offline.`}`,
-    checking: false,
-  };
+  return `Nothing to update ${scope}.${offline === 0 ? "" : ` ${offline} offline.`}`;
 }
 
 function BulkUpdateProgress({ remainingJobs }: { remainingJobs: number }) {
@@ -981,40 +513,26 @@ function BulkUpdateProgress({ remainingJobs }: { remainingJobs: number }) {
   );
 }
 
-interface ProviderCliUpdatesSectionProps extends ProviderCliJobState {
+interface MachineUpdatesSectionProps {
   machines: readonly UpdateInventoryMachine[];
   now: number;
   localDaemonHostId: string | null;
   serverHostId: string | null;
   retryPendingHostId: string | null;
-  onStartInstall: (hostId: string, issue: ProviderCliActionableIssue) => void;
   onRetryDaemonUpdate: (hostId: string) => void;
   onRetryAllDaemonUpdates: (hostIds: string[]) => void;
-  onRecheckClis: (hostId: string) => void;
 }
 
-export function ProviderCliUpdatesSection({
+export function MachineUpdatesSection({
   machines,
   now,
   localDaemonHostId,
   serverHostId,
   retryPendingHostId,
-  runningJobKey,
-  queuedJobKeys,
-  failuresByJobKey,
-  onStartInstall,
   onRetryDaemonUpdate,
   onRetryAllDaemonUpdates,
-  onRecheckClis,
-}: ProviderCliUpdatesSectionProps) {
-  const [expandedHostIds, setExpandedHostIds] = useState<ReadonlySet<string>>(
-    () => new Set(),
-  );
+}: MachineUpdatesSectionProps) {
   const [showAll, setShowAll] = useState(false);
-  const jobs = { runningJobKey, queuedJobKeys, failuresByJobKey };
-
-  const remainingJobs = (runningJobKey === null ? 0 : 1) + queuedJobKeys.size;
-
   const attention = machines.filter((machine) =>
     machineNeedsAttention(machine, now),
   );
@@ -1022,63 +540,36 @@ export function ProviderCliUpdatesSection({
     (machine) => !machineNeedsAttention(machine, now),
   );
   const listed = showAll ? [...attention, ...quiet] : attention;
-  const startable = machines.flatMap((machine) =>
-    machineProviderItems(machine, jobs)
-      .filter(itemIsStartable)
-      .map((item) => ({ hostId: machine.host.id, issue: item.issue })),
-  );
   const stalledHostIds = machines
     .filter((machine) => machineDaemonState(machine, now) === "stalled")
     .map((machine) => machine.host.id);
 
-  const updateAllButton =
-    remainingJobs === 0 && startable.length > 0 ? (
-      <UpdateActionButton
-        label={`Update all ${startable.length} CLI tool${startable.length === 1 ? "" : "s"}`}
-        tooltipLabel="Update all"
-        icon={UPDATE_ACTION_ICON}
-        visibleLabel="Update all"
-        variant="default"
-        onClick={() => {
-          for (const { hostId, issue } of startable) {
-            onStartInstall(hostId, issue);
-          }
-        }}
-      />
-    ) : null;
-  const retryAllButton =
-    stalledHostIds.length > BULK_RETRY_THRESHOLD ? (
-      <UpdateActionButton
-        label={`Update all ${stalledHostIds.length} machines now`}
-        visibleLabel="Retry all"
-        icon="RotateCcw"
-        iconPosition="end"
-        variant="default"
-        className="font-medium"
-        onClick={() => onRetryAllDaemonUpdates(stalledHostIds)}
-      />
-    ) : null;
   const bulkActions =
-    retryAllButton !== null || updateAllButton !== null || remainingJobs > 0 ? (
+    stalledHostIds.length > BULK_RETRY_THRESHOLD ? (
       <div
         role="toolbar"
         aria-label="Bulk update actions"
         className="flex flex-wrap items-center justify-end gap-2"
       >
-        <BulkUpdateProgress remainingJobs={remainingJobs} />
-        {retryAllButton}
-        {updateAllButton}
+        <UpdateActionButton
+          label={`Update all ${stalledHostIds.length} machines now`}
+          visibleLabel="Retry all"
+          icon="RotateCcw"
+          iconPosition="end"
+          variant="default"
+          className="font-medium"
+          onClick={() => onRetryAllDaemonUpdates(stalledHostIds)}
+        />
       </div>
     ) : null;
 
-  const summary = quietFleetSummary(quiet);
   return (
-    <div data-updates-domain="provider-clis" className="space-y-2">
+    <div data-updates-domain="machines" className="space-y-2">
       <SettingsSection
         action={bulkActions}
         actionPlacement="inline"
         bodyClassName="overflow-hidden p-0"
-        title="Provider CLIs"
+        title="Machines"
       >
         {machines.length === 0 ? (
           <ResourceListState state="empty" message="No machines available." />
@@ -1090,14 +581,11 @@ export function ProviderCliUpdatesSection({
             <span className="flex h-5 w-6 shrink-0 items-center justify-center">
               <Icon
                 aria-hidden
-                name={summary.checking ? "Loading" : "CircleCheck"}
-                className={cn(
-                  "size-4 text-input",
-                  summary.checking && "animate-spin",
-                )}
+                name="CircleCheck"
+                className="size-4 text-input"
               />
             </span>
-            {summary.message}
+            {quietFleetSummary(quiet)}
           </div>
         ) : (
           <div className="divide-y divide-border">
@@ -1115,23 +603,8 @@ export function ProviderCliUpdatesSection({
                   machine={machine}
                   now={now}
                   tags={tags}
-                  expanded={expandedHostIds.has(hostId)}
                   retryUpdatePending={retryPendingHostId === hostId}
-                  runningJobKey={runningJobKey}
-                  queuedJobKeys={queuedJobKeys}
-                  failuresByJobKey={failuresByJobKey}
-                  onToggle={() => {
-                    setExpandedHostIds((current) => {
-                      const next = new Set(current);
-                      if (!next.delete(hostId)) {
-                        next.add(hostId);
-                      }
-                      return next;
-                    });
-                  }}
-                  onStartInstall={onStartInstall}
                   onRetryDaemonUpdate={onRetryDaemonUpdate}
-                  onRecheckClis={onRecheckClis}
                 />
               );
             })}
@@ -1366,8 +839,6 @@ export function UpdatesSettingsSection() {
   const serverPrimaryHostId = useSystemConfig().data?.primaryHostId ?? null;
   const retryHostUpdate = useRetryHostUpdate();
   const now = useNow(30_000);
-  const { failuresByJobKey, queuedJobKeys, runningJobKey, startInstall } =
-    useProviderCliInstallRunner();
   const pluginUpdateCheck = usePluginUpdateCheck(null, {
     enabled: inventory.plugins !== null,
   });
@@ -1401,7 +872,8 @@ export function UpdatesSettingsSection() {
           (candidate) => candidate.host.id === hostId,
         );
         appToast.success(
-          "Retrying the update on " + (machine?.host.name ?? "the requested machine"),
+          "Retrying the update on " +
+            (machine?.host.name ?? "the requested machine"),
         );
       },
     });
@@ -1416,7 +888,7 @@ export function UpdatesSettingsSection() {
 
   return (
     <div className="space-y-6">
-      <ProviderCliUpdatesSection
+      <MachineUpdatesSection
         machines={inventory.machines}
         now={now}
         localDaemonHostId={localDaemonHostId}
@@ -1424,15 +896,8 @@ export function UpdatesSettingsSection() {
         retryPendingHostId={
           retryHostUpdate.isPending ? (retryHostUpdate.variables ?? null) : null
         }
-        runningJobKey={runningJobKey}
-        queuedJobKeys={queuedJobKeys}
-        failuresByJobKey={failuresByJobKey}
-        onStartInstall={(hostId, issue) => startInstall({ hostId, issue })}
         onRetryDaemonUpdate={retryDaemonUpdate}
         onRetryAllDaemonUpdates={retryAllStalledDaemonUpdates}
-        onRecheckClis={(hostId) => {
-          void invalidateHostProviderCliStatus({ queryClient, hostId });
-        }}
       />
       {inventory.plugins === null ? null : (
         <PluginUpdatesSection

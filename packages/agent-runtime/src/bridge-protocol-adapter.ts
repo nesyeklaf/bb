@@ -254,20 +254,9 @@ export function createBridgeProtocolAdapter(
             method: BRIDGE_REQUEST_METHODS.providerInstallationStatus,
             params: {
               providerId: options.id,
-              checkUpdates: command.checkUpdates,
               ...(command.requirement !== undefined
                 ? { requirement: command.requirement }
                 : {}),
-              ...cwdAndStaticProviderOptions(command.cwd),
-            },
-          };
-        case "provider/installation/run":
-          return {
-            kind: "request",
-            method: BRIDGE_REQUEST_METHODS.providerInstallationRun,
-            params: {
-              providerId: options.id,
-              action: command.action,
               ...cwdAndStaticProviderOptions(command.cwd),
             },
           };

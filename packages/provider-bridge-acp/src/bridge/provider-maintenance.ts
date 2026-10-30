@@ -6,7 +6,6 @@ import path from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import type {
   ProviderHealthResult,
-  ProviderInstallationRunResult,
   ProviderInstallationStatus,
   ProviderUsage,
   ProviderUsageResult,
@@ -14,7 +13,6 @@ import type {
 } from "@bb/provider-bridge-protocol";
 import {
   clampPercent,
-  downloadedInstallerCommand,
   resolveExecutablePath,
   versionFrom,
 } from "@bb/provider-bridge-protocol/bridge-kit";
@@ -27,7 +25,6 @@ const CURSOR_DASHBOARD_URL =
   "https://api2.cursor.sh/aiserver.v1.DashboardService";
 const CURSOR_KEYCHAIN_ACCOUNT = "cursor-user";
 const CURSOR_ACCESS_TOKEN_SERVICE = "cursor-access-token";
-const CURSOR_INSTALL_SCRIPT_URL = "https://cursor.com/install";
 
 function cursorAuthFilePath(): string {
   if (process.platform === "win32") {
@@ -130,7 +127,6 @@ function readAccountEmail(): string | null {
 
 export interface AcpMaintenanceDialect {
   loginCommand: string;
-  installer(): { command: string; args: string[]; displayCommand: string };
   readAccount(): Promise<{ email: string | null } | null>;
   readUsage(): Promise<ProviderUsageResult>;
 }
@@ -142,7 +138,6 @@ function healthResult(args: {
   installedVersion?: string | null;
   statusMessage?: string | null;
 }): ProviderHealthResult {
-  const maintained = args.maintenance !== undefined;
   return {
     supported: true,
     health: {
@@ -152,8 +147,6 @@ function healthResult(args: {
       planLabel: null,
       installedVersion: args.installedVersion ?? null,
       minimumSupportedVersion: null,
-      canInstall: maintained,
-      canUpdate: maintained && args.status !== "not_installed",
       loginCommand: args.maintenance?.loginCommand ?? null,
     },
   };
@@ -233,60 +226,13 @@ export async function getAcpProviderInstallationStatus(args: {
     installed && args.command !== null
       ? await readAcpCliVersion(args.command)
       : null;
-  const installAction =
-    args.maintenance !== undefined && !installed
-      ? {
-          kind: "install" as const,
-          label: "Install" as const,
-          command: args.maintenance.installer().displayCommand,
-        }
-      : null;
   return {
     executableName,
     executablePath: resolvedExecutable,
     installed,
-    installSource: installed ? "external" : "notInstalled",
     currentVersion,
-    latestVersion: null,
     minimumSupportedVersion: null,
-    npmPackageName: null,
-    npmGlobalPackageVersion: null,
-    installAction,
-    needsUpdate: false,
     versionUnsupported: false,
-  };
-}
-
-export async function getAcpProviderInstallationRun(args: {
-  maintenance: AcpMaintenanceDialect | undefined;
-  command: string | null;
-  action: "install" | "update";
-}): Promise<ProviderInstallationRunResult> {
-  const status = await getAcpProviderInstallationStatus(args);
-  return buildAcpProviderInstallationRun(status, args);
-}
-
-function buildAcpProviderInstallationRun(
-  status: ProviderInstallationStatus,
-  args: {
-    maintenance: AcpMaintenanceDialect | undefined;
-    command: string | null;
-    action: "install" | "update";
-  },
-): ProviderInstallationRunResult {
-  if (
-    status.installAction?.kind !== args.action ||
-    args.maintenance === undefined
-  ) {
-    return {
-      available: false,
-      message: `${args.command ?? "This ACP agent"} ${args.action} is not available on this host.`,
-    };
-  }
-  return {
-    available: true,
-    command: args.maintenance.installer(),
-    verification: { kind: "installed" },
   };
 }
 
@@ -415,7 +361,6 @@ export async function getAcpProviderUsage(args: {
 
 export const CURSOR_ACP_MAINTENANCE: AcpMaintenanceDialect = {
   loginCommand: "cursor-agent login",
-  installer: () => downloadedInstallerCommand(CURSOR_INSTALL_SCRIPT_URL),
   readAccount: async () => {
     const accessToken = await readAccessToken();
     return accessToken === null ? null : { email: readAccountEmail() };
@@ -469,6 +414,5 @@ async function readCursorUsage(): Promise<ProviderUsageResult> {
 }
 
 export const __testing = {
-  buildProviderInstallationRun: buildAcpProviderInstallationRun,
   normalizeUsage,
 };

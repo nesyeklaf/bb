@@ -55,8 +55,6 @@ function providerHostResponse(
           planLabel: null,
           installedVersion: null,
           minimumSupportedVersion: null,
-          canInstall: false,
-          canUpdate: false,
           loginCommand: null,
         },
       },

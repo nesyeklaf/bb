@@ -21,8 +21,6 @@ function readyHealth(providerId: string): ProviderHealth {
     planLabel: null,
     installedVersion: "1.0.0",
     minimumSupportedVersion: null,
-    canInstall: false,
-    canUpdate: false,
     loginCommand: null,
   };
 }

@@ -3,7 +3,6 @@ import path from "node:path";
 import type { AgentRuntime } from "@bb/agent-runtime";
 import type {
   HostDaemonInjectedSkillSource,
-  ProviderCliInstallEvent,
   ProviderCliStatus,
 } from "@bb/host-daemon-contract";
 import type { HostWorkspace } from "@bb/host-workspace";
@@ -164,9 +163,6 @@ function createRuntime(): FakeDispatchRuntime {
     providerInstallationStatus: vi.fn(async () => {
       throw new Error("Unexpected provider installation status call");
     }),
-    providerInstallationRun: vi.fn(async () => {
-      throw new Error("Unexpected provider installation run call");
-    }),
     listRunningProviders: vi.fn(() => ["fake"]),
     getActiveTurnId: (threadId) => activeTurnsByThreadId.get(threadId) ?? null,
     waitForActiveTurn: vi.fn(
@@ -230,60 +226,14 @@ function createTurnSubmitCommand(
   };
 }
 
-function createProviderCliInstallEventStream(
-  events: readonly ProviderCliInstallEvent[],
-): ReadableStream<Uint8Array> {
-  const encoder = new TextEncoder();
-  return new ReadableStream({
-    start(controller) {
-      for (const event of events) {
-        controller.enqueue(encoder.encode(`${JSON.stringify(event)}\n`));
-      }
-      controller.close();
-    },
-  });
-}
-
-function claudeCodeStatus(args: {
-  currentVersion: string;
-  latestVersion: string | null;
-}): ProviderCliStatus {
-  return {
-    displayName: "Claude Code",
-    executableName: "claude",
-    executablePath: "/Users/me/.local/bin/claude",
-    installed: true,
-    installSource: "external",
-    currentVersion: args.currentVersion,
-    latestVersion: args.latestVersion,
-    minimumSupportedVersion: null,
-    npmPackageName: "@anthropic-ai/claude-code",
-    npmGlobalPackageVersion: null,
-    installAction: {
-      kind: "update",
-      label: "Update",
-      command: "claude update",
-    },
-    needsUpdate:
-      args.latestVersion === null || args.currentVersion !== args.latestVersion,
-    versionUnsupported: false,
-  };
-}
-
 function supportedCodexInstallationStatus(): ProviderCliStatus {
   return {
     displayName: "Codex",
     executableName: "codex",
     executablePath: "/usr/local/bin/codex",
     installed: true,
-    installSource: "npmGlobal",
     currentVersion: "0.146.0",
-    latestVersion: null,
     minimumSupportedVersion: "0.136.0",
-    npmPackageName: "@openai/codex",
-    npmGlobalPackageVersion: "0.146.0",
-    installAction: null,
-    needsUpdate: false,
     versionUnsupported: false,
   };
 }
@@ -326,79 +276,6 @@ function createInstallationGatedThreadStart(
     injectedSkillSources: [],
     instructionMode: "append",
   };
-}
-
-async function runSuccessfulClaudeCodeUpdateVerification(args: {
-  before: ProviderCliStatus;
-  after: ProviderCliStatus;
-}) {
-  const dataDir = await makeTempDir("bb-command-dispatch-provider-cli-");
-  const manager = new RuntimeManager({
-    dataDir,
-    createRuntime,
-    provisionWorkspace: async () => createWorkspace(),
-  });
-  const providerInstallationStatus = vi.fn().mockResolvedValueOnce(args.after);
-  const events: ProviderCliInstallEvent[] = [
-    {
-      type: "started",
-      provider: "claude-code",
-      command: "claude update",
-    },
-    {
-      type: "completed",
-      provider: "claude-code",
-      exitCode: 0,
-      signal: null,
-      success: true,
-    },
-  ];
-  const result = await dispatchOnlineRpcCommand(
-    {
-      type: "provider.installation.run",
-      bridgeLaunch: DISPATCH_TEST_BRIDGE_LAUNCH,
-      providerId: "claude-code",
-      action: "update",
-    },
-    {
-      dataDir,
-      logger: silentLogger,
-      eventSink: {
-        emit: vi.fn(),
-        flush: vi.fn(async () => undefined),
-      },
-      fetchProjectAttachment: async () => {
-        throw new Error("Unexpected project attachment fetch");
-      },
-      fetchPluginHostArtifact: fetchDispatchTestArtifact,
-      ...unexpectedProviderMaintenance,
-      providerInstallationStatus,
-      providerInstallationRun: async () => ({
-        available: true,
-        command: {
-          command: "claude",
-          args: ["update"],
-          displayCommand: "claude update",
-        },
-        verification:
-          args.before.latestVersion === null
-            ? {
-                kind: "version_changed",
-                previousVersion: args.before.currentVersion ?? "unknown",
-              }
-            : {
-                kind: "version_at_least",
-                version: args.before.latestVersion,
-              },
-      }),
-      runtimeManager: manager,
-      streamProviderInstallation: () =>
-        createProviderCliInstallEventStream(events),
-      threadStorageRootPath: "/tmp/bb-thread-storage",
-    },
-    new AbortController().signal,
-  );
-  return { events, providerInstallationStatus, result };
 }
 
 describe("dispatchCommand", () => {
@@ -1370,18 +1247,8 @@ describe("dispatchCommand", () => {
       executableName: "example-agent",
       executablePath: "/usr/local/bin/example-agent",
       installed: true,
-      installSource: "npmGlobal",
       currentVersion: "0.135.0",
-      latestVersion: null,
       minimumSupportedVersion: "0.136.0",
-      npmPackageName: "example-agent",
-      npmGlobalPackageVersion: "0.135.0",
-      installAction: {
-        kind: "update",
-        label: "Update",
-        command: "example-agent update",
-      },
-      needsUpdate: false,
       versionUnsupported: true,
     };
 
@@ -1515,14 +1382,8 @@ describe("dispatchCommand", () => {
       executableName: "codex",
       executablePath: "/usr/local/bin/codex",
       installed: true,
-      installSource: "npmGlobal",
       currentVersion: "0.146.0",
-      latestVersion: null,
       minimumSupportedVersion: "0.136.0",
-      npmPackageName: "@openai/codex",
-      npmGlobalPackageVersion: "0.146.0",
-      installAction: null,
-      needsUpdate: false,
       versionUnsupported: false,
     };
 
@@ -1546,10 +1407,7 @@ describe("dispatchCommand", () => {
       }),
     ).resolves.toEqual({ providerThreadId: "provider-thread-rewind-1" });
     expect(providerInstallationStatus).toHaveBeenCalledWith(
-      expect.objectContaining({
-        requirement: "thread_rewind",
-        checkUpdates: false,
-      }),
+      expect.objectContaining({ requirement: "thread_rewind" }),
     );
     expect(runtime.prepareThreadRewind).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -1579,7 +1437,6 @@ describe("dispatchCommand", () => {
             ...supportedCodexStatus,
             currentVersion: "0.140.0",
             minimumSupportedVersion: "0.143.0",
-            npmGlobalPackageVersion: "0.140.0",
             versionUnsupported: true,
           }),
           runtimeManager: manager,
@@ -1642,9 +1499,6 @@ describe("dispatchCommand", () => {
 
     expect(providerInstallationStatus).toHaveBeenCalledOnce();
     expect(runtime.startThread).toHaveBeenCalledTimes(2);
-    expect(providerInstallationStatus).toHaveBeenCalledWith(
-      expect.objectContaining({ checkUpdates: false }),
-    );
   });
 
   it("retries concurrent thread starts when a shell env refresh interrupts their shared probe", async () => {
@@ -1821,17 +1675,10 @@ describe("dispatchCommand", () => {
         installed: false,
         executablePath: null,
         currentVersion: null,
-        npmGlobalPackageVersion: null,
-        installAction: {
-          kind: "install",
-          label: "Install",
-          command: "npm i -g @openai/codex",
-        },
       })
       .mockResolvedValueOnce({
         ...supportedCodexInstallationStatus(),
         currentVersion: "0.135.0",
-        npmGlobalPackageVersion: "0.135.0",
         versionUnsupported: true,
       });
     const options = makeDispatchOptions({
@@ -1888,378 +1735,6 @@ describe("dispatchCommand", () => {
     } finally {
       now.mockRestore();
     }
-  });
-
-  it("invalidates the provider maintenance runtime after a verified provider update", async () => {
-    const dataDir = await makeTempDir("bb-command-dispatch-provider-cli-");
-    const staleRuntime = createRuntime();
-    const freshRuntime = createRuntime();
-    const createRuntimeSpy = vi.fn(() => staleRuntime);
-    createRuntimeSpy.mockReturnValueOnce(staleRuntime);
-    createRuntimeSpy.mockReturnValueOnce(freshRuntime);
-    const manager = new RuntimeManager({
-      createRuntime: createRuntimeSpy,
-      dataDir,
-      provisionWorkspace: async () => createWorkspace(),
-    });
-    await manager.ensureProviderMaintenanceRuntime({ dataDir });
-
-    const events: ProviderCliInstallEvent[] = [
-      {
-        type: "started",
-        provider: "codex",
-        command: "codex update",
-      },
-      {
-        type: "completed",
-        provider: "codex",
-        exitCode: 0,
-        signal: null,
-        success: true,
-      },
-    ];
-    const streamProviderInstallation = vi.fn(() =>
-      createProviderCliInstallEventStream(events),
-    );
-    const command: CommandOf<"provider.installation.run"> = {
-      type: "provider.installation.run",
-      bridgeLaunch: DISPATCH_TEST_BRIDGE_LAUNCH,
-      providerId: "codex",
-      action: "update",
-    };
-
-    const result = await dispatchOnlineRpcCommand(
-      command,
-      {
-        dataDir,
-        logger: silentLogger,
-        eventSink: {
-          emit: vi.fn(),
-          flush: vi.fn(async () => undefined),
-        },
-        fetchProjectAttachment: async () => {
-          throw new Error("Unexpected project attachment fetch");
-        },
-        fetchPluginHostArtifact: fetchDispatchTestArtifact,
-        ...unexpectedProviderMaintenance,
-        runtimeManager: manager,
-        providerInstallationRun: async () => ({
-          available: true,
-          command: {
-            command: "codex",
-            args: ["update"],
-            displayCommand: "codex update",
-          },
-          verification: { kind: "version_changed", previousVersion: "0.1.0" },
-        }),
-        providerInstallationStatus: async () => ({
-          executableName: "codex",
-          executablePath: "/usr/local/bin/codex",
-          installed: true,
-          installSource: "external",
-          currentVersion: "0.2.0",
-          latestVersion: "0.2.0",
-          minimumSupportedVersion: null,
-          npmPackageName: null,
-          npmGlobalPackageVersion: null,
-          installAction: null,
-          needsUpdate: false,
-          versionUnsupported: false,
-        }),
-        streamProviderInstallation,
-        threadStorageRootPath: "/tmp/bb-thread-storage",
-      },
-      new AbortController().signal,
-    );
-
-    expect(result).toEqual({ events });
-    expect(streamProviderInstallation).toHaveBeenCalledWith(
-      expect.objectContaining({
-        providerId: "codex",
-        plan: {
-          command: "codex",
-          args: ["update"],
-          displayCommand: "codex update",
-        },
-      }),
-    );
-    expect(staleRuntime.shutdown).toHaveBeenCalledOnce();
-
-    await manager.ensureProviderMaintenanceRuntime({ dataDir });
-    expect(createRuntimeSpy).toHaveBeenCalledTimes(2);
-    expect(freshRuntime.shutdown).not.toHaveBeenCalled();
-  });
-
-  it("keeps the provider maintenance runtime after a failed provider update", async () => {
-    const cases: Array<{
-      action: CommandOf<"provider.installation.run">["action"];
-      events: ProviderCliInstallEvent[];
-      provider: CommandOf<"provider.installation.run">["providerId"];
-    }> = [
-      {
-        action: "update",
-        provider: "codex",
-        events: [
-          {
-            type: "completed",
-            provider: "codex",
-            exitCode: 1,
-            signal: null,
-            success: false,
-          },
-        ],
-      },
-    ];
-
-    for (const testCase of cases) {
-      const dataDir = await makeTempDir("bb-command-dispatch-provider-cli-");
-      const runtime = createRuntime();
-      const createRuntimeSpy = vi.fn(() => runtime);
-      const manager = new RuntimeManager({
-        createRuntime: createRuntimeSpy,
-        dataDir,
-        provisionWorkspace: async () => createWorkspace(),
-      });
-      await manager.ensureProviderMaintenanceRuntime({ dataDir });
-      const streamProviderInstallation = vi.fn(() =>
-        createProviderCliInstallEventStream(testCase.events),
-      );
-      const result = await dispatchOnlineRpcCommand(
-        {
-          type: "provider.installation.run",
-          bridgeLaunch: DISPATCH_TEST_BRIDGE_LAUNCH,
-          providerId: testCase.provider,
-          action: testCase.action,
-        },
-        {
-          dataDir,
-          logger: silentLogger,
-          eventSink: {
-            emit: vi.fn(),
-            flush: vi.fn(async () => undefined),
-          },
-          fetchProjectAttachment: async () => {
-            throw new Error("Unexpected project attachment fetch");
-          },
-          fetchPluginHostArtifact: fetchDispatchTestArtifact,
-          ...unexpectedProviderMaintenance,
-          providerInstallationRun: async () => ({
-            available: true,
-            command: {
-              command: testCase.provider,
-              args: [testCase.action],
-              displayCommand: `${testCase.provider} ${testCase.action}`,
-            },
-            verification: {
-              kind: "version_changed",
-              previousVersion: "2.1.220",
-            },
-          }),
-          runtimeManager: manager,
-          streamProviderInstallation,
-          threadStorageRootPath: "/tmp/bb-thread-storage",
-        },
-        new AbortController().signal,
-      );
-
-      expect(result).toEqual({ events: testCase.events });
-      expect(runtime.shutdown).not.toHaveBeenCalled();
-      await expect(
-        manager.ensureProviderMaintenanceRuntime({ dataDir }),
-      ).resolves.toBe(runtime);
-      expect(createRuntimeSpy).toHaveBeenCalledTimes(1);
-    }
-  });
-
-  it("reports a successful Claude update command as failed when the active executable stays old", async () => {
-    const dataDir = await makeTempDir("bb-command-dispatch-provider-cli-");
-    const runtime = createRuntime();
-    const manager = new RuntimeManager({
-      createRuntime: () => runtime,
-      dataDir,
-      provisionWorkspace: async () => createWorkspace(),
-    });
-    const providerInstallationStatus = vi.fn().mockResolvedValueOnce(
-      claudeCodeStatus({
-        currentVersion: "2.1.220",
-        latestVersion: "2.1.227",
-      }),
-    );
-
-    const result = await dispatchOnlineRpcCommand(
-      {
-        type: "provider.installation.run",
-        bridgeLaunch: DISPATCH_TEST_BRIDGE_LAUNCH,
-        providerId: "claude-code",
-        action: "update",
-      },
-      {
-        dataDir,
-        logger: silentLogger,
-        eventSink: {
-          emit: vi.fn(),
-          flush: vi.fn(async () => undefined),
-        },
-        fetchProjectAttachment: async () => {
-          throw new Error("Unexpected project attachment fetch");
-        },
-        fetchPluginHostArtifact: fetchDispatchTestArtifact,
-        ...unexpectedProviderMaintenance,
-        providerInstallationStatus,
-        providerInstallationRun: async () => ({
-          available: true,
-          command: {
-            command: "claude",
-            args: ["update"],
-            displayCommand: "claude update",
-          },
-          verification: { kind: "version_at_least", version: "2.1.227" },
-        }),
-        runtimeManager: manager,
-        streamProviderInstallation: () =>
-          createProviderCliInstallEventStream([
-            {
-              type: "started",
-              provider: "claude-code",
-              command: "claude update",
-            },
-            {
-              type: "output",
-              provider: "claude-code",
-              stream: "stdout",
-              text: "Successfully updated from 2.1.220 to version 2.1.227\n",
-            },
-            {
-              type: "completed",
-              provider: "claude-code",
-              exitCode: 0,
-              signal: null,
-              success: true,
-            },
-          ]),
-        threadStorageRootPath: "/tmp/bb-thread-storage",
-      },
-      new AbortController().signal,
-    );
-
-    expect(providerInstallationStatus).toHaveBeenCalledOnce();
-    expect(result.events).toEqual([
-      expect.objectContaining({ type: "started" }),
-      expect.objectContaining({ type: "output" }),
-      expect.objectContaining({
-        type: "error",
-        provider: "claude-code",
-        message: expect.stringContaining(
-          "could not verify the installed result",
-        ),
-      }),
-      {
-        type: "completed",
-        provider: "claude-code",
-        exitCode: 0,
-        signal: null,
-        success: false,
-      },
-    ]);
-  });
-
-  it("does not spawn when the provider withdraws a stale installation action", async () => {
-    const dataDir = await makeTempDir("bb-command-dispatch-provider-cli-");
-    const manager = new RuntimeManager({
-      createRuntime,
-      dataDir,
-      provisionWorkspace: async () => createWorkspace(),
-    });
-    const providerInstallationStatus = vi.fn();
-    const streamProviderInstallation = vi.fn();
-
-    const result = await dispatchOnlineRpcCommand(
-      {
-        type: "provider.installation.run",
-        bridgeLaunch: DISPATCH_TEST_BRIDGE_LAUNCH,
-        providerId: "claude-code",
-        action: "update",
-      },
-      {
-        dataDir,
-        logger: silentLogger,
-        eventSink: {
-          emit: vi.fn(),
-          flush: vi.fn(async () => undefined),
-        },
-        fetchProjectAttachment: async () => {
-          throw new Error("Unexpected project attachment fetch");
-        },
-        fetchPluginHostArtifact: fetchDispatchTestArtifact,
-        ...unexpectedProviderMaintenance,
-        providerInstallationStatus,
-        providerInstallationRun: async () => ({
-          available: false,
-          message: "Claude Code update is no longer available on this host.",
-        }),
-        runtimeManager: manager,
-        streamProviderInstallation,
-        threadStorageRootPath: "/tmp/bb-thread-storage",
-      },
-      new AbortController().signal,
-    );
-
-    expect(providerInstallationStatus).not.toHaveBeenCalled();
-    expect(streamProviderInstallation).not.toHaveBeenCalled();
-    expect(result.events).toEqual([
-      {
-        type: "error",
-        provider: "claude-code",
-        message: "Claude Code update is no longer available on this host.",
-      },
-    ]);
-  });
-
-  it("accepts a Claude update that advances when the release channel is unknown", async () => {
-    const verification = await runSuccessfulClaudeCodeUpdateVerification({
-      before: claudeCodeStatus({
-        currentVersion: "2.1.69",
-        latestVersion: null,
-      }),
-      after: claudeCodeStatus({
-        currentVersion: "2.1.221",
-        latestVersion: null,
-      }),
-    });
-
-    expect(verification.providerInstallationStatus).toHaveBeenCalledOnce();
-    expect(verification.result).toEqual({ events: verification.events });
-  });
-
-  it("rejects a Claude update that does not advance when the release channel is unknown", async () => {
-    const verification = await runSuccessfulClaudeCodeUpdateVerification({
-      before: claudeCodeStatus({
-        currentVersion: "2.1.69",
-        latestVersion: null,
-      }),
-      after: claudeCodeStatus({
-        currentVersion: "2.1.69",
-        latestVersion: null,
-      }),
-    });
-
-    expect(verification.result.events).toEqual([
-      expect.objectContaining({ type: "started" }),
-      expect.objectContaining({
-        type: "error",
-        provider: "claude-code",
-        message: expect.stringContaining(
-          "could not verify the installed result",
-        ),
-      }),
-      {
-        type: "completed",
-        provider: "claude-code",
-        exitCode: 0,
-        signal: null,
-        success: false,
-      },
-    ]);
   });
 
   it("injects the current skill snapshot when spawning beside an active sibling", async () => {

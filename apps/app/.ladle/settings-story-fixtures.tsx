@@ -18,10 +18,7 @@ import {
   systemConfigQueryKey,
   systemProvidersQueryKey,
 } from "../src/hooks/queries/query-keys";
-import {
-  buildUpdateInventoryProviderIssues,
-  type UpdateInventoryMachine,
-} from "../src/hooks/useUpdateInventory";
+import type { UpdateInventoryMachine } from "../src/hooks/useUpdateInventory";
 import { createAppQueryClient } from "../src/lib/query-client";
 import { makeSystemConfig } from "../src/test/fixtures/system-config";
 import { systemMachineProvidersQueryKey } from "../src/hooks/queries/query-keys";
@@ -31,8 +28,8 @@ import {
 } from "./machine-story-fixtures";
 import { makeProviderInfo } from "@bb/test-helpers/domain-fixtures";
 import {
+  MachineUpdatesSection,
   PluginUpdatesSection,
-  ProviderCliUpdatesSection,
 } from "../src/components/settings/UpdatesSettingsSection";
 import {
   HOST_IDS,
@@ -112,45 +109,26 @@ const SETTINGS_STORY_HOSTS = [
 const localProviderStatus = {
   codex: makeProviderCliStatus("codex", {
     currentVersion: "0.145.0",
-    latestVersion: "0.146.0",
-    needsUpdate: true,
-    installAction: {
-      kind: "update",
-      label: "Update",
-      command: "codex update",
-    },
   }),
   "claude-code": makeProviderCliStatus("claude-code", {
     currentVersion: "2.1.0",
-    latestVersion: "2.1.0",
   }),
   "acp-cursor": makeProviderCliStatus("acp-cursor", {
     currentVersion: "0.49.0",
-    latestVersion: "0.49.0",
   }),
 } satisfies ProviderCliStatusResponse;
 
 const remoteProviderStatus = {
   codex: makeProviderCliStatus("codex", {
     currentVersion: "0.145.0",
-    latestVersion: "0.146.0",
-    needsUpdate: true,
-    installAction: {
-      kind: "update",
-      label: "Update",
-      command: "codex update",
-    },
   }),
   "claude-code": makeProviderCliStatus("claude-code", {
     currentVersion: "2.1.0",
-    latestVersion: "2.1.0",
   }),
   "acp-cursor": makeProviderCliStatus("acp-cursor", {
     installed: false,
     executablePath: null,
     currentVersion: null,
-    latestVersion: "0.49.0",
-    installSource: undefined,
   }),
 } satisfies ProviderCliStatusResponse;
 
@@ -248,34 +226,23 @@ const systemProviders = [
 const settingsUpdateMachine = {
   host: SETTINGS_STORY_PRIMARY_HOST,
   isPrimary: true,
-  providerStatus: localProviderStatus,
-  statusPending: false,
-  statusError: false,
-  statusFetching: false,
-  issues: buildUpdateInventoryProviderIssues(localProviderStatus),
   canRetryDaemonUpdate: false,
 } satisfies UpdateInventoryMachine;
 
 const noJobs: ReadonlySet<string> = new Set();
-const noFailures = new Map<string, never>();
 const noop = () => {};
 
 export function SettingsUpdatesStory() {
   return (
     <div className="space-y-6">
-      <ProviderCliUpdatesSection
+      <MachineUpdatesSection
         machines={[settingsUpdateMachine]}
         now={0}
         localDaemonHostId={null}
         serverHostId={null}
         retryPendingHostId={null}
-        runningJobKey={null}
-        queuedJobKeys={noJobs}
-        failuresByJobKey={noFailures}
-        onStartInstall={noop}
         onRetryDaemonUpdate={noop}
         onRetryAllDaemonUpdates={noop}
-        onRecheckClis={noop}
       />
       <PluginUpdatesSection
         plugins={{ trackedCount: 0, items: [] }}

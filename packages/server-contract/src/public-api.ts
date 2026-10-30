@@ -80,7 +80,6 @@ import {
   noRequest,
   optionalQueryRequest,
   queryRequest,
-  textResponse,
   type ApiSchemaFromRouteDescriptors,
   type EmptyInput,
 } from "@bb/hono-typed-routes";
@@ -153,8 +152,6 @@ import {
   type HostPickFolderResponse,
   type HostPathsExistRequest,
   type HostPathsExistResponse,
-  type HostProviderCliInstallEvent,
-  type HostProviderCliInstallRequest,
   type HostProviderCliStatusResponse,
   type HostRetryUpdateResponse,
   type ProjectAttachmentContentQuery,
@@ -327,7 +324,6 @@ import {
   hostRemovePathRequestSchema,
   hostPickFolderRequestSchema,
   hostPathsExistRequestSchema,
-  hostProviderCliInstallRequestSchema,
   projectAttachmentContentQuerySchema,
   projectBranchesQuerySchema,
   projectCommandsQuerySchema,
@@ -992,14 +988,6 @@ export const publicApiRoutes = {
       method: "get",
       request: noRequest<PathId>(),
       response: jsonResponse<HostProviderCliStatusResponse>(),
-    }),
-    providerCliInstall: defineRoute({
-      path: "/hosts/:id/provider-clis/install",
-      method: "post",
-      request: jsonRequest<PathId, HostProviderCliInstallRequest>(
-        hostProviderCliInstallRequestSchema,
-      ),
-      response: textResponse<HostProviderCliInstallEvent>(),
     }),
     deleteOldServerCopy: defineRoute({
       path: "/hosts/:id/old-server-copy",

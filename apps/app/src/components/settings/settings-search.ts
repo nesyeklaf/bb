@@ -229,7 +229,7 @@ export const SETTINGS_SEARCH_INDEX: Record<
   updates: {
     keywords: ["upgrade", "version"],
     settings: [
-      { title: "Provider CLIs", keywords: ["agents", "upgrade"] },
+      { title: "Machines", keywords: ["daemon", "host", "upgrade"] },
       {
         title: "Plugins",
         keywords: ["plugin updates", "outdated", "upgrade"],

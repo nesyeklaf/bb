@@ -9,27 +9,6 @@ import {
   getAcpProviderInstallationStatus,
 } from "./provider-maintenance.js";
 
-function cursorMissingInstallationStatus() {
-  return {
-    executableName: "cursor-agent",
-    executablePath: null,
-    installed: false,
-    installSource: "notInstalled" as const,
-    currentVersion: null,
-    latestVersion: null,
-    minimumSupportedVersion: null,
-    npmPackageName: null,
-    npmGlobalPackageVersion: null,
-    installAction: {
-      kind: "install" as const,
-      label: "Install" as const,
-      command: "install Cursor",
-    },
-    needsUpdate: false,
-    versionUnsupported: false,
-  };
-}
-
 describe("ACP provider maintenance", () => {
   it.each([
     ["2026.03.07-acde123", "2026.03.07-acde123"],
@@ -71,8 +50,6 @@ describe("ACP provider maintenance", () => {
         ).toMatchObject({
           installed: true,
           currentVersion: version,
-          latestVersion: null,
-          needsUpdate: false,
           versionUnsupported: false,
         });
         expect(
@@ -118,45 +95,6 @@ describe("ACP provider maintenance", () => {
           cost: { usedUsdCents: 1250, limitUsdCents: 5000 },
         },
       ],
-    });
-  });
-
-  it("offers the installer only through a fresh matching action", () => {
-    expect(
-      __testing.buildProviderInstallationRun(
-        cursorMissingInstallationStatus(),
-        {
-          maintenance: CURSOR_ACP_MAINTENANCE,
-          command: "cursor-agent",
-          action: "install",
-        },
-      ),
-    ).toMatchObject({
-      available: true,
-      command: { command: "sh" },
-      verification: { kind: "installed" },
-    });
-    expect(
-      __testing.buildProviderInstallationRun(
-        { ...cursorMissingInstallationStatus(), installAction: null },
-        { maintenance: undefined, command: "opencode", action: "install" },
-      ),
-    ).toEqual({
-      available: false,
-      message: "opencode install is not available on this host.",
-    });
-    expect(
-      __testing.buildProviderInstallationRun(
-        cursorMissingInstallationStatus(),
-        {
-          maintenance: undefined,
-          command: "opencode",
-          action: "install",
-        },
-      ),
-    ).toEqual({
-      available: false,
-      message: "opencode install is not available on this host.",
     });
   });
 });

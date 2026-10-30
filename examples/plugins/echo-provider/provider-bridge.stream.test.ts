@@ -481,8 +481,6 @@ describe("the echo bridge's provider maintenance", () => {
         planLabel: null,
         installedVersion: null,
         minimumSupportedVersion: null,
-        canInstall: false,
-        canUpdate: false,
         loginCommand: null,
       },
     });

@@ -370,8 +370,6 @@ const ONLINE_RPC_RESPONSE_RESULT_FIXTURES: OnlineRpcResponseResultFixtures = {
       planLabel: "Pro",
       installedVersion: "1.2.3",
       minimumSupportedVersion: "1.0.0",
-      canInstall: true,
-      canUpdate: true,
       loginCommand: "agent login",
     },
   },
@@ -405,35 +403,9 @@ const ONLINE_RPC_RESPONSE_RESULT_FIXTURES: OnlineRpcResponseResultFixtures = {
     executableName: "codex",
     executablePath: null,
     installed: false,
-    installSource: "notInstalled",
     currentVersion: null,
-    latestVersion: "0.136.0",
     minimumSupportedVersion: "0.136.0",
-    npmPackageName: "@openai/codex",
-    npmGlobalPackageVersion: null,
-    installAction: {
-      kind: "install",
-      label: "Install",
-      command: "npm install -g @openai/codex@latest",
-    },
-    needsUpdate: false,
     versionUnsupported: false,
-  },
-  "provider.installation.run": {
-    events: [
-      {
-        type: "started",
-        provider: "codex",
-        command: "npm install -g @openai/codex@latest",
-      },
-      {
-        type: "completed",
-        provider: "codex",
-        exitCode: 0,
-        signal: null,
-        success: true,
-      },
-    ],
   },
   "server_move.inspect": {
     dataDir: "/home/me/.bb-machines/bb.example.com",
@@ -1060,7 +1032,7 @@ describe("host-daemon command schemas", () => {
   });
 
   it("uses the current host-daemon protocol version", () => {
-    expect(HOST_DAEMON_PROTOCOL_VERSION).toBe(258);
+    expect(HOST_DAEMON_PROTOCOL_VERSION).toBe(259);
     expect(HOST_ARTIFACT_MAX_BYTES).toBe(256 * 1024 * 1024);
   });
 
@@ -1078,7 +1050,8 @@ describe("host-daemon command schemas", () => {
     expect(contract.isCompatibleHostDaemonProtocolVersion(255)).toBe(false);
     expect(contract.isCompatibleHostDaemonProtocolVersion(256)).toBe(false);
     expect(contract.isCompatibleHostDaemonProtocolVersion(257)).toBe(false);
-    expect(contract.isCompatibleHostDaemonProtocolVersion(258)).toBe(true);
+    expect(contract.isCompatibleHostDaemonProtocolVersion(258)).toBe(false);
+    expect(contract.isCompatibleHostDaemonProtocolVersion(259)).toBe(true);
     expect(contract.hostDaemonSupportsConnectNext(246)).toBe(false);
     expect(contract.hostDaemonSupportsConnectNext(247)).toBe(true);
     expect(contract.hostDaemonSupportsDesktopBrokerProof(247)).toBe(false);

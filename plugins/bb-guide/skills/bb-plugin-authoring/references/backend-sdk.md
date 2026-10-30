@@ -45,7 +45,7 @@ signatures (see "Looking up the exact API" in distribution.md).
   `experimental_diffViewed` `experimental_markDiffViewed`
   `experimental_clearDiffViewed`
 - `hosts`: `list` `get` `update` `delete` `directory` `pathsExist`
-  `pickFolder` `cloneDefaultPath` `providerCliStatus` `installProviderCli`
+  `pickFolder` `cloneDefaultPath` `providerCliStatus`
   `retryUpdate` `experimental_listProviders` `experimental_create`
   `experimental_getEnrollmentCommand` `experimental_reconnect`
   `experimental_suspend` `experimental_resume` `experimental_retryCleanup`

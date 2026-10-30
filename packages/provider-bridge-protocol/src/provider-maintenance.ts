@@ -20,7 +20,6 @@ export type ProviderInstallationRequirement = z.infer<
 export const providerInstallationStatusParamsSchema =
   providerMaintenanceParamsSchema.extend({
     requirement: providerInstallationRequirementSchema.optional(),
-    checkUpdates: z.boolean().default(true),
   });
 export type ProviderInstallationStatusParams = z.infer<
   typeof providerInstallationStatusParamsSchema
@@ -41,8 +40,6 @@ export const providerHealthSchema = z
     planLabel: z.string().min(1).nullable(),
     installedVersion: z.string().min(1).nullable(),
     minimumSupportedVersion: z.string().min(1).nullable(),
-    canInstall: z.boolean(),
-    canUpdate: z.boolean(),
     loginCommand: z.string().min(1).nullable(),
     localLoginCommand: z.string().min(1).nullable().optional(),
   })
@@ -114,113 +111,16 @@ export const providerUsageResultSchema = z.discriminatedUnion("supported", [
 
 export type ProviderUsageResult = z.infer<typeof providerUsageResultSchema>;
 
-export const providerInstallationActionKindSchema = z.enum([
-  "install",
-  "update",
-]);
-export type ProviderInstallationActionKind = z.infer<
-  typeof providerInstallationActionKindSchema
->;
-
-export const providerInstallationActionSchema = z
-  .object({
-    kind: providerInstallationActionKindSchema,
-    label: z.enum(["Install", "Update"]),
-    command: z.string().min(1),
-  })
-  .passthrough();
-export type ProviderInstallationAction = z.infer<
-  typeof providerInstallationActionSchema
->;
-
-export const providerInstallationSourceSchema = z.enum([
-  "notInstalled",
-  "npmGlobal",
-  "external",
-]);
-export type ProviderInstallationSource = z.infer<
-  typeof providerInstallationSourceSchema
->;
-
 export const providerInstallationStatusSchema = z
   .object({
     executableName: z.string().min(1),
     executablePath: z.string().min(1).nullable(),
     installed: z.boolean(),
-    installSource: providerInstallationSourceSchema,
     currentVersion: z.string().min(1).nullable(),
-    latestVersion: z.string().min(1).nullable(),
     minimumSupportedVersion: z.string().min(1).nullable(),
-    npmPackageName: z.string().min(1).nullable(),
-    npmGlobalPackageVersion: z.string().min(1).nullable(),
-    installAction: providerInstallationActionSchema.nullable(),
-    needsUpdate: z.boolean(),
     versionUnsupported: z.boolean(),
   })
   .passthrough();
 export type ProviderInstallationStatus = z.infer<
   typeof providerInstallationStatusSchema
->;
-
-export const providerInstallationRunParamsSchema =
-  providerMaintenanceParamsSchema.extend({
-    action: providerInstallationActionKindSchema,
-  });
-export type ProviderInstallationRunParams = z.infer<
-  typeof providerInstallationRunParamsSchema
->;
-
-export const providerInstallationCommandSchema = z
-  .object({
-    command: z.string().min(1),
-    args: z.array(z.string()).max(64),
-    displayCommand: z.string().min(1),
-  })
-  .passthrough();
-export type ProviderInstallationCommand = z.infer<
-  typeof providerInstallationCommandSchema
->;
-
-export const providerInstallationVerificationSchema = z.discriminatedUnion(
-  "kind",
-  [
-    z.object({ kind: z.literal("installed") }).passthrough(),
-    z
-      .object({
-        kind: z.literal("version_changed"),
-        previousVersion: z.string().min(1),
-      })
-      .passthrough(),
-    z
-      .object({
-        kind: z.literal("version_at_least"),
-        version: z.string().min(1),
-      })
-      .passthrough(),
-  ],
-);
-export type ProviderInstallationVerification = z.infer<
-  typeof providerInstallationVerificationSchema
->;
-
-export const providerInstallationRunResultSchema = z.discriminatedUnion(
-  "available",
-  [
-    z
-      .object({
-        available: z.literal(false),
-        message: z.string().min(1),
-      })
-      .passthrough(),
-    z
-      .object({
-        available: z.literal(true),
-        command: providerInstallationCommandSchema,
-        verification: providerInstallationVerificationSchema,
-      })
-      .passthrough(),
-  ],
-);
-export type ProviderInstallationRunResult = z.infer<
-  typeof providerInstallationRunResultSchema
 >;

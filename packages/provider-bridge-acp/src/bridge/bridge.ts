@@ -102,7 +102,6 @@ import {
 import { buildCursorParameterizedModelCatalog } from "../cursor-model-selection.js";
 import {
   getAcpProviderHealth,
-  getAcpProviderInstallationRun,
   getAcpProviderInstallationStatus,
   getAcpProviderUsage,
 } from "./provider-maintenance.js";
@@ -3841,16 +3840,6 @@ async function handleRequest(
         await getAcpProviderInstallationStatus(
           maintenanceTarget(request.params.providerOptions),
         ),
-      );
-      return;
-
-    case "provider/installation/run":
-      sendResult(
-        request.id,
-        await getAcpProviderInstallationRun({
-          ...maintenanceTarget(request.params.providerOptions),
-          action: request.params.action,
-        }),
       );
       return;
 

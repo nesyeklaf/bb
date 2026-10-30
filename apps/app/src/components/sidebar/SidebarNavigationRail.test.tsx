@@ -136,9 +136,6 @@ vi.mock("@/hooks/queries/system-queries", () => ({
 vi.mock("@/hooks/useMachineAttention", () => ({
   useMachineAttention: () => ({ label: null }),
 }));
-vi.mock("@/components/provider-cli/provider-cli-install", () => ({
-  useProviderCliInstallRunner: () => ({ runningJobKey: null }),
-}));
 
 const THREAD_PATH = getThreadRoutePath({
   projectId: "proj_one",

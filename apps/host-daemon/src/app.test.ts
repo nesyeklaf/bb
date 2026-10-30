@@ -289,9 +289,6 @@ function createFakeRuntime(): AgentRuntime {
     async providerInstallationStatus() {
       throw new Error("Unexpected provider installation status call");
     },
-    async providerInstallationRun() {
-      throw new Error("Unexpected provider installation run call");
-    },
     listRunningProviders() {
       return [];
     },
@@ -699,7 +696,6 @@ describe("createHostDaemonApp", () => {
     | "listCommands"
     | "listModels"
     | "providerHealth"
-    | "providerInstallationRun"
     | "providerInstallationStatus"
     | "providerUsage";
 
@@ -755,16 +751,6 @@ describe("createHostDaemonApp", () => {
       method: "providerInstallationStatus",
       waitsForFreshShellEnv: true,
     },
-    {
-      command: {
-        type: "provider.installation.run",
-        providerId: "codex",
-        action: "install",
-        bridgeLaunch: DISPATCH_TEST_BRIDGE_LAUNCH,
-      },
-      method: "providerInstallationRun",
-      waitsForFreshShellEnv: true,
-    },
   ];
 
   async function createExpiredShellEnvApp(args: {
@@ -794,10 +780,6 @@ describe("createHostDaemonApp", () => {
       providerInstallationStatus: recordCall(
         "providerInstallationStatus",
         runtime.providerInstallationStatus,
-      ),
-      providerInstallationRun: recordCall(
-        "providerInstallationRun",
-        runtime.providerInstallationRun,
       ),
     };
     const app = await createHostDaemonApp({

@@ -98,7 +98,6 @@ Use `--selected-model <model-id>` to discover its reasoning choices and include 
 - `bb machine retry-update`
 - `bb machine provider-cli`
 - `bb machine provider-cli status`
-- `bb machine provider-cli install`
 
 ## server
 
@@ -114,7 +113,6 @@ Use `--selected-model <model-id>` to discover its reasoning choices and include 
 - `bb server install-machine-service`
 
 ## updates
-
 
 ## terminal
 

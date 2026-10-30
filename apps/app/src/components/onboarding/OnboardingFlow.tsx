@@ -11,15 +11,6 @@ import { AddMachineDialog } from "@/components/dialogs/AddMachineDialog";
 import { ProjectPathDialog } from "@/components/dialogs/ProjectPathDialog";
 import { PluginSettingsSections } from "@/components/plugin/PluginSettingsSections";
 import { useSetPluginEnabled } from "@/components/plugin/useSetPluginEnabled";
-import {
-  buildProviderCliIssue,
-  hasProviderCliAction,
-  useProviderCliInstallRunner,
-} from "@/components/provider-cli/provider-cli-install";
-import {
-  openProviderCliInstallLog,
-  providerCliJobKey,
-} from "@/components/provider-cli/provider-cli-install-store";
 import { ThreadTerminalView } from "@/components/thread/terminal/ThreadTerminalView";
 import { appToast } from "@/components/ui/app-toast";
 import { applyPluginInstallJob } from "@/hooks/cache-owners/plugin-cache-owner";
@@ -40,7 +31,6 @@ import { usePluginList } from "@/hooks/queries/plugin-settings-queries";
 import { useSidebarNavigation } from "@/hooks/queries/sidebar-navigation-query";
 import { terminalOutputTailQueryKey } from "@/hooks/queries/query-keys";
 import {
-  useHostProviderCliStatus,
   useSystemConfig,
   useSystemProviderStates,
   useSystemProviders,
@@ -95,7 +85,6 @@ const SIGN_IN_TERMINAL_ROWS = 14;
 const SIGN_IN_OUTPUT_POLL_INTERVAL_MS = 1_000;
 const SIGN_IN_OUTPUT_TAIL_BYTES = 64 * 1024;
 const SIGN_IN_TERMINAL_FALLBACK_DELAY_MS = 6_000;
-const INSTALL_FAILED_MESSAGE = "Install failed";
 const PLUGIN_TOGGLE_SETTLE_TIMEOUT_MS = 10_000;
 
 function decodeTerminalChunks(chunks: readonly TerminalOutputChunk[]): string {
@@ -269,8 +258,6 @@ function AgentStepContainer({
   const providersQuery = useSystemProviders(
     hostId === null ? { enabled: false } : { hostId },
   );
-  const cliStatusQuery = useHostProviderCliStatus({ hostId });
-  const installRunner = useProviderCliInstallRunner();
   const { isLocalDaemonHost } = useHostDaemon();
   const createTerminal = useCreateTerminal();
   const closeTerminal = useCloseTerminal();
@@ -333,11 +320,6 @@ function AgentStepContainer({
     if (signingInProviderReady) endSignIn("ready");
   }, [endSignIn, signingInProviderReady]);
 
-  const { runningJobKey } = installRunner;
-  useEffect(() => {
-    if (runningJobKey === null) void refetchStates();
-  }, [refetchStates, runningJobKey]);
-
   const startSignIn = async (
     providerId: string,
     requestedMethod?: SignInMethod,
@@ -385,23 +367,6 @@ function AgentStepContainer({
     setSignIn(next);
   };
 
-  const startInstall = (providerId: string) => {
-    const status = cliStatusQuery.data?.[providerId];
-    if (hostId === null || status === undefined) return;
-    const issue = buildProviderCliIssue({ provider: providerId, status });
-    if (issue === null || !hasProviderCliAction(issue)) return;
-    installRunner.startInstall({ hostId, issue });
-  };
-
-  const viewInstallLog = (providerId: string) => {
-    if (hostId === null) return;
-    const failure = installRunner.failuresByJobKey.get(
-      providerCliJobKey(hostId, providerId),
-    );
-    if (failure === undefined) return;
-    openProviderCliInstallLog(failure.logDialogState);
-  };
-
   const agents: OnboardingAgent[] | null =
     hostId === null || states === undefined
       ? null
@@ -409,7 +374,6 @@ function AgentStepContainer({
           const info = providersQuery.data?.find(
             (provider) => provider.id === health.providerId,
           );
-          const jobKey = providerCliJobKey(hostId, health.providerId);
           const signingIn = signIn?.providerId === health.providerId;
           return {
             id: health.providerId,
@@ -417,16 +381,8 @@ function AgentStepContainer({
             provider: info ?? { id: health.providerId, logoUrl: null },
             state: resolveAgentSetupState({
               health,
-              cliStatus: cliStatusQuery.data?.[health.providerId],
-              installing:
-                installRunner.runningJobKey === jobKey ||
-                installRunner.queuedJobKeys.has(jobKey),
-              installFailure: installRunner.failuresByJobKey.has(jobKey)
-                ? INSTALL_FAILED_MESSAGE
-                : null,
               signingIn,
               signInFailed: signInFailedProviderId === health.providerId,
-              installInfoPending: cliStatusQuery.isPending,
             }),
             expanded:
               signingIn && signIn !== null ? (
@@ -477,12 +433,9 @@ function AgentStepContainer({
         machineName={hostName}
         agents={agents}
         onSignIn={(providerId) => void startSignIn(providerId)}
-        onInstall={startInstall}
-        onViewInstallLog={viewInstallLog}
         onCancelSignIn={() => endSignIn()}
         onRecheck={() => {
           void refetchStates();
-          void cliStatusQuery.refetch();
         }}
       />
     </OnboardingLayout>

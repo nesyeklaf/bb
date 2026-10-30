@@ -5,7 +5,6 @@ import {
 } from "@bb/domain";
 import {
   initializeParamsSchema,
-  providerInstallationRunParamsSchema,
   providerInstallationStatusParamsSchema,
   providerMaintenanceParamsSchema,
   modelListParamsSchema as canonicalModelListParamsSchema,
@@ -57,10 +56,6 @@ export const acpBridgeCommandSchema = z.discriminatedUnion("method", [
   z.object({
     method: z.literal("provider/installation/status"),
     params: providerInstallationStatusParamsSchema,
-  }),
-  z.object({
-    method: z.literal("provider/installation/run"),
-    params: providerInstallationRunParamsSchema,
   }),
   z.object({
     method: z.literal("thread/start"),
