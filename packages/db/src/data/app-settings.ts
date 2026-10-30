@@ -189,6 +189,20 @@ export function setAiServiceSelection(
   return selections;
 }
 
+export function hasAppSettingsMarker(db: DbConnection, key: string): boolean {
+  return (
+    db
+      .select({ key: appSettingsValues.key })
+      .from(appSettingsValues)
+      .where(eq(appSettingsValues.key, key))
+      .get() !== undefined
+  );
+}
+
+export function setAppSettingsMarker(db: DbConnection, key: string): void {
+  writeValue(db, key, true, Date.now());
+}
+
 export function getEarlyAdopter(db: DbConnection): boolean {
   const row = db
     .select({ value: appSettingsValues.value })

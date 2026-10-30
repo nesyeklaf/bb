@@ -646,7 +646,6 @@ export function createPluginRegistration(context: PluginRegistrationContext) {
 
   async function backfillNormalizedPluginRegistrations(): Promise<void> {
     for (const row of listUnnormalizedPluginRegistrations(deps.db)) {
-      if (row.source.startsWith("npm:")) continue;
       const parsed = parsePluginSource(row.source);
       let sourceIntent: NormalizeLegacyInstalledPluginInput["sourceIntent"];
       let exactResolution: LegacyPluginExactResolution;

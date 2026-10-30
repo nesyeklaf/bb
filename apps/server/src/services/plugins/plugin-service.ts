@@ -193,6 +193,7 @@ import type {
   PluginResolvedProviderEnv,
   PluginResolvedProviderEnvHealth,
 } from "./plugin-service-internal.js";
+import { removeRetiredOutgoingConnectionState } from "./retired-outgoing-state.js";
 import type { PluginMachineProviderBridge } from "./plugin-machine-provider-registry.js";
 import { fillPluginPresentation } from "./plugin-presentation.js";
 export type {
@@ -1306,10 +1307,23 @@ export function createPluginService(deps: PluginServiceDeps): PluginService {
     }
   }
 
+  async function removeNpmSourcedPlugins(): Promise<void> {
+    for (const row of listInstalledPlugins(deps.db)) {
+      if (row.sourceKind !== "npm" && !row.source.startsWith("npm:")) continue;
+      await deleteRemovedPluginData(row, pluginProviderIds(row));
+      deleteAllPluginKvValues(deps.db, row.id);
+      deleteInstalledPlugin(deps.db, row.id);
+      logger.warn(
+        `plugin ${row.id} removed because npm plugin sources are no longer supported (${row.source}); reinstall it from a git repository or a local path`,
+      );
+    }
+  }
+
   async function removeUnbundledBuiltins(): Promise<void> {
     for (const row of listInstalledPlugins(deps.db)) {
       if (!isOrphanedBuiltinRow(row)) continue;
       await deleteRemovedPluginData(row, pluginProviderIds(row));
+      deleteAllPluginKvValues(deps.db, row.id);
       deleteInstalledPlugin(deps.db, row.id);
       logger.info(
         `plugin ${row.id} removed because bb no longer bundles ${row.source}; its settings, secrets, and schedules were deleted`,
@@ -1477,6 +1491,13 @@ export function createPluginService(deps: PluginServiceDeps): PluginService {
       setLoadHold(options?.hold ?? null);
       loadPassActive = true;
       try {
+        const retired = removeRetiredOutgoingConnectionState(deps.db);
+        if (retired !== null) {
+          logger.info(
+            `removed retired outgoing-connection state: ${JSON.stringify(retired)}`,
+          );
+        }
+        await removeNpmSourcedPlugins();
         await backfillNormalizedPluginRegistrations();
         await withPluginOperationLock(REGISTRATION_MUTATION_KEY, async () => {
           for (const artifact of listPendingGitPluginArtifacts(deps.db)) {
