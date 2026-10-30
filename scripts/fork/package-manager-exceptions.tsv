@@ -11,6 +11,5 @@ apps/server/src/services/skills/registry-skill-install.ts	S3	skill registry inst
 packages/plugin-build/src/toolchain.ts	S3	plugin build resolves the bundled npm
 packages/process-utils/src/host-toolchain.ts	S3	defines the npm launchers the S3 callers use
 plugins/browser-automation/installer.ts	S3	runtime download of the browser package with npm
-plugins/environment-modal-sandbox/Dockerfile	S3	sandbox image build, not part of the fork runtime
 scripts/fork/release.sh	fork	npm pack of the local bb-app package, no registry access
 scripts/fork/remote.sh	fork	deploy installs the fork tarball with npm install -g; its dependencies resolve through the npm registry

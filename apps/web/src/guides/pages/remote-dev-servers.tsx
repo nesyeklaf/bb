@@ -405,19 +405,6 @@ export const guide: Guide = {
       ),
     },
     {
-      question: "Don't have a dev box?",
-      answer: (
-        <p>
-          bb can run machines in your own Modal account. Install the{" "}
-          <a href="/marketplace/environment-modal-sandbox">
-            Modal Sandbox plugin
-          </a>
-          , then pick <strong>Modal Sandbox</strong> as the machine when you
-          start a new thread.
-        </p>
-      ),
-    },
-    {
       question: "How do I keep a machine from running too many agents?",
       answer: (
         <p>
