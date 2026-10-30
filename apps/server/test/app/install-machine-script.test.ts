@@ -105,6 +105,7 @@ function writeJoinedState(
 
 function createEnrollingBbAppScript(args: {
   hostId: string;
+  idleDaemon?: boolean;
   invocationPath?: string;
   statusServerUrl?: string;
 }): string {
@@ -151,6 +152,7 @@ if (cliArgs[0] === "machine" && cliArgs[1] === "enroll") {
   process.exit(0);
 }
 ${recordInvocation}
+${args.idleDaemon === true ? "Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0);" : ""}
 const port = Number(option("--host-daemon-port"));
 const serverUrl = option("--server-url");
 const statusServerUrl = ${JSON.stringify(args.statusServerUrl)} ?? serverUrl;
@@ -257,44 +259,28 @@ done
   );
 }
 
-function writeEnrollingBbApp(
-  fixture: ReturnType<typeof createFixture>,
-  invocationPath: string,
-  hostId = "host-test",
-  statusServerUrl?: string,
+function writeServerInstalledBbApp(
+  fixture: Fixture,
+  script: Parameters<typeof createEnrollingBbAppScript>[0] = {
+    hostId: "host-test",
+  },
 ): void {
+  writeServerInstallTools(fixture, 200);
   writeExecutable(
-    join(fixture.binDir, "bb-app"),
-    createEnrollingBbAppScript({ hostId, invocationPath, statusServerUrl }),
-  );
-  writeEnrollingBb(fixture, hostId);
-}
-
-function writeEnrollingBb(
-  fixture: ReturnType<typeof createFixture>,
-  hostId = "host-test",
-): void {
-  writeExecutable(
-    join(fixture.binDir, "bb"),
-    createEnrollingBbAppScript({ hostId }),
+    join(fixture.dataDir, "bb-app-template"),
+    createEnrollingBbAppScript(script),
   );
 }
 
-function writeCurlArtifactMock(
-  fixture: ReturnType<typeof createFixture>,
-  artifactStatus: number,
-): void {
-  writeExecutable(
-    join(fixture.binDir, "curl"),
-    `#!/bin/sh
-output=
-while [ "$#" -gt 0 ]; do
-  if [ "$1" = --output ]; then output=$2; shift 2; else shift; fi
-done
-[ -z "$output" ] || printf '%s' 'fixture-tarball' >"$output"
-printf '%s' '${artifactStatus}'
-`,
-  );
+function writePathExecutablesRecordingCalls(fixture: Fixture): string {
+  const callsLog = join(fixture.dataDir, "path-calls.log");
+  for (const name of ["bb-app", "bb"]) {
+    writeExecutable(
+      join(fixture.binDir, name),
+      `#!/bin/sh\nprintf '%s\\n' "${name} $*" >>"${callsLog}"\nexit 0\n`,
+    );
+  }
+  return callsLog;
 }
 
 function writeUnreachableUserBus(fixture: Fixture, init: string): void {
@@ -342,7 +328,7 @@ exec '${process.execPath}' "$@"
 `,
       );
       writeExecutable(join(fixture.binDir, "id"), `#!/bin/sh\necho ${uid}\n`);
-      writeCurlArtifactMock(fixture, 404);
+      writeServerInstallTools(fixture, 404);
       const result = runScript(BOOTSTRAP_ARGS, fixture, {
         HOME: unset ? undefined : fixture.homeDir,
       });
@@ -679,23 +665,10 @@ exec '${process.execPath}' "$@"
     "enrolls privately with portable service selection (%j)",
     ({ container }) => {
       const fixture = createFixture();
-      writeCurlArtifactMock(fixture, 404);
-      writeEnrollingBbApp(
-        fixture,
-        join(fixture.dataDir, "daemon-invocation"),
-        "host-test",
-      );
-      writeExecutable(
-        join(fixture.binDir, "bb"),
-        `#!/usr/bin/env node
-const fs = require("node:fs");
-const path = require("node:path");
-const bundle = JSON.parse(process.env.BB_ENROLLMENT);
-fs.writeFileSync(path.join(process.env.BB_DATA_DIR, "enrollment-argv"), JSON.stringify(process.argv.slice(2)));
-fs.writeFileSync(path.join(process.env.BB_DATA_DIR, "auth.json"), JSON.stringify({hostId: bundle.hostId, hostKey: "durable-test"}));
-fs.writeFileSync(path.join(process.env.BB_DATA_DIR, "config.json"), JSON.stringify({serverUrl: bundle.serverUrl}));
-`,
-      );
+      writeServerInstalledBbApp(fixture, {
+        hostId: "host-test",
+        invocationPath: join(fixture.dataDir, "daemon-invocation"),
+      });
       if (container) {
         writeExecutable(
           join(fixture.binDir, "uname"),
@@ -758,11 +731,10 @@ fs.writeFileSync(path.join(process.env.BB_DATA_DIR, "config.json"), JSON.stringi
     },
   );
 
-  it("uses bb-app from PATH and enrolls from the private bootstrap bundle", () => {
+  it("installs the server's bb-app and enrolls from the private bootstrap bundle", () => {
     const fixture = createFixture();
     const invocationPath = join(fixture.dataDir, "invocation");
-    writeCurlArtifactMock(fixture, 404);
-    writeEnrollingBbApp(fixture, invocationPath);
+    writeServerInstalledBbApp(fixture, { hostId: "host-test", invocationPath });
     const result = runScript(BOOTSTRAP_ARGS, fixture, {
       BB_INSTALL_SKIP_SERVICE: "1",
     });
@@ -800,8 +772,7 @@ fs.writeFileSync(path.join(process.env.BB_DATA_DIR, "config.json"), JSON.stringi
     const fixture = createFixture();
     const invocationPath = join(fixture.dataDir, "invocation");
     const daemonPidPath = join(fixture.dataDir, "install-daemon.pid");
-    writeCurlArtifactMock(fixture, 404);
-    writeEnrollingBbApp(fixture, invocationPath);
+    writeServerInstalledBbApp(fixture, { hostId: "host-test", invocationPath });
     writeJoinedState(fixture);
 
     const result = runScript(BOOTSTRAP_ARGS, fixture, {
@@ -832,8 +803,7 @@ fs.writeFileSync(path.join(process.env.BB_DATA_DIR, "config.json"), JSON.stringi
     const fixture = createFixture();
     const invocationPath = join(fixture.dataDir, "invocation");
     const daemonPidPath = join(fixture.dataDir, "install-daemon.pid");
-    writeCurlArtifactMock(fixture, 404);
-    writeEnrollingBbApp(fixture, invocationPath);
+    writeServerInstalledBbApp(fixture, { hostId: "host-test", invocationPath });
     const reconnectEnv = {
       BB_DATA_DIR: "",
       BB_INSTALL_SKIP_SERVICE: "1",
@@ -889,13 +859,11 @@ fs.writeFileSync(path.join(process.env.BB_DATA_DIR, "config.json"), JSON.stringi
   it("accepts the daemon's normalized loopback server URL", () => {
     const fixture = createFixture();
     const invocationPath = join(fixture.dataDir, "invocation");
-    writeCurlArtifactMock(fixture, 404);
-    writeEnrollingBbApp(
-      fixture,
+    writeServerInstalledBbApp(fixture, {
+      hostId: "host-test",
       invocationPath,
-      "host-test",
-      "http://127.0.0.1:20101",
-    );
+      statusServerUrl: "http://127.0.0.1:20101",
+    });
     const result = runScript(BOOTSTRAP_ARGS, fixture, {
       BB_ENROLLMENT: bootstrapBundle("http://localhost:20101"),
       BB_INSTALL_SKIP_SERVICE: "1",
@@ -1076,6 +1044,30 @@ fs.writeFileSync(path.join(process.env.BB_DATA_DIR, "config.json"), JSON.stringi
     );
   });
 
+  it.each([
+    [404, "The server does not provide its bb-app package"],
+    [500, "Could not download the server's bb-app package"],
+  ] as const)(
+    "never runs a bb-app or bb from PATH when the server package download returns %s",
+    (status, message) => {
+      const fixture = createFixture();
+      writeServerInstallTools(fixture, status);
+      const pathCallsLog = writePathExecutablesRecordingCalls(fixture);
+      const result = runScript(BOOTSTRAP_ARGS, fixture, {
+        BB_INSTALL_SKIP_SERVICE: "1",
+      });
+
+      expect(result.status).toBe(1);
+      expect(result.stderr).toContain(message);
+      expect(existsSync(pathCallsLog)).toBe(false);
+      expect(existsSync(join(fixture.dataDir, "npm.log"))).toBe(false);
+      expect(existsSync(join(fixture.dataDir, "auth.json"))).toBe(false);
+      expect(existsSync(join(fixture.dataDir, "install-daemon.pid"))).toBe(
+        false,
+      );
+    },
+  );
+
   it("fails without calling npm when the server provides no package", () => {
     const fixture = createFixture();
     writeServerInstallTools(fixture, 404);
@@ -1133,9 +1125,7 @@ fs.writeFileSync(path.join(process.env.BB_DATA_DIR, "config.json"), JSON.stringi
 
   it("refuses a data dir enrolled for a different host instead of faking success", () => {
     const fixture = createFixture();
-    writeCurlArtifactMock(fixture, 404);
-    writeExecutable(join(fixture.binDir, "bb-app"), "#!/bin/sh\nexit 99\n");
-    writeEnrollingBb(fixture);
+    writeServerInstalledBbApp(fixture);
     writeJoinedState(fixture, "https://machine.getbb.app", "host-other");
     const result = runScript(BOOTSTRAP_ARGS, fixture, {
       BB_INSTALL_SKIP_SERVICE: "1",
@@ -1318,8 +1308,7 @@ fi
     });
     const fixture = createFixture();
     const invocationPath = join(fixture.dataDir, "invocation");
-    writeCurlArtifactMock(fixture, 404);
-    writeEnrollingBbApp(fixture, invocationPath);
+    writeServerInstalledBbApp(fixture, { hostId: "host-test", invocationPath });
 
     try {
       const result = runScript(BOOTSTRAP_ARGS, fixture, {
@@ -1350,14 +1339,10 @@ fi
 
   it("reports periodic progress while a host daemon is still joining", () => {
     const fixture = createFixture();
-    writeCurlArtifactMock(fixture, 404);
-    writeExecutable(
-      join(fixture.binDir, "bb-app"),
-      `#!/usr/bin/env node
-setInterval(() => {}, 1000);
-`,
-    );
-    writeEnrollingBb(fixture);
+    writeServerInstalledBbApp(fixture, {
+      hostId: "host-test",
+      idleDaemon: true,
+    });
     writeExecutable(join(fixture.binDir, "sleep"), "#!/bin/sh\nexit 0\n");
 
     const result = runScript(BOOTSTRAP_ARGS, fixture, {
@@ -1742,8 +1727,7 @@ fi
   it("fails before joining when the systemd user bus is unavailable on a systemd host", () => {
     const fixture = createFixture();
     const invocationPath = join(fixture.dataDir, "invocation");
-    writeCurlArtifactMock(fixture, 404);
-    writeEnrollingBbApp(fixture, invocationPath);
+    writeServerInstalledBbApp(fixture, { hostId: "host-test", invocationPath });
     writeUnreachableUserBus(fixture, "systemd");
 
     const result = runScript(BOOTSTRAP_ARGS, fixture, {
@@ -1762,8 +1746,7 @@ fi
   it("runs a detached daemon on Linux without systemd as init", () => {
     const fixture = createFixture();
     const invocationPath = join(fixture.dataDir, "invocation");
-    writeCurlArtifactMock(fixture, 404);
-    writeEnrollingBbApp(fixture, invocationPath);
+    writeServerInstalledBbApp(fixture, { hostId: "host-test", invocationPath });
     writeUnreachableUserBus(fixture, "tini");
 
     const result = runScript(BOOTSTRAP_ARGS, fixture, {
