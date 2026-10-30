@@ -1,4 +1,3 @@
-import path from "node:path";
 import { HOST_DAEMON_RESTART_EXIT_CODE } from "@bb/config/machine-service";
 import { startDesktopBrowserBroker } from "./desktop-browser-broker.js";
 import { MachineEnvironment } from "./machine-environment.js";
@@ -27,12 +26,6 @@ import {
   type RuntimeManagerOptions,
 } from "./runtime-manager.js";
 import { WatchManager } from "./watch-manager.js";
-import {
-  ConnectTunnelClient,
-  resolveTrustedConnectGate,
-} from "./connect-tunnel/index.js";
-import { MachineNextTunnel, machineNextFrpDir } from "./connect-next/index.js";
-import { defaultTrustedCertificates, resolveFrpc } from "@bb/frp-client";
 import { TerminalManager } from "./terminals/terminal-manager.js";
 import {
   createServerClient,
@@ -142,8 +135,6 @@ export interface HostDaemonApp {
   localApi: LocalApiServer | null;
   runtimeManager: RuntimeManager;
   watchManager: WatchManager;
-  connectTunnel: ConnectTunnelClient;
-  machineNextTunnel: MachineNextTunnel;
   terminalManager: TerminalManager;
   router: CommandRouter;
   connection: ServerConnection;
@@ -497,47 +488,6 @@ export async function createHostDaemonApp(
       });
     },
   });
-  const connectTunnel = new ConnectTunnelClient({
-    serverUrl: options.serverUrl,
-    hostName: options.hostName,
-    machineCredential: options.serverHeaders?.["x-bb-connect-machine"],
-    fetchFn: options.fetchFn,
-    logger: options.logger,
-    onIdentity: (identity) => {
-      sendServerMessage({
-        type: "connect-tunnel.identity",
-        identity,
-      });
-    },
-    onStatusChange: (status) => {
-      options.logger.debug(
-        { connectTunnelStatus: status },
-        "Machine tunnel status",
-      );
-    },
-  });
-  const machineNextTunnel = new MachineNextTunnel({
-    frpDir: machineNextFrpDir(options.dataDir),
-    trustedBaseDomain: () => {
-      try {
-        return resolveTrustedConnectGate(options.serverUrl).baseDomain;
-      } catch {
-        return null;
-      }
-    },
-    machineCredential: options.serverHeaders?.["x-bb-connect-machine"],
-    ensureIdentity: () => connectTunnel.ensureTunnelIdentity(),
-    resolveBinary: () =>
-      resolveFrpc({
-        dataDir: path.dirname(machineNextFrpDir(options.dataDir)),
-        env: process.env,
-      }),
-    trustedCertificates: () => defaultTrustedCertificates(process.env),
-    logger: options.logger,
-    onStatusChange: (status) => {
-      sendServerMessage({ type: "connect-next.status", status });
-    },
-  });
   const skillTreeTransport: SkillTreeTransport = {
     fetchManifest: (treeHash) =>
       runSessionRequest({
@@ -837,7 +787,6 @@ export async function createHostDaemonApp(
     resolveInteractiveRequest: async (request) => {
       interactiveRequestRegistry.resolve(request);
     },
-    ensureConnectTunnelIdentity: () => connectTunnel.ensureTunnelIdentity(),
     serverMove,
     pluginHostManager,
     threadStorageRootPath,
@@ -888,29 +837,9 @@ export async function createHostDaemonApp(
         threadStorageTargets: message.threadStorageTargets,
       });
     },
-    onConnectSharesReplace: (message) => {
-      connectTunnel.replaceShareSet({
-        generation: message.generation,
-        ports: message.ports,
-      });
-      void machineNextTunnel.setPorts(connectTunnel.status().ports);
-    },
-    onConnectNextReplace: (message) => {
-      machineNextTunnel.replace({
-        generation: message.generation,
-        config: message.config,
-      });
-    },
     onTerminalMessage: (message) => terminalManager.handleMessage(message),
     onSessionOpened: async (session) => {
       sessionState.value = session.sessionId;
-      connectTunnel.replaceAuthoritativeShareSet(session.connectShares);
-      machineNextTunnel.replaceAuthoritative(session.connectNext);
-      void machineNextTunnel.setPorts(connectTunnel.status().ports);
-      sendServerMessage({
-        type: "connect-next.status",
-        status: machineNextTunnel.status(),
-      });
       await pluginHostManager.reconcileGenerations(
         session.pluginHostGenerations,
       );
@@ -943,8 +872,6 @@ export async function createHostDaemonApp(
     setSession: (session) => {
       sessionState.value = session?.sessionId ?? null;
       desktopBrowserBroker.setConnected(session !== null);
-      if (session === null) machineNextTunnel.sessionLost();
-      else machineNextTunnel.sessionRestored();
       if (session === null) {
         terminalManager.releaseOutputFlowControl();
         clearInteractiveInterruptRetry();
@@ -1000,8 +927,6 @@ export async function createHostDaemonApp(
       await pluginHostManager.shutdown();
       await options.closeMachineAuthProxy?.();
       await localApi?.close();
-      connectTunnel.shutdown();
-      await machineNextTunnel.shutdown();
       await watchManager.shutdown();
       disposeParcelWatcherBackend();
       await terminalManager.shutdownAll();
@@ -1051,8 +976,6 @@ export async function createHostDaemonApp(
     localApi,
     runtimeManager,
     watchManager,
-    connectTunnel,
-    machineNextTunnel,
     terminalManager,
     router,
     connection,

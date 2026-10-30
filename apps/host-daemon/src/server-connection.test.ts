@@ -60,8 +60,6 @@ function createSession(args: CreateSessionArgs): HostDaemonSessionOpenResponse {
     idleProviderSessionTimeoutMinutes: 30,
     leaseTimeoutMs: args.leaseTimeoutMs,
     retiredEnvironmentIds: [],
-    connectShares: { generation: 0, ports: [] },
-    connectNext: { generation: 0, config: null },
     pluginHostGenerations: [],
     sessionId: args.sessionId,
     watchSet: {
@@ -319,14 +317,14 @@ describe("ServerConnection", () => {
       data: JSON.stringify({
         type: "server.moved",
         serverUrl: "https://new-server.example.test",
-        headers: { "x-bb-connect-machine": "bbcm_new" },
+        headers: { "x-bb-machine-access": "bbcm_new" },
       }),
     });
 
     await vi.waitFor(() => {
       expect(onServerMoved).toHaveBeenCalledWith({
         serverUrl: "https://new-server.example.test",
-        headers: { "x-bb-connect-machine": "bbcm_new" },
+        headers: { "x-bb-machine-access": "bbcm_new" },
         source: "message",
       });
     });
@@ -476,7 +474,7 @@ describe("ServerConnection", () => {
   it("adds the machine credential to WS dial headers only when configured", async () => {
     const configured = createConnectionFixture({
       serverHeaders: {
-        "x-bb-connect-machine": "bbcm_machine",
+        "x-bb-machine-access": "bbcm_machine",
         "x-test-access": "opaque",
       },
     });
@@ -486,7 +484,7 @@ describe("ServerConnection", () => {
       await plain.connection.start();
       expect(configured.webSocket.headers[0]).toEqual({
         authorization: "Bearer host-key-server-connection-test",
-        "x-bb-connect-machine": "bbcm_machine",
+        "x-bb-machine-access": "bbcm_machine",
         "x-test-access": "opaque",
       });
       expect(plain.webSocket.headers[0]).toEqual({

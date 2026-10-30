@@ -895,7 +895,6 @@ describe("bb-app launcher", () => {
         BB_HOST_ENROLL_KEY: "bbde_supplied",
         BB_HOST_ID: "host_remote",
         BB_CONNECT_MACHINE_CREDENTIAL: "bbcm_machine",
-        BB_CONNECT_MACHINE_ID: "machine-1",
       },
       serverUrl: "https://bb.example.test",
     });
@@ -906,11 +905,7 @@ describe("bb-app launcher", () => {
     });
     expect(
       JSON.parse(readFileSync(join(dataDir, "config.json"), "utf8")),
-    ).toMatchObject({
-      machineCredential: "bbcm_machine",
-      connectMachineId: "machine-1",
-      serverUrl: "https://bb.example.test",
-    });
+    ).toEqual({ serverUrl: "https://bb.example.test" });
   });
 
   it("requires the join-code host ID on a fresh machine", async () => {
@@ -2156,7 +2151,7 @@ it("preserves machine identity and access headers through real config set and un
   const dataDir = mkdtempSync(join(tmpdir(), "bb-app-config-machine-"));
   const identity = {
     serverUrl: "https://machine.example",
-    serverHeaders: { "x-bb-connect-machine": "private-machine-access" },
+    serverHeaders: { "x-bb-machine-access": "private-machine-access" },
     machineCredential: "legacy-private",
     connectMachineId: "cloud-device",
   };

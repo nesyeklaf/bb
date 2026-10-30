@@ -203,7 +203,7 @@ async function createSourceServer(root: string): Promise<SourceServer> {
     JSON.stringify({
       config: { BB_LOG_LEVEL: "info" },
       serverUrl: "https://bb.example.test",
-      serverHeaders: { "x-bb-connect-machine": "bbcm_source" },
+      serverHeaders: { "x-bb-machine-access": "bbcm_source" },
     }),
   );
   await writeFileWithDirs(

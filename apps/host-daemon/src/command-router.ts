@@ -78,7 +78,6 @@ export interface CommandRouterOptions {
   refreshShellEnv: CommandDispatchOptions["refreshShellEnv"];
   resolveInteractiveRequest?: CommandDispatchOptions["resolveInteractiveRequest"];
   pluginHostManager?: PluginHostManager;
-  ensureConnectTunnelIdentity?: CommandDispatchOptions["ensureConnectTunnelIdentity"];
   serverMove?: CommandDispatchOptions["serverMove"];
   threadStorageRootPath: string;
   logger: CommandRouterLogger;
@@ -316,7 +315,6 @@ export class CommandRouter {
       refreshShellEnv: this.options.refreshShellEnv,
       emitEnvironmentHookProgress: this.options.emitEnvironmentHookProgress,
       resolveInteractiveRequest: this.options.resolveInteractiveRequest,
-      ensureConnectTunnelIdentity: this.options.ensureConnectTunnelIdentity,
       serverMove: this.options.serverMove,
       threadStorageRootPath: this.options.threadStorageRootPath,
       logger: this.options.logger,

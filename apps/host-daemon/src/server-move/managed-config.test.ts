@@ -31,7 +31,7 @@ describe("rewriteManagedConfigServer", () => {
         config: { BB_LOG_LEVEL: "debug" },
         customModels: [{ providerId: "codex", model: "gpt-custom" }],
         serverUrl: "https://old.example.test",
-        serverHeaders: { "x-bb-connect-machine": "bbcm_old" },
+        serverHeaders: { "x-bb-machine-access": "bbcm_old" },
         machineCredential: "bbcm_old",
         connectMachineId: "machine-1",
       }),
@@ -41,7 +41,7 @@ describe("rewriteManagedConfigServer", () => {
     await rewriteManagedConfigServer({
       dataDir,
       serverUrl: "https://new.example.test",
-      headers: { "x-bb-connect-machine": "bbcm_new" },
+      headers: { "x-bb-machine-access": "bbcm_new" },
     });
 
     expect(
@@ -50,7 +50,7 @@ describe("rewriteManagedConfigServer", () => {
       config: { BB_LOG_LEVEL: "debug" },
       customModels: [{ providerId: "codex", model: "gpt-custom" }],
       serverUrl: "https://new.example.test",
-      serverHeaders: { "x-bb-connect-machine": "bbcm_new" },
+      serverHeaders: { "x-bb-machine-access": "bbcm_new" },
     });
     if (process.platform !== "win32") {
       expect((await stat(join(dataDir, "config.json"))).mode & 0o777).toBe(
@@ -98,7 +98,7 @@ describe("move import config handling", () => {
       JSON.stringify({
         config: { BB_LOG_LEVEL: "debug" },
         serverUrl: "https://old.example.test",
-        serverHeaders: { "x-bb-connect-machine": "bbcm_target" },
+        serverHeaders: { "x-bb-machine-access": "bbcm_target" },
         machineCredential: "bbcm_target",
       }),
     );
@@ -113,7 +113,7 @@ describe("move import config handling", () => {
     ).toEqual({
       config: { BB_LOG_LEVEL: "info" },
       serverUrl: "https://old.example.test",
-      serverHeaders: { "x-bb-connect-machine": "bbcm_target" },
+      serverHeaders: { "x-bb-machine-access": "bbcm_target" },
       machineCredential: "bbcm_target",
     });
 

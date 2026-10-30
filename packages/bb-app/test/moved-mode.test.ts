@@ -674,7 +674,7 @@ describe("bb-app start after the server moved", () => {
     writeFileSync(
       join(dataDir, "config.json"),
       JSON.stringify({
-        serverHeaders: { "x-bb-connect-machine": "bbcm_laptop" },
+        serverHeaders: { "x-bb-machine-access": "bbcm_laptop" },
         serverUrl: "https://bb.example.com/desk",
       }),
     );
@@ -690,14 +690,14 @@ describe("bb-app start after the server moved", () => {
       BB_SERVER_URL: "https://bb.example.com/desk",
     });
     expect(JSON.parse(connectLaunch.env.BB_SERVER_HEADERS ?? "null")).toEqual({
-      "x-bb-connect-machine": "bbcm_laptop",
+      "x-bb-machine-access": "bbcm_laptop",
     });
     expect(connectLaunch.env.BB_THREAD_ID).toBeUndefined();
 
     writeFileSync(
       join(dataDir, "config.json"),
       JSON.stringify({
-        serverHeaders: { "x-bb-connect-machine": "bbcm_rotated" },
+        serverHeaders: { "x-bb-machine-access": "bbcm_rotated" },
         serverUrl: "https://desk.tailnet.example",
       }),
     );
@@ -708,7 +708,7 @@ describe("bb-app start after the server moved", () => {
       "https://desk.tailnet.example",
     );
     expect(JSON.parse(rewrittenLaunch.env.BB_SERVER_HEADERS ?? "null")).toEqual(
-      { "x-bb-connect-machine": "bbcm_rotated" },
+      { "x-bb-machine-access": "bbcm_rotated" },
     );
 
     writeFileSync(join(dataDir, "config.json"), JSON.stringify({}));

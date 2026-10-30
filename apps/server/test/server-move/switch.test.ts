@@ -44,7 +44,7 @@ describe("old server daemon config", () => {
 
     const backup = await writeOldServerDaemonConfig({
       dataDir,
-      headers: { "x-bb-connect-machine": "bbcm_laptop" },
+      headers: { "x-bb-machine-access": "bbcm_laptop" },
       serverUrl: "https://laptop.getbb.test",
     });
 
@@ -53,7 +53,7 @@ describe("old server daemon config", () => {
       customModels: [{ providerId: "codex", model: "gpt-test" }],
       connectMachineId: "machine-1",
       serverUrl: "https://laptop.getbb.test",
-      serverHeaders: { "x-bb-connect-machine": "bbcm_laptop" },
+      serverHeaders: { "x-bb-machine-access": "bbcm_laptop" },
     });
     if (process.platform !== "win32") {
       expect((await stat(path)).mode & 0o777).toBe(0o600);

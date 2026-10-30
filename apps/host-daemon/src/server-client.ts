@@ -370,9 +370,6 @@ export function createServerClient(
         hostId: args.hostId,
         instanceId: args.instanceId,
         hostName: args.hostName,
-        hasMachineCredential: Boolean(
-          options.serverHeaders?.["x-bb-connect-machine"]?.trim(),
-        ),
         platform: resolveHostPlatform(),
         dataDir: args.dataDir,
         localApiPort: args.localApiPort,

@@ -1011,15 +1011,8 @@ function applyManagedConfigEnv(
 ): NodeJS.ProcessEnv {
   return {
     ...args.env,
-    ...(args.config.serverHeaders !== undefined ||
-    args.config.machineCredential !== undefined
-      ? {
-          BB_SERVER_HEADERS: JSON.stringify(
-            args.config.serverHeaders ?? {
-              "x-bb-connect-machine": args.config.machineCredential,
-            },
-          ),
-        }
+    ...(args.config.serverHeaders !== undefined
+      ? { BB_SERVER_HEADERS: JSON.stringify(args.config.serverHeaders) }
       : {}),
     ...args.config.config,
     ...args.envFile.env,
@@ -1156,12 +1149,6 @@ function mergeManagedConfig(
   }
   if (patchConfig.sharedSkillRoots !== undefined) {
     nextConfig.sharedSkillRoots = patchConfig.sharedSkillRoots;
-  }
-  if (patchConfig.machineCredential !== undefined) {
-    nextConfig.machineCredential = patchConfig.machineCredential;
-  }
-  if (patchConfig.connectMachineId !== undefined) {
-    nextConfig.connectMachineId = patchConfig.connectMachineId;
   }
 
   if (patchConfig.config !== undefined) {
@@ -2616,17 +2603,9 @@ export async function createHostDaemonJoinEnv(
     toOptionalString(args.env.BB_HOST_ID) ??
     (await readPersistedHostId(args.context.dataDir));
   const suppliedJoinCode = toOptionalString(args.env.BB_HOST_ENROLL_KEY);
-  const machineCredential = toOptionalString(
-    args.env.BB_CONNECT_MACHINE_CREDENTIAL,
-  );
-  const connectMachineId = toOptionalString(args.env.BB_CONNECT_MACHINE_ID);
   const writeJoinConfig = (): Promise<void> =>
     writeManagedConfig({
-      config: {
-        serverUrl: args.serverUrl,
-        ...(machineCredential !== undefined ? { machineCredential } : {}),
-        ...(connectMachineId !== undefined ? { connectMachineId } : {}),
-      },
+      config: { serverUrl: args.serverUrl },
       dataDir: args.context.dataDir,
     });
   if (suppliedJoinCode !== undefined) {

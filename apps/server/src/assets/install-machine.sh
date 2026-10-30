@@ -10,8 +10,8 @@ Usage: install.sh --bootstrap-env <NAME> [--host-daemon-port <port>]
 
 Machines enroll from a private bootstrap bundle. Get the one-line command that
 carries it from Settings -> Machines -> Add a machine, or from
-`bb machine create --provider manual`. That command works through bb connect,
-Tailscale, and any other address machines can reach.
+`bb machine create --provider manual`. That command works through Tailscale,
+WireGuard, and any other address machines can reach.
 --adopt installs the service for a data directory that is already enrolled,
 such as the one a server move leaves behind, reading its machine ID from
 auth.json and its server address and credentials from config.json.
@@ -474,7 +474,7 @@ if [ "$adopt" = yes ]; then
     try { url = new URL(config?.serverUrl); }
     catch { fail(`${configFile} has no server address.`); }
     if (!["http:", "https:"].includes(url.protocol) || url.username || url.password || url.search || url.hash) fail(`${configFile} has an unusable server address.`);
-    const headers = config.serverHeaders ?? (typeof config.machineCredential === "string" ? { "x-bb-connect-machine": config.machineCredential } : {});
+    const headers = config.serverHeaders ?? {};
     if (typeof headers !== "object" || headers === null || Array.isArray(headers) || !Object.values(headers).every((value) => typeof value === "string")) fail(`${configFile} has invalid server headers.`);
     process.stdout.write(JSON.stringify({ dataDir, hostId: auth.hostId, serverUrl: url.href.replace(/\/$/u, ""), headers }));
   ' "$requested_data_dir"); then

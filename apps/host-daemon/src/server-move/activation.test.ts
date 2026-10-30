@@ -38,7 +38,7 @@ async function prepareMove(
     join(fixture.dataDir, "config.json"),
     JSON.stringify({
       serverUrl: "https://bb.example.test",
-      serverHeaders: { "x-bb-connect-machine": "bbcm_target" },
+      serverHeaders: { "x-bb-machine-access": "bbcm_target" },
       machineCredential: "bbcm_target",
     }),
   );

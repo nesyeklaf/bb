@@ -564,7 +564,7 @@ describe("server move coordinator", () => {
       seedTopology(harness);
       const base = createTestServerMoveEnvironment(harness);
       const { events, retired } = base;
-      const grantHeaders = { "x-bb-connect-machine": "bbcm_laptop" };
+      const grantHeaders = { "x-bb-machine-access": "bbcm_laptop" };
       const accountRpcStatuses: number[] = [];
       const accountRpcPath =
         "/api/v1/plugins/bb-account/rpc/bb-account.v1.fetch";
@@ -1225,7 +1225,7 @@ describe("server move coordinator", () => {
         timings: RECOVERY_TIMINGS,
       });
       const { events, plugins, retired } = base;
-      const grantHeaders = { "x-bb-connect-machine": "bbcm_laptop" };
+      const grantHeaders = { "x-bb-machine-access": "bbcm_laptop" };
       const coordinator = createServerMoveCoordinator({
         ...base.environment,
         resolveMode: async () => ({

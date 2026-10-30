@@ -48,7 +48,7 @@ describe("ServerMoveService.prepare", () => {
       join(fixture.dataDir, "config.json"),
       JSON.stringify({
         serverUrl: "https://bb.example.test",
-        serverHeaders: { "x-bb-connect-machine": "bbcm_target" },
+        serverHeaders: { "x-bb-machine-access": "bbcm_target" },
         machineCredential: "bbcm_target",
         connectMachineId: "machine-target",
       }),
@@ -87,7 +87,7 @@ describe("ServerMoveService.prepare", () => {
     expect(await readJson(join(fixture.dataDir, "config.json"))).toEqual({
       config: { BB_LOG_LEVEL: "info" },
       serverUrl: "https://bb.example.test",
-      serverHeaders: { "x-bb-connect-machine": "bbcm_target" },
+      serverHeaders: { "x-bb-machine-access": "bbcm_target" },
       machineCredential: "bbcm_target",
       connectMachineId: "machine-target",
     });

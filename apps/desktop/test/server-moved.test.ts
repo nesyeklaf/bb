@@ -1045,7 +1045,7 @@ describe("readServerMovedConnectCredential", () => {
   it("reads the machine credential the move wrote for this computer", async () => {
     const dataDir = await createTempDir();
     await writeConfig(dataDir, {
-      serverHeaders: { "x-bb-connect-machine": "bbcm_laptop" },
+      serverHeaders: { "x-bb-machine-access": "bbcm_laptop" },
       serverUrl: "https://laptop.getbb.app/",
     });
 
@@ -1066,7 +1066,7 @@ describe("readServerMovedConnectCredential", () => {
   it("does not use the credential for a different server", async () => {
     const dataDir = await createTempDir();
     await writeConfig(dataDir, {
-      serverHeaders: { "x-bb-connect-machine": "bbcm_laptop" },
+      serverHeaders: { "x-bb-machine-access": "bbcm_laptop" },
       serverUrl: "https://laptop.getbb.app",
     });
 
@@ -1083,7 +1083,7 @@ describe("readServerMovedConnectCredential", () => {
   it("does not use a credential that config.json pins to another address", async () => {
     const dataDir = await createTempDir();
     await writeConfig(dataDir, {
-      serverHeaders: { "x-bb-connect-machine": "bbcm_old" },
+      serverHeaders: { "x-bb-machine-access": "bbcm_old" },
       serverUrl: "http://127.0.0.1:38886",
     });
 

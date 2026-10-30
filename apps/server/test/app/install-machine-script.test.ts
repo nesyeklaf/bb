@@ -1170,7 +1170,7 @@ exec '${process.execPath}' "$@"
       join(fixture.dataDir, "config.json"),
       JSON.stringify({
         serverUrl: "https://machine.getbb.app/",
-        serverHeaders: { "x-bb-connect-machine": "machine-credential" },
+        serverHeaders: { "x-bb-machine-access": "machine-credential" },
       }),
     );
     writeServerInstallTools(fixture, 200);
@@ -1201,7 +1201,7 @@ fi
     expect(existsSync(join(fixture.dataDir, "enrollment-argv"))).toBe(false);
     expect(
       readFileSync(join(fixture.dataDir, "curl-config.log"), "utf8"),
-    ).toContain('header = "x-bb-connect-machine: machine-credential"');
+    ).toContain('header = "x-bb-machine-access: machine-credential"');
     const plist = readFileSync(
       join(
         fixture.homeDir,
@@ -1214,37 +1214,6 @@ fi
     );
     expect(plist).toContain("<string>--auto-update</string>");
     expect(plist).toContain("<string>https://machine.getbb.app</string>");
-  });
-
-  it("sends a legacy machine credential when adopting a data directory", () => {
-    const fixture = createFixture();
-    writeFileSync(
-      join(fixture.dataDir, "auth.json"),
-      JSON.stringify({ hostId: "host-test", hostKey: "secret" }),
-    );
-    writeFileSync(
-      join(fixture.dataDir, "config.json"),
-      JSON.stringify({
-        serverUrl: "https://machine.getbb.app",
-        machineCredential: "legacy-credential",
-      }),
-    );
-    writeServerInstallTools(fixture, 200);
-
-    const result = runScript(
-      ["--adopt", "--data-dir", fixture.dataDir],
-      fixture,
-      { BB_ENROLLMENT: undefined, BB_INSTALL_SKIP_SERVICE: "1" },
-    );
-
-    expect(result.status, result.stderr).toBe(0);
-    process.kill(
-      Number(readFileSync(join(fixture.dataDir, "install-daemon.pid"), "utf8")),
-      "SIGTERM",
-    );
-    expect(
-      readFileSync(join(fixture.dataDir, "curl-config.log"), "utf8"),
-    ).toContain('header = "x-bb-connect-machine: legacy-credential"');
   });
 
   it.each([

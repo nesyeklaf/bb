@@ -88,7 +88,7 @@ async function createFixture(): Promise<Fixture> {
     join(dataDir, "config.json"),
     JSON.stringify({
       serverUrl: "https://me.getbb.app",
-      serverHeaders: { "x-bb-connect-machine": "grant-secret" },
+      serverHeaders: { "x-bb-machine-access": "grant-secret" },
     }),
   );
   const installerPath = join(root, "install-machine.sh");

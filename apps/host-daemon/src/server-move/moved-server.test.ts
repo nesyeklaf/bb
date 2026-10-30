@@ -42,8 +42,8 @@ describe("normalizeMovedServerUrl", () => {
 describe("validateServerHeaders", () => {
   it("accepts token names and printable values", () => {
     expect(
-      validateServerHeaders({ "x-bb-connect-machine": "bbcm_abc 123" }),
-    ).toEqual({ "x-bb-connect-machine": "bbcm_abc 123" });
+      validateServerHeaders({ "x-bb-machine-access": "bbcm_abc 123" }),
+    ).toEqual({ "x-bb-machine-access": "bbcm_abc 123" });
   });
 
   it.each<Record<string, string>>([

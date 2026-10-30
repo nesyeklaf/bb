@@ -272,15 +272,6 @@ export const BB_SERVER_HEADERS_ENV = defineEnvVar<Record<string, string>>({
   },
 });
 
-export const BB_CONNECT_MACHINE_CREDENTIAL_ENV = defineEnvVar<
-  string | undefined
->({
-  description:
-    "Daemon-managed bb connect credential for traversing the public machine gate",
-  name: "BB_CONNECT_MACHINE_CREDENTIAL",
-  parse: parseOptionalTrimmedStringEnvValue,
-});
-
 export const BB_HOST_ENROLL_KEY_ENV = defineEnvVar<string | undefined>({
   description:
     "One-time enrollment token used to bootstrap a host daemon with the bb server",

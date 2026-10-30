@@ -106,6 +106,59 @@ describe("internal session protocol version", () => {
     }
   });
 
+  it("refuses a connect-era daemon and serves its update from this server", async () => {
+    const server = await startTestServer();
+    try {
+      const hostKey = createTestDaemonHostKey({ hostId: "host-connect-era" });
+      upsertHost(server.db, server.hub, {
+        id: "host-connect-era",
+        name: "Connect Era Host",
+      });
+      const connectEraProtocolVersion = 259;
+      expect(HOST_DAEMON_COMPATIBLE_PROTOCOL_VERSIONS).not.toContain(
+        connectEraProtocolVersion,
+      );
+
+      const response = await fetch(`${server.baseUrl}/internal/session/open`, {
+        method: "POST",
+        headers: {
+          authorization: `Bearer ${hostKey}`,
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          hostId: "host-connect-era",
+          instanceId: "instance-connect-era",
+          hostName: "Connect Era Host",
+          hasMachineCredential: true,
+          platform: "linux",
+          dataDir: "/tmp/host-connect-era-data",
+          localApiPort: 38_888,
+          protocolVersion: connectEraProtocolVersion,
+          activeThreads: [],
+          undeliveredEventThreadIds: [],
+          loadedEnvironments: [],
+        }),
+      });
+
+      expect(response.status).toBe(400);
+      expect(await response.json()).toMatchObject({
+        code: "protocol_version_mismatch",
+        details: { serverProtocolVersion: HOST_DAEMON_PROTOCOL_VERSION },
+      });
+      expect(
+        getHost(server.db, "host-connect-era")?.lastRejectedProtocolVersion,
+      ).toBe(connectEraProtocolVersion);
+
+      const version = await fetch(`${server.baseUrl}/install/version`);
+      expect(version.status).toBe(200);
+      expect(await version.json()).toMatchObject({
+        protocolVersion: HOST_DAEMON_PROTOCOL_VERSION,
+      });
+    } finally {
+      await server.close();
+    }
+  });
+
   it("rejects a session open whose protocol version does not match the server", async () => {
     const server = await startTestServer();
     try {

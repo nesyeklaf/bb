@@ -746,7 +746,7 @@ describe("bb server unlock", () => {
   const connectGrantConfig = {
     config: { BB_LOG_LEVEL: "debug" },
     serverUrl: "https://me.getbb.app",
-    serverHeaders: { "x-bb-connect-machine": "grant-secret" },
+    serverHeaders: { "x-bb-machine-access": "grant-secret" },
   };
 
   async function writeConnectLockWithGrant(): Promise<{
@@ -780,7 +780,7 @@ describe("bb server unlock", () => {
     expect(vi.mocked(globalThis.fetch)).toHaveBeenCalledWith(
       "https://me.getbb.app/api/v1/system/version",
       expect.objectContaining({
-        headers: { "x-bb-connect-machine": "grant-secret" },
+        headers: { "x-bb-machine-access": "grant-secret" },
         signal: expect.any(AbortSignal),
       }),
     );
@@ -988,7 +988,7 @@ describe("bb server unlock", () => {
         customModels: [{ providerId: "codex", model: "gpt-5.4" }],
         customAcpAgents: [{ id: "not a valid agent" }],
         serverUrl: "https://me.getbb.app",
-        serverHeaders: { "x-bb-connect-machine": "credential" },
+        serverHeaders: { "x-bb-machine-access": "credential" },
         machineCredential: "machine-secret",
         connectMachineId: "machine-1",
       }),

@@ -18,7 +18,7 @@ it("strips daemon-private inherited variables and returns clone failures as-is",
   );
   vi.stubEnv(
     "BB_SERVER_HEADERS",
-    JSON.stringify({ "x-bb-connect-machine": "private-daemon-token" }),
+    JSON.stringify({ "x-bb-machine-access": "private-daemon-token" }),
   );
   vi.stubEnv("BB_PRIVATE_TEST", "other-daemon-private");
   const contributedEnv = Object.entries({
