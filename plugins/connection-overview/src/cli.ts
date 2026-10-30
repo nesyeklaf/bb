@@ -5,7 +5,8 @@ import {
   type PluginCliResult,
 } from "@get-bb/plugin-sdk";
 import type { ConnectionState } from "./classify.js";
-import { evaluateStatus, type SourceHealth } from "./coverage.js";
+import type { SourceHealth } from "./coverage.js";
+import { buildStatusReport, isIncoming } from "./report.js";
 import { parseSince } from "./since.js";
 import type { DestinationRow, Store } from "./store.js";
 
@@ -16,16 +17,6 @@ const SINCE = {
 } as const;
 const JSON_FLAG = { type: "boolean", description: "Print JSON" } as const;
 const RED = { type: "boolean", description: "Only red rows" } as const;
-
-export const NOT_MEASURED = [
-  "hosts that are not Linux",
-  "remote and sandbox environments",
-  "unreadable pids",
-  "connections shorter than about 1 s",
-  "unconnected UDP (sendto without connect)",
-  "bb CLI processes started outside the server and daemon trees",
-  "the clients themselves (browser, desktop, phone)",
-];
 
 function failure(error: unknown): PluginCliResult {
   return {
@@ -77,11 +68,7 @@ export function registerCli(
             : undefined;
           const rows = deps.store
             .list({ since, ...(states === undefined ? {} : { states }) })
-            .filter((row) =>
-              direction === "in"
-                ? row.direction === "in"
-                : row.direction !== "in",
-            );
+            .filter((row) => isIncoming(row) === (direction === "in"));
           return {
             exitCode: 0,
             stdout: input.options.json
@@ -113,45 +100,42 @@ export function registerCli(
           run: (input) => {
             try {
               const since = parseSince(input.options.since, now());
-              const rows = deps.store.list({ since });
-              const sources = deps.health();
-              const gaps = deps.store.gaps(since);
-              const result = evaluateStatus({
-                sources,
-                gaps,
-                redCount: rows.filter((row) => row.state === "red").length,
-                capReached: deps.store.capReached(),
-              });
-              const counts: Record<string, number> = {};
-              for (const row of rows)
-                counts[row.state] = (counts[row.state] ?? 0) + 1;
-              const report = {
-                exitCode: result.exitCode,
+              const report = buildStatusReport(
+                {
+                  rows: deps.store.list({ since }),
+                  sources: deps.health(),
+                  gaps: deps.store.gaps(since),
+                  capReached: deps.store.capReached(),
+                },
+                since,
+              );
+              const json = {
+                exitCode: report.exitCode,
                 since: iso(since),
-                problems: result.problems,
-                counts,
-                sources,
-                gaps,
-                notMeasured: NOT_MEASURED,
+                problems: report.problems,
+                counts: report.counts,
+                sources: report.sources,
+                gaps: report.gaps,
+                notMeasured: report.notMeasured,
               };
               const text = [
-                `Window since ${report.since}: exit ${result.exitCode}`,
-                ...result.problems.map((problem) => `  problem: ${problem}`),
+                `Window since ${json.since}: exit ${report.exitCode}`,
+                ...report.problems.map((problem) => `  problem: ${problem}`),
                 `  rows: ${
-                  Object.entries(counts)
+                  Object.entries(report.counts)
                     .map(([state, count]) => `${state} ${count}`)
                     .join(", ") || "none"
                 }`,
-                ...sources.map(
+                ...report.sources.map(
                   (source) =>
                     `  source ${source.label}: collector ${source.collector}, transport ${source.transport}, ${source.treeSize} processes, ${source.unreadablePids} unreadable${source.error === null ? "" : ", error " + source.error}`,
                 ),
-                `  not measured: ${NOT_MEASURED.join("; ")}`,
+                `  not measured: ${report.notMeasured.join("; ")}`,
               ].join("\n");
               return {
-                exitCode: result.exitCode,
+                exitCode: report.exitCode,
                 stdout: input.options.json
-                  ? JSON.stringify(report, null, 2) + "\n"
+                  ? JSON.stringify(json, null, 2) + "\n"
                   : text + "\n",
               };
             } catch (error) {

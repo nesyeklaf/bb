@@ -11,6 +11,7 @@ import {
   validateExtraHosts,
 } from "./allowlist.js";
 import { normalizeHost } from "./classify.js";
+import { createAlerter } from "./alert.js";
 import { registerCli } from "./cli.js";
 import {
   createCollector,
@@ -18,12 +19,13 @@ import {
   type Cursor,
   type SourceDriver,
 } from "./collector.js";
-import { hostConnectionsContract } from "./contract.js";
+import { OVERVIEW_TAG, hostConnectionsContract } from "./contract.js";
 import { subscribeHostnameChannels } from "./diagnostics.js";
 import { createHostnameBook } from "./hostnames.js";
 import { linuxInterfaces, wireguardSubnets } from "./interfaces.js";
 import type { Cidr } from "./ip.js";
 import { normalizeIp } from "./ip.js";
+import { registerOverviewRpc } from "./overview-rpc.js";
 import { nodeProcFs } from "./proc-fs.js";
 import { startSamplingLoop } from "./sampling-loop.js";
 import { createRequestPeerCollector } from "./request-peers.js";
@@ -33,6 +35,13 @@ export const EXTRA_ALLOWED_HOSTS = "extraAllowedHosts";
 export const SERVER_SOURCE_ID = "server";
 const RESOLVE_INTERVAL_MS = 2 * 60_000;
 const PRUNE_INTERVAL_MS = 60 * 60_000;
+const NOTIFICATIONS_PLUGIN_ID = "push-notifications";
+const NOTIFICATIONS_SEND_TIMEOUT_MS = 10_000;
+
+const notificationDeliverySchema = z.object({
+  ok: z.literal(true),
+  channels: z.array(z.enum(["web", "desktop"])),
+});
 
 const cursorSchema = z.object({
   generation: z.string().nullable(),
@@ -100,6 +109,7 @@ export default function connectionOverview(bb: BbPluginApi) {
     store.reclassifyHostnames((hostname) =>
       allowedHosts.has(normalizeHost(hostname)),
     );
+    bb.rpc.experimental_invalidate([OVERVIEW_TAG]);
   }
   settings.onChange(() => void refreshAllowlist());
 
@@ -125,6 +135,21 @@ export default function connectionOverview(bb: BbPluginApi) {
     read: (after) => bb.server.internal_DO_NOT_USE_requestPeers({ after }),
     bindSubnets: () => bindSubnets,
     serverPid: process.pid,
+  });
+
+  const alerter = createAlerter({
+    store,
+    send: async (notification) => {
+      await bb.sdk.plugins.callRpc({
+        pluginId: NOTIFICATIONS_PLUGIN_ID,
+        method: "notifications.send",
+        input: notification,
+        outputSchema: notificationDeliverySchema,
+        signal: AbortSignal.timeout(NOTIFICATIONS_SEND_TIMEOUT_MS),
+      });
+    },
+    onSendFailed: (error) =>
+      bb.log.warn(`connection overview: alert not sent: ${String(error)}`),
   });
 
   async function resolveListedHosts() {
@@ -241,6 +266,14 @@ export default function connectionOverview(bb: BbPluginApi) {
           );
         }
         await Promise.all(drivers.map((driver) => collector.pull(driver)));
+        bb.rpc.experimental_invalidate([OVERVIEW_TAG]);
+        try {
+          await alerter.sweep();
+        } catch (error) {
+          bb.log.warn(
+            `connection overview: alert sweep failed: ${String(error)}`,
+          );
+        }
         await waitFor(
           Math.max(0, PULL_INTERVAL_MS - (Date.now() - started)),
           signal,
@@ -250,8 +283,7 @@ export default function connectionOverview(bb: BbPluginApi) {
     },
   });
 
-  registerCli(bb, {
-    store,
-    health: () => collector.health(activeSources),
-  });
+  const health = () => collector.health(activeSources);
+  registerCli(bb, { store, health });
+  registerOverviewRpc(bb, { store, health });
 }
