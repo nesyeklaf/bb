@@ -117,5 +117,19 @@ export function classify(
           ? "shared by listed and unlisted names"
           : "stale resolution",
     };
+  if (unlisted.length > 0)
+    return {
+      direction,
+      state: "red",
+      reason:
+        "resolves to unlisted " +
+        [...new Set(unlisted.map((entry) => entry.name))].join(", "),
+    };
+  if (freshListed.length > 0)
+    return {
+      direction,
+      state: "red",
+      reason: "listed address from a process that is not a provider CLI",
+    };
   return { direction, state: "red", reason: "unknown address" };
 }

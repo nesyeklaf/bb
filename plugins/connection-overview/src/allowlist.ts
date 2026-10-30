@@ -7,6 +7,7 @@ export const BUILTIN_ALLOWED_HOSTS = [
   "platform.claude.com",
   "statsig.anthropic.com",
   "mcp-proxy.anthropic.com",
+  "http-intake.logs.us5.datadoghq.com",
   "api.openai.com",
   "auth.openai.com",
   "chatgpt.com",
@@ -20,6 +21,7 @@ export const BUILTIN_ALLOWED_HOSTS = [
 export const INFERENCE_PROCESSES = new Set([
   "claude",
   "codex",
+  "pi",
   "git",
   "git-remote-http",
   "git-remote-https",

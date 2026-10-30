@@ -109,7 +109,25 @@ describe("classify, first match wins", () => {
     });
     expect(
       classify(out("2607:6bc0::10", 443, "node"), null, context(fresh)),
-    ).toMatchObject({ state: "red", reason: "unknown address" });
+    ).toMatchObject({
+      state: "red",
+      reason: "listed address from a process that is not a provider CLI",
+    });
+  });
+
+  it("names the unlisted host a red address resolves to", () => {
+    const seen = {
+      "2606:4700:20::681a:384": [
+        { name: "getbb.app", ip: "2606:4700:20::681a:384", at: NOW - 1_000 },
+      ],
+    };
+    expect(
+      classify(
+        out("2606:4700:20::681a:384", 443, "MainThread"),
+        null,
+        context(seen),
+      ),
+    ).toMatchObject({ state: "red", reason: "resolves to unlisted getbb.app" });
   });
 
   it("turns shared and stale resolutions yellow", () => {
