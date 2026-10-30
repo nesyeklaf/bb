@@ -149,24 +149,16 @@ For direct access at `http://<tailscale-ip>:<app-port>` instead, run:
 pnpm dev:remote
 ```
 
-This binds the Vite app and main server to all IPv4 interfaces. The remote
-browser must be able to reach both the printed app and server ports for realtime
-updates. The server API is unauthenticated and permits command execution and
-file reads, so use this only behind a trusted network boundary and restrict the
-ports to Tailscale traffic with the host firewall when the LAN is not trusted.
+This binds the Vite app to all IPv4 interfaces. The remote browser must also
+reach the printed server port for realtime updates, so put the machine's
+tailnet or WireGuard address in `BB_SERVER_BIND_HOST` (for example in
+`.env.local`); the server refuses wildcard, LAN and public addresses. The
+server API is unauthenticated and permits command execution and file reads, so
+restrict the Vite port to Tailscale traffic with the host firewall when the LAN
+is not trusted.
 
 To access the production-style worktree server directly from another machine,
-run:
-
-```bash
-pnpm start:worktree-remote
-```
-
-This uses the same checkout-specific data directory and ports as
-`pnpm start:worktree`, but binds its single server listener to all IPv4
-interfaces. The server API is unauthenticated and permits command execution and
-file reads, so use it only behind a trusted network boundary and restrict the
-port to Tailscale traffic with the host firewall when the LAN is not trusted.
+set `BB_SERVER_BIND_HOST` to that address and run `pnpm start:worktree`.
 
 To use the component storybook from another machine, run:
 

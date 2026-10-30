@@ -123,15 +123,15 @@ These entries are startup-only:
 - `BB_APP_SURFACE`, `BB_APP_URL` (when set through `bb-app env`),
   `BB_DATA_DIR`, `BB_DEV_APP_PORT`, and `BB_EXTERNAL_URL`
 - `BB_HOST_DAEMON_PORT` and `BB_INHERITED_SKILLS_ROOTS`
-- `BB_CONNECT_GATE_KEYS_URL`, `BB_LOG_LEVEL`,
+- `BB_LOG_LEVEL`,
   `BB_MANAGED_DEV_BUILTIN_PLUGIN_HOT_RELOAD`, and `BB_PERF_DIAGNOSTICS`
 - `BB_SERVER_BIND_HOST`, `BB_SERVER_PORT`, and all `BB_FF_*` feature flags
 
 Setting or unsetting one still reloads any other pending changes, but running
 processes keep their current values until a full launcher restart
 (`bb-app stop && bb-app start`) or a desktop app restart. In particular,
-changing or unsetting `BB_SERVER_BIND_HOST` does not close an existing
-`0.0.0.0` listener until that restart. `bb-app config refresh` names any
+changing or unsetting `BB_SERVER_BIND_HOST` does not close a listener on a
+previously listed address until that restart. `bb-app config refresh` names any
 startup-only keys present in `config.json` or `env.json`.
 
 ## Stopping A Running bb
@@ -186,9 +186,8 @@ do not set it yourself.
 | ------------------------------ | -------------------------------------------------- | ----------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `BB_APP_URL`                   | `bb-app config`                                    | Optional for remote use | Human-facing app URL used for generated links, allowed browser origins, and the allowed DNS hostname for requests. Leave empty for local-only use. Live when set with `bb-app config`.                                                                                     |
 | `BB_EXTERNAL_URL`              | `bb-app env`, or environment                       | Startup-only            | Internet-facing HTTPS base URL for generated public links; the fallback for `machineServerUrl`.                                                                                                                                                                            |
-| `BB_CONNECT_GATE_KEYS_URL`     | `bb-app env`, or environment                       | Startup-only testing    | Public key set the bb connect next tunnel ingress verifies gate assertions with. Default `https://getbb.app/.well-known/bb-connect-gate-keys.json`. See [connect-next.md](connect-next.md).                                                                                |
 | `BB_SERVER_URL`                | `bb-app config`                                    | Remote CLI/host use     | Server targeted by the standalone `bb` CLI and `host-daemon` commands on this machine. Defaults to `http://127.0.0.1:38886`. It does not change where `npx bb-app` binds.                                                                                                  |
-| `BB_SERVER_BIND_HOST`          | `bb-app env`, environment, or `--server-bind-host` | Startup-only            | Server listener host: `127.0.0.1` (default) or `0.0.0.0`. Not a `bb-app config` key. See [Startup Flags](#startup-flags).                                                                                                                                                  |
+| `BB_SERVER_BIND_HOST`          | `bb-app env`, environment, or `--server-bind-host` | Startup-only            | Extra listener addresses besides `127.0.0.1`: tailnet or WireGuard interface addresses, separated by commas or spaces. Not a `bb-app config` key. See [Startup Flags](#startup-flags).                                                                                     |
 | `BB_SERVER_PORT`               | `bb-app env`, environment, or `--server-port`      | Startup-only            | HTTP listener port. Defaults to `38886`.                                                                                                                                                                                                                                   |
 | `BB_HOST_DAEMON_PORT`          | `bb-app env`, environment, or `--host-daemon-port` | Startup-only            | Local host-daemon API port. Defaults to `38887`.                                                                                                                                                                                                                           |
 | `BB_LOG_LEVEL`                 | `bb-app config`                                    | Startup-only debugging  | `trace`, `debug`, `info`, `warn`, `error`, or `fatal`.                                                                                                                                                                                                                     |
@@ -1264,13 +1263,16 @@ Use launcher flags for per-run startup details:
 npx bb-app --data-dir ~/.bb-test --server-port 48886 --host-daemon-port 48887
 ```
 
-The server listens on `127.0.0.1` by default. Set
-`--server-bind-host 0.0.0.0` (or `BB_SERVER_BIND_HOST=0.0.0.0`) only when a
-trusted network boundary must reach the listener directly: the public API is
-unauthenticated and permits command execution and file reads. The only
-accepted bind hosts are `127.0.0.1` and `0.0.0.0` (IPv4 only); containers must
-also publish the port. With wildcard binding the startup `Server listening`
-and `app` lines show `http://0.0.0.0:<port>`.
+The server always listens on `127.0.0.1`. `--server-bind-host <addresses>` (or
+`BB_SERVER_BIND_HOST`) adds listeners on the listed addresses, separated by
+commas or spaces. Each must be a concrete tailnet address (`100.64.0.0/10`,
+`fd7a:115c:a1e0::/48`) or an address of a WireGuard interface on this host;
+`127.0.0.1` in the list is accepted and changes nothing. The server exits at
+startup on `0.0.0.0`, `::`, any other address, a malformed entry, or a
+duplicate. The public API is unauthenticated and permits command execution and
+file reads, so every peer on those networks can drive bb. The startup
+`Server listening` line names every listener address; the `app` line keeps the
+loopback URL. See [Using bb on multiple devices](multiple-devices.md).
 
 The data directory holds all bb-managed state: the SQLite database, logs, host
 identity, thread storage, custom themes, and plugins. It defaults to `~/.bb/`
@@ -1288,7 +1290,7 @@ Expo commands accept `BB_MOBILE_VARIANT=production` (the default) or `dev`;
 other values fail validation. The dev variant omits HTTPS app-link registration. See [mobile build instructions](../apps/mobile/README.md#android-local-apk-and-verification).
 
 For source development only, `pnpm dev`, `pnpm start:worktree`,
-`pnpm start:worktree-remote`, and `pnpm start` load the repo-root
+and `pnpm start` load the repo-root
 [dotenv-cli](https://github.com/entropitor/dotenv-cli) cascade. Add a repo-root
 `.env` only to override the defaults above.
 
@@ -1299,7 +1301,8 @@ For source development only, `pnpm dev`, `pnpm start:worktree`,
   the instance id is the sanitized checkout path relative to your home
   directory plus a short hash. The server and Vite bind to loopback; an
   explicit `BB_DEV_APP_HOST` overrides the Vite listener, and remote HTTP dev
-  through it also needs `BB_SERVER_BIND_HOST=0.0.0.0` for realtime updates.
+  through it also needs the server's tailnet or WireGuard address in
+  `BB_SERVER_BIND_HOST` for realtime updates.
   It defaults `BB_SKIP_ONBOARDING` to `1`, so new instances skip the first-run
   setup screen; set `BB_SKIP_ONBOARDING=0` to retain setup or replay it from Settings.
 - `pnpm start:worktree` loads the same cascade and checkout-specific data
@@ -1307,8 +1310,6 @@ For source development only, `pnpm dev`, `pnpm start:worktree`,
   the main server (no Vite or hot reload). First-run setup is skipped, as with `pnpm dev`. Its data
   directory, ports, inherited skills, and listener host take
   precedence over that instance's `config.json` or `env.json`.
-- `pnpm start:worktree-remote` does the same but binds the main server to
-  `0.0.0.0`; protect the port with a trusted network boundary.
 - `pnpm start` loads `.env`, `.env.local`, `.env.production`, and
   `.env.production.local`, and uses the packaged launcher policy with build
   outputs from `apps/app`, `apps/server`, and `apps/host-daemon`.

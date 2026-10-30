@@ -112,7 +112,7 @@ export interface IntegrationHarness {
 
 interface CreateHarnessOptions {
   serverPort?: number;
-  bindHost?: "127.0.0.1" | "0.0.0.0";
+  bindHost?: string;
   staticDir?: string;
   builtinPlugins?: readonly string[];
 }

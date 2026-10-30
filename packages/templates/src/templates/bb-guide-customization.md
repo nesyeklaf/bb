@@ -223,15 +223,15 @@ data and the dev-app port, inherited skill roots, and
 `BB_LOG_LEVEL`. Use `bb-app config`, not `bb-app env`, to change `BB_APP_URL`
 live. After a startup-only change, run `bb-app stop && bb-app start` or restart
 the desktop app; until then, changing or unsetting `BB_SERVER_BIND_HOST` does
-not close a previous `0.0.0.0` listener.
+not close a listener on a previously listed address.
 
-`--server-bind-host 0.0.0.0` (or `BB_SERVER_BIND_HOST=0.0.0.0`) listens on
-every interface for direct remote access; containers must also publish the
-port. BB accepts request hosts that are `localhost`, IP addresses (including
+`--server-bind-host <addresses>` (or `BB_SERVER_BIND_HOST`) adds listeners on
+the listed tailnet or WireGuard interface addresses next to `127.0.0.1`;
+wildcard, LAN and public addresses stop the server at startup. BB accepts request hosts that are `localhost`, IP addresses (including
 LAN and Tailscale IPs), or the hostname in `BB_APP_URL`. For a custom DNS name
 or reverse proxy, run `npx bb-app config set BB_APP_URL https://bb.example.com`
 before connecting, including from the CLI or SDK; forwarded host headers cannot
-authorize an unconfigured name. BB Connect needs no additional configuration.
+authorize an unconfigured name.
 
 Keyboard shortcuts
 

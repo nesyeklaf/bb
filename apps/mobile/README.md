@@ -247,7 +247,9 @@ EXPO_PUBLIC_BB_SERVER_URL=http://127.0.0.1:<port> pnpm dev   # Metro (dev-client
 The iOS Simulator shares the Mac loopback, so `pnpm dev` (repo root) or
 `pnpm dev` gives a server URL that works as-is. Physical
 phones need a Tailscale Serve URL or the server's tailnet address in
-`BB_SERVER_BIND_HOST`.
+`BB_SERVER_BIND_HOST`. For the E2E backend below, set
+`BB_MOBILE_E2E_BIND_HOST` to one tailnet or WireGuard address of this machine;
+the backend then listens only there.
 
 ## E2E (Maestro)
 
