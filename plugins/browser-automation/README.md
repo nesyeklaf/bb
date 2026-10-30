@@ -15,14 +15,13 @@ sessions show a live preview inline in the chat that expands into a lightbox; se
 
 ## Runtime installation and provenance
 
-The DevBrowser runtime is installed automatically on the **selected browser
-host** the first time a session is opened there. Nothing is installed on the
-server or on the invoking agent's machine, and the user's global npm
-installation is never touched. `runtime-pin.ts` pins one exact npm release:
+bb never downloads the DevBrowser runtime. You install it on the **selected
+browser host** yourself, outside bb; the plugin only looks for it and verifies
+it. `runtime-pin.ts` pins one exact release:
 
 | Field        | Value                                                               |
 | ------------ | ------------------------------------------------------------------- |
-| package      | `dev-browser@1.0.0-rc.4` from `registry.npmjs.org`                  |
+| package      | `dev-browser@1.0.0-rc.4`                                            |
 | repository   | [SawyerHood/dev-browser](https://github.com/SawyerHood/dev-browser) |
 | tag / commit | `v1.0.0-rc.4` at `e5d746f1fc17a3301d6e7f865f89c034f15f69fb`         |
 | linux-x64    | `fa6cec3f84463e171bd7b307e2e1f0243df59c70c38f96d790dc41b160db921a`  |
@@ -31,45 +30,27 @@ installation is never touched. `runtime-pin.ts` pins one exact npm release:
 | darwin-arm64 | `f0a7e7d10ab8be0fee1ee8ac2ca33d3efc46b493e5e998b29ea75c79479a2e8d`  |
 
 The digests are the SHA-256 values published in that release's `SHA256SUMS`.
-The pin never follows the `next` or `latest` dist-tags and never falls back to
-another version. Windows has no upstream artifact and is refused.
+Windows has no upstream artifact and is refused.
 
-On the browser host the installer (`installer.ts`, run inside the plugin host
-worker) performs these steps under
-`<plugin host dataDir>/runtime/npm/`, a directory owned by the plugin:
+The plugin expects this layout under `<plugin host dataDir>/runtime/npm/`:
 
-1. Locate `npm` on the host worker's `PATH`; a missing npm is a clear error
-   naming the host requirement. npm 9.5 or newer is required for attestation
-   checks.
-2. `npm install --ignore-scripts` of the exact version from the pinned
-   registry (passed explicitly, so a host `.npmrc` mirror cannot substitute
-   it) into a private staging directory with a plugin-owned npm cache. The
-   package's own postinstall is never run, and the resolved tarball URL must
-   come from the pinned registry.
-3. `npm audit signatures --json` must exit zero with no invalid or missing
-   signatures. The SLSA provenance attestation is then fetched from the
-   registry: its subject digest must equal the installed tarball integrity and
-   its workflow must name the pinned repository at tag `v<version>`.
-4. Download `dev-browser-<platform>` and `SHA256SUMS` from the GitHub release
-   for that tag into the package's `bin/dev-browser-bin`, the location the
-   package's own shim expects. The stream digest must equal the pinned
-   digest, and `SHA256SUMS` must agree, before the file is used.
-5. Run `dev-browser-bin --version` and require the pinned version, write
-   `verified.json`, and atomically rename the staging directory to
-   `runtime/npm/dev-browser@<version>/`.
+```
+dev-browser@1.0.0-rc.4/
+  verified.json
+  node_modules/dev-browser/bin/dev-browser-bin
+```
 
-Warm starts read `verified.json`, re-hash the binary, and use it without npm or
-network access; a tampered or missing binary triggers a fresh install. A lock
-file, created atomically with the installer's PID, serializes concurrent
-installs across worker processes; in-process callers share one job. Locks
-whose owner process is gone are reclaimed only after re-checking their
-identity, and staging directories are scoped per package version. An interrupted or failed install removes its staging directory
-and leaves no partial runtime; the next open retries. When no session is
-waiting on an install for 15 seconds, the install is cancelled.
+`verified.json` records `package`, `version`, `platform`, `sha256`, `binary`
+(the relative path above) and `installedAt`. On every start the plugin checks
+that the record matches the pin, that the binary is executable, and that its
+SHA-256 equals the pinned digest for the host platform. Nothing runs npm or
+touches the network. A missing, tampered or mismatched runtime fails the open
+with a message that names the expected directory, the version and the digest.
 
-Because a first install can exceed the 30-second host RPC deadline, the server
-polls the host's `prepare` RPC, which long-polls the shared install job and
-reports progress, before calling `open`.
+To install it, fetch `dev-browser-<platform>` from the GitHub release for the
+tag, confirm its SHA-256 against `SHA256SUMS` and the digest above, place it
+at the binary path, make it executable, and write `verified.json`. A runtime
+installed by an earlier bb release in the same layout keeps working.
 
 ### No fallback
 
@@ -82,13 +63,10 @@ never chosen automatically. The upstream MIT license is preserved in
 
 ### Bumping the pin
 
-1. Wait for the upstream tag workflow to publish both the npm version and the
-   GitHub release; merging alone publishes nothing.
-2. Fetch `https://github.com/SawyerHood/dev-browser/releases/download/v<version>/SHA256SUMS`
+1. Fetch `https://github.com/SawyerHood/dev-browser/releases/download/v<version>/SHA256SUMS`
    and copy the four digests into `runtimeRelease.artifacts`.
-3. Confirm `npm view dev-browser@<version> gitHead` matches the tag commit.
-4. Run `pnpm exec turbo run smoke:install --filter=bb-plugin-browser-automation` on a
-   Linux and a macOS host.
+2. Install the new version by hand on a Linux and a macOS host and run the
+   `smoke` task against it.
 
 Headless sessions need Chrome/Chromium on that host. The plugin checks
 `<plugin host dataDir>/runtime/chrome`, the standard macOS Chrome path, then
