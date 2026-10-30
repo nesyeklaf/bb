@@ -202,6 +202,9 @@ export function createStore(
 
   return {
     record: (observations: readonly Observation[]) => record(observations),
+    atomically<T>(work: () => T): T {
+      return db.transaction(work)();
+    },
     recordGap(sourceId: string, start: number, end: number, reason: string) {
       insertGap.run(sourceId, Math.round(start), Math.round(end), reason);
     },

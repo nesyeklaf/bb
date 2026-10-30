@@ -20,6 +20,8 @@ import {
 import { hostConnectionsContract } from "./contract.js";
 import { subscribeHostnameChannels } from "./diagnostics.js";
 import { createHostnameBook } from "./hostnames.js";
+import { linuxInterfaces, wireguardSubnets } from "./interfaces.js";
+import type { Cidr } from "./ip.js";
 import { normalizeIp } from "./ip.js";
 import { nodeProcFs } from "./proc-fs.js";
 import { startSamplingLoop } from "./sampling-loop.js";
@@ -83,6 +85,7 @@ export default function connectionOverview(bb: BbPluginApi) {
   const unsubscribe = subscribeHostnameChannels(book);
   let allowedHosts = allowedHostSet("");
   let resolvers = new Set<string>();
+  let bindSubnets: readonly Cidr[] = wireguardSubnets(linuxInterfaces);
   const host = bb.hosts.experimental_client({
     contract: hostConnectionsContract,
   });
@@ -105,7 +108,7 @@ export default function connectionOverview(bb: BbPluginApi) {
     context: () => ({
       allowedHosts,
       resolvers,
-      bindSubnets: [],
+      bindSubnets,
       inferenceProcesses: INFERENCE_PROCESSES,
     }),
     loadCursor: (sourceId) => {
@@ -118,7 +121,7 @@ export default function connectionOverview(bb: BbPluginApi) {
   const requestPeers = createRequestPeerCollector({
     store,
     read: (after) => bb.server.internal_DO_NOT_USE_requestPeers({ after }),
-    bindSubnets: () => [],
+    bindSubnets: () => bindSubnets,
     serverPid: process.pid,
   });
 
@@ -175,6 +178,7 @@ export default function connectionOverview(bb: BbPluginApi) {
         const started = Date.now();
         if (started - lastResolve >= RESOLVE_INTERVAL_MS) {
           lastResolve = started;
+          bindSubnets = wireguardSubnets(linuxInterfaces);
           await resolveListedHosts();
         }
         if (started - lastPrune >= PRUNE_INTERVAL_MS) {

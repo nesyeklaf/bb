@@ -37,7 +37,9 @@ async function harness() {
     host,
     store,
     collector,
-    add: (peers: Array<Partial<Omit<InternalDoNotUsePluginRequestPeer, "seq">>>) =>
+    add: (
+      peers: Array<Partial<Omit<InternalDoNotUsePluginRequestPeer, "seq">>>,
+    ) =>
       host.harness.inspection.internal_DO_NOT_USE_addRequestPeers(
         peers.map((peer) => ({
           at: 1_000_000,
@@ -102,9 +104,7 @@ describe("request peer collector", () => {
     const { store, collector, add } = await harness();
     add([{ at: 1_000 }]);
     collector.pull();
-    add(
-      Array.from({ length: 8193 }, (_, index) => ({ at: 2_000 + index })),
-    );
+    add(Array.from({ length: 8193 }, (_, index) => ({ at: 2_000 + index })));
     collector.pull();
     expect(store.gaps(0)).toMatchObject([
       {
@@ -115,6 +115,43 @@ describe("request peer collector", () => {
       },
     ]);
     expect(store.list({ since: 0, direction: "in" })[0]?.count).toBe(8193);
+  });
+});
+
+describe("request peer collector without a saved read", () => {
+  it("records a gap when the ring overwrote requests before the first read", async () => {
+    const { store, collector, add } = await harness();
+    add(Array.from({ length: 8195 }, (_, index) => ({ at: 5_000 + index })));
+    expect(collector.pull()).toBe(8192);
+    expect(store.gaps(0)).toMatchObject([
+      {
+        sourceId: REQUEST_SOURCE_ID,
+        start: 5_003,
+        end: 5_003,
+        reason: "request ring overwrote 3 unread entries before the first read",
+      },
+    ]);
+  });
+
+  it("commits rows and the cursor together", async () => {
+    const { store, collector, add, host } = await harness();
+    const failing = createRequestPeerCollector({
+      store: {
+        ...store,
+        saveCursor: () => {
+          throw new Error("interrupted");
+        },
+      },
+      read: (after) =>
+        host.bb.server.internal_DO_NOT_USE_requestPeers({ after }),
+      bindSubnets: () => [],
+      serverPid: 4242,
+    });
+    add([{}]);
+    expect(() => failing.pull()).toThrow("interrupted");
+    expect(store.list({ since: 0, direction: "in" })).toEqual([]);
+    expect(collector.pull()).toBe(1);
+    expect(store.list({ since: 0, direction: "in" })[0]?.count).toBe(1);
   });
 });
 

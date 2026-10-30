@@ -36,13 +36,7 @@ export function createRequestPeerCollector(options: {
     const after = resumed ? saved.after : 0;
     const lastAt = resumed ? saved.lastAt : null;
     const first = snapshot.peers[0];
-    if (first !== undefined && first.seq > after + 1 && lastAt !== null)
-      options.store.recordGap(
-        REQUEST_SOURCE_ID,
-        lastAt,
-        first.at,
-        "request ring overwrote unread entries",
-      );
+    const lost = first === undefined ? 0 : first.seq - after - 1;
     const bindSubnets = options.bindSubnets();
     const observations: Observation[] = snapshot.peers.map((peer) => {
       const classification = classifyRequestPeer(peer, { bindSubnets });
@@ -64,13 +58,24 @@ export function createRequestPeerCollector(options: {
         },
       };
     });
-    options.store.record(observations);
     const last = snapshot.peers.at(-1);
-    options.store.saveCursor(cursorKey, {
-      generation: snapshot.generation,
-      after: snapshot.latestSeq,
-      lastAt: last?.at ?? lastAt,
-    } satisfies RequestCursor);
+    options.store.atomically(() => {
+      if (first !== undefined && lost > 0)
+        options.store.recordGap(
+          REQUEST_SOURCE_ID,
+          lastAt ?? first.at,
+          first.at,
+          lastAt === null
+            ? `request ring overwrote ${lost} unread entries before the first read`
+            : "request ring overwrote unread entries",
+        );
+      options.store.record(observations);
+      options.store.saveCursor(cursorKey, {
+        generation: snapshot.generation,
+        after: snapshot.latestSeq,
+        lastAt: last?.at ?? lastAt,
+      } satisfies RequestCursor);
+    });
     return observations.length;
   }
 
