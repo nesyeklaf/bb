@@ -434,35 +434,6 @@ describe("bb plugin catalog", () => {
     expect(output).toContain(`resolves to commit: ${"b".repeat(40)}`);
   });
 
-  it("reports an npm listing by package and range", async () => {
-    const fetchMock = vi.mocked(fetch);
-    fetchMock
-      .mockResolvedValueOnce(
-        json({
-          plan: {
-            ...thirdPartyPlan,
-            source: "npm:bb-plugin-notes@beta",
-            resolvedSource: {
-              kind: "npm",
-              package: "bb-plugin-notes",
-              tag: "beta",
-              registry: "https://npm.acme.test",
-            },
-          },
-        }),
-      )
-      .mockResolvedValueOnce(json({ ok: true, plugin: installedPlugin }));
-
-    await runCommand(
-      ["plugin", "install", "notes@acme-plugins", "--yes"],
-      register,
-    );
-
-    const output = collectLogPayloads(vi.mocked(console.log)).join("\n");
-    expect(output).toContain("npm package: bb-plugin-notes@beta");
-    expect(output).toContain("registry: https://npm.acme.test");
-  });
-
   it("says so when a listed git source does not resolve right now", async () => {
     const fetchMock = vi.mocked(fetch);
     fetchMock
@@ -514,7 +485,6 @@ describe("bb plugin catalog", () => {
     const error = collectLogPayloads(vi.mocked(console.error)).join("\n");
     expect(error).toContain("either a catalog plugin or a path on disk");
     expect(error).toContain("path:<path>");
-    expect(error).toContain("npm:<package>");
     expect(error).toContain("Git repository URL");
   });
 

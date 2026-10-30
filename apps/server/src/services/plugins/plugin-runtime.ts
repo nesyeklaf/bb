@@ -1098,7 +1098,7 @@ export function createPluginRuntime(context: PluginRuntimeContext) {
     );
   }
 
-  function sourceKind(source: string): "path" | "git" | "npm" | "builtin" {
+  function sourceKind(source: string): "path" | "git" | "builtin" {
     try {
       return parsePluginSource(source).kind;
     } catch {

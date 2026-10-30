@@ -29,9 +29,7 @@ const TOOL_SKILL_DETAIL_ROUTE = getSkillDetailRoutePath({
 
 const TOOL_ROUTE_SEQUENCE = [
   "/skills",
-  "/skills/registry",
   TOOL_SKILL_DETAIL_ROUTE,
-  "/skills/registry/moss-skills%2Fmoss-notes",
   "/plugins",
   "/plugins/github",
 ] as const;

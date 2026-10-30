@@ -119,7 +119,7 @@ export const SETTINGS_SEARCH_INDEX: Record<
     ],
   },
   "ai-services": {
-    keywords: ["bb cloud", "llm"],
+    keywords: ["claude", "llm"],
     settings: [
       {
         title: "Thread titles",

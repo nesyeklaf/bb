@@ -5,10 +5,7 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { serve } from "@hono/node-server";
-import {
-  ensurePersonalProject,
-  type DbConnection,
-} from "@bb/db";
+import { ensurePersonalProject, type DbConnection } from "@bb/db";
 import { createMigratedConnection } from "@bb/db/testing";
 import { defaultFeatureFlags } from "@bb/domain";
 import {
@@ -202,7 +199,6 @@ async function startIntegrationServer(
     featureFlags: defaultFeatureFlags,
     hostDaemonPort: 3001,
     inheritedSkillsRootPaths: [],
-    marketplaceUrl: "https://marketplace.invalid/marketplace.json",
     connectGateKeysUrl: "https://gate-keys.invalid/bb-connect-gate-keys.json",
     appUrl: "https://bb.example.test",
     serverPort: 0,

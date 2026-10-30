@@ -246,7 +246,6 @@ export function ProfileWebViewScreen() {
       safeArea,
       capabilities: [
         "haptic",
-        "badge",
         "share",
         "open-external",
         "safe-area",

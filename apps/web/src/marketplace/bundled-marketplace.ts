@@ -21,7 +21,6 @@ export const UNLISTED_BUNDLED_PLUGINS: ReadonlySet<string> = new Set([
 export const INSTALL_ON_REQUEST_BUNDLED_PLUGINS: ReadonlySet<string> = new Set([
   "browser-automation",
   "docs",
-  "environment-modal-sandbox",
   "github",
   "memory",
   "tasks",

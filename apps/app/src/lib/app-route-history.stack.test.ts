@@ -13,9 +13,7 @@ const TOOL_SKILL_DETAIL_ROUTE = getSkillDetailRoutePath({
 
 const TOOL_ROUTE_SEQUENCE = [
   "/skills",
-  "/skills/registry",
   TOOL_SKILL_DETAIL_ROUTE,
-  "/skills/registry/moss-skills%2Fmoss-notes",
   "/plugins",
   "/plugins/github",
 ] as const;
@@ -53,9 +51,7 @@ describe("app route history stack", () => {
     }
     expect(backUrls).toEqual([
       "/plugins",
-      "/skills/registry/moss-skills%2Fmoss-notes",
       TOOL_SKILL_DETAIL_ROUTE,
-      "/skills/registry",
       "/skills",
       "/",
     ]);

@@ -191,52 +191,27 @@ describe("plugin update scheduling", () => {
       delayMs: number;
       onElapsed: () => Promise<void>;
     }> = [];
-    let firstFetch = true;
-    let resolveFirstFetch!: (response: Response) => void;
-    const deferredFetch = new Promise<Response>((resolve) => {
-      resolveFirstFetch = resolve;
-    });
-    const packumentResponse = () =>
-      new Response(
-        JSON.stringify({
-          versions: {
-            "1.0.0": {
-              version: "1.0.0",
-              dist: { integrity: "sha512-current" },
-            },
-            "1.1.0": {
-              version: "1.1.0",
-              dist: { integrity: "sha512-next" },
-            },
-          },
-          "dist-tags": { latest: "1.1.0" },
-        }),
-        { status: 200, headers: { "content-type": "application/json" } },
-      );
-    vi.stubGlobal("fetch", () => {
-      if (!firstFetch) return Promise.resolve(packumentResponse());
-      firstFetch = false;
-      return deferredFetch;
-    });
+    let latestCommit = "";
 
-    const upsertNpmRow = (id: string) => {
-      const packageName = `bb-plugin-${id}`;
+    const upsertGitRow = async (id: string) => {
+      const rowRepo = join(schedulingWorkDir, `repo-${id}`);
+      await mkdir(rowRepo, { recursive: true });
+      await git(rowRepo, ["init", "-q", "-b", "main"]);
+      await git(rowRepo, ["config", "user.email", "test@example.com"]);
+      await git(rowRepo, ["config", "user.name", "Test"]);
+      const current = await commitPlugin(rowRepo, "1.0.0");
+      latestCommit = await commitPlugin(rowRepo, "1.1.0");
       upsertInstalledPlugin(schedulingDb, {
         id,
-        source: `npm:${packageName}`,
+        source: `git:${rowRepo}@main`,
         provenance: { kind: "direct" },
         sourceIntent: {
-          kind: "npm",
-          packageName,
-          registry: "https://updates.test",
-          requestedSpec: "",
-          specKind: "default",
+          kind: "git",
+          url: rowRepo,
+          subdirectory: null,
+          selector: { kind: "ref", ref: "main", refKind: "branch" },
         },
-        exactResolution: {
-          kind: "npm",
-          version: "1.0.0",
-          integrity: "sha512-current",
-        },
+        exactResolution: { kind: "git", commit: current },
         updateState: {
           lastCheckAt: null,
           availableCompatibleVersion: null,
@@ -282,7 +257,7 @@ describe("plugin update scheduling", () => {
     };
 
     try {
-      upsertNpmRow("scheduled");
+      await upsertGitRow("updater");
       await restartWithScheduler();
       service?.startPeriodicUpdateChecks();
       expect(scheduled.map((entry) => entry.delayMs)).toEqual([0]);
@@ -290,16 +265,15 @@ describe("plugin update scheduling", () => {
       if (initial === undefined)
         throw new Error("missing initial update check");
       const sweep = initial.onElapsed();
-      expect(getInstalledPlugin(schedulingDb, "scheduled")).toMatchObject({
+      expect(getInstalledPlugin(schedulingDb, "updater")).toMatchObject({
         lastUpdateCheckAt: null,
         availableCompatibleVersion: null,
       });
-      resolveFirstFetch(packumentResponse());
       expect(sweep).toBeInstanceOf(Promise);
       await sweep;
-      expect(getInstalledPlugin(schedulingDb, "scheduled")).toMatchObject({
+      expect(getInstalledPlugin(schedulingDb, "updater")).toMatchObject({
         lastUpdateCheckAt: clock,
-        availableCompatibleVersion: "1.1.0",
+        availableCompatibleVersion: latestCommit,
       });
       expect(scheduled.map((entry) => entry.delayMs)).toEqual([6 * HOUR]);
       await service?.stopPeriodicUpdateChecks();
@@ -311,8 +285,8 @@ describe("plugin update scheduling", () => {
       expect(scheduled.map((entry) => entry.delayMs)).toEqual([4 * HOUR]);
       await service?.stopPeriodicUpdateChecks();
 
-      upsertNpmRow("never-checked");
-      await service?.checkForUpdates("scheduled");
+      await upsertGitRow("never-checked");
+      await service?.checkForUpdates("updater");
       service?.startPeriodicUpdateChecks();
       expect(scheduled.map((entry) => entry.delayMs)).toEqual([0]);
       await service?.stopPeriodicUpdateChecks();
@@ -320,7 +294,6 @@ describe("plugin update scheduling", () => {
       await service?.stopPeriodicUpdateChecks();
       await service?.stop();
       schedulingDb.$client.close();
-      vi.unstubAllGlobals();
       await rm(schedulingWorkDir, { recursive: true, force: true });
     }
   });
@@ -429,101 +402,7 @@ describe("plugin update service and routes", () => {
     await rm(workDir, { recursive: true, force: true });
   });
 
-  it("keeps a multi-plugin check usable when one npm registry is offline", async () => {
-    const updateState = {
-      lastCheckAt: null,
-      availableCompatibleVersion: null,
-      newestIncompatibleVersion: null,
-      statusDetail: null,
-    };
-    for (const packageName of [
-      "bb-plugin-offline-registry",
-      "bb-plugin-healthy-registry",
-    ]) {
-      const id = packageName.replace("bb-plugin-", "");
-      upsertInstalledPlugin(db, {
-        id,
-        source: `npm:${packageName}`,
-        provenance: { kind: "direct" },
-        sourceIntent: {
-          kind: "npm",
-          packageName,
-          registry: `https://${id}.test`,
-          requestedSpec: "",
-          specKind: "default",
-        },
-        exactResolution: {
-          kind: "npm",
-          version: "1.0.0",
-          integrity: "sha512-current",
-        },
-        updateState,
-        activeArtifactId: null,
-        rootDir: join(workDir, id),
-        version: "1.0.0",
-        enabled: false,
-        enabledFollowsDefault: false,
-      });
-    }
-    vi.stubGlobal(
-      "fetch",
-      async (input: string | URL | Request): Promise<Response> => {
-        const url = String(input);
-        if (url.startsWith("https://offline-registry.test/")) {
-          throw new TypeError("network unreachable");
-        }
-        if (url.startsWith("https://healthy-registry.test/")) {
-          return new Response(
-            JSON.stringify({
-              versions: {
-                "1.0.0": {
-                  version: "1.0.0",
-                  dist: { integrity: "sha512-current" },
-                },
-                "1.1.0": {
-                  version: "1.1.0",
-                  dist: { integrity: "sha512-next" },
-                },
-              },
-              "dist-tags": { latest: "1.1.0" },
-            }),
-            { status: 200, headers: { "content-type": "application/json" } },
-          );
-        }
-        throw new Error(`unexpected registry request: ${url}`);
-      },
-    );
-
-    const results = await service.checkForUpdates();
-    expect(results).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({
-          id: "offline-registry",
-          outcome: "unavailable",
-          detail: expect.stringContaining("network unreachable"),
-        }),
-        expect.objectContaining({
-          id: "healthy-registry",
-          outcome: "update-available",
-          candidate: expect.objectContaining({ version: "1.1.0" }),
-        }),
-      ]),
-    );
-    expect(service.listUpdateResults()).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({
-          id: "offline-registry",
-          outcome: "unavailable",
-        }),
-        expect.objectContaining({
-          id: "healthy-registry",
-          outcome: "update-available",
-        }),
-      ]),
-    );
-  });
-
-  it("reports legacy retired-marketplace installs as unavailable without fetching", async () => {
+  it("reports legacy npm installs as unavailable without fetching", async () => {
     upsertInstalledPlugin(db, {
       id: "legacy-marketplace",
       source: "npm:bb-plugin-legacy-marketplace@^0.2.0",
@@ -568,7 +447,9 @@ describe("plugin update service and routes", () => {
       expect.objectContaining({
         id: "legacy-marketplace",
         outcome: "unavailable",
-        detail: expect.stringContaining("retired remote marketplace"),
+        detail: expect.stringContaining(
+          "npm plugin sources are no longer supported",
+        ),
       }),
     ]);
     expect(fetched.filter((url) => url.includes("api.github.com"))).toEqual([]);
@@ -723,15 +604,12 @@ describe("plugin update service and routes", () => {
       sourceGitRef: null,
       sourceGitSubdirectory: null,
       sourceGitCommit: null,
-      statsJson: null,
       manifestJson: JSON.stringify({
         schemaVersion: 1,
         name: "acme-plugins",
         displayName: "Acme Plugins",
         plugins: [],
       }),
-      etag: null,
-      lastModified: null,
       lastSuccessfulRefreshAt: Date.now(),
       lastAttemptedRefreshAt: Date.now(),
       lastError: null,
@@ -739,7 +617,6 @@ describe("plugin update service and routes", () => {
     const catalog = createPluginCatalogService({
       db,
       appVersion: "1.0.0",
-      marketplaceUrl: "https://marketplace.test/marketplace.json",
       dataDir: join(workDir, "data"),
       plugins: service,
     });
@@ -1054,73 +931,12 @@ describe("plugin update service and routes", () => {
     ]);
   }, 60_000);
 
-  function upsertNpmRow(
-    id: string,
-    registry: string,
-    provenance:
-      | { kind: "direct" }
-      | { kind: "catalog"; marketplace: string; entryId: string } = {
-      kind: "direct",
-    },
-  ): void {
-    const packageName = `bb-plugin-${id}`;
-    upsertInstalledPlugin(db, {
-      id,
-      source: `npm:${packageName}`,
-      provenance,
-      sourceIntent: {
-        kind: "npm",
-        packageName,
-        registry,
-        requestedSpec: "",
-        specKind: "default",
-      },
-      exactResolution: {
-        kind: "npm",
-        version: "1.0.0",
-        integrity: "sha512-current",
-      },
-      updateState: {
-        lastCheckAt: null,
-        availableCompatibleVersion: null,
-        newestIncompatibleVersion: null,
-        statusDetail: null,
-      },
-      activeArtifactId: null,
-      rootDir: join(workDir, id),
-      version: "1.0.0",
-      enabled: false,
-      enabledFollowsDefault: false,
-    });
-  }
-
   it("shares one in-flight full sweep between concurrent callers", async () => {
     const first = service.checkForUpdates();
     expect(service.checkForUpdates()).toBe(first);
     await first;
     expect(service.checkForUpdates()).not.toBe(first);
   }, 60_000);
-
-  it("keeps the guarded registry policy for catalog installs during a check", async () => {
-    upsertNpmRow("listed", "https://127.0.0.1", {
-      kind: "catalog",
-      marketplace: "bb-community",
-      entryId: "listed",
-    });
-    const fetchMock = vi.fn(async () => {
-      throw new Error("unexpected unguarded fetch");
-    });
-    vi.stubGlobal("fetch", fetchMock);
-
-    await expect(service.checkForUpdates("listed")).resolves.toEqual([
-      expect.objectContaining({
-        id: "listed",
-        outcome: "unavailable",
-        detail: expect.stringContaining("non-public address 127.0.0.1"),
-      }),
-    ]);
-    expect(fetchMock).not.toHaveBeenCalled();
-  });
 
   it("deletes the replaced version once the update settles and keeps rollback state through the grace period", async () => {
     await service.stop();
@@ -1334,7 +1150,7 @@ describe("plugin update service and routes", () => {
     expect(response.status).toBe(422);
     expect(await response.json()).toEqual({
       error:
-        'plugin "updater" is pinned by its source intent; remove and reinstall it with an npm range, a git branch, or a git semver range to track updates',
+        'plugin "updater" is pinned by its source intent; remove and reinstall it with a git branch or a git semver range to track updates',
     });
   });
 

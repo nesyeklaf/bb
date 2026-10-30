@@ -124,8 +124,7 @@ These entries are startup-only:
   `BB_DATA_DIR`, `BB_DEV_APP_PORT`, and `BB_EXTERNAL_URL`
 - `BB_HOST_DAEMON_PORT` and `BB_INHERITED_SKILLS_ROOTS`
 - `BB_CONNECT_GATE_KEYS_URL`, `BB_LOG_LEVEL`,
-  `BB_MANAGED_DEV_BUILTIN_PLUGIN_HOT_RELOAD`, `BB_MARKETPLACE_URL`,
-  and `BB_PERF_DIAGNOSTICS`
+  `BB_MANAGED_DEV_BUILTIN_PLUGIN_HOT_RELOAD`, and `BB_PERF_DIAGNOSTICS`
 - `BB_SERVER_BIND_HOST`, `BB_SERVER_PORT`, and all `BB_FF_*` feature flags
 
 Setting or unsetting one still reloads any other pending changes, but running
@@ -187,7 +186,6 @@ do not set it yourself.
 | ------------------------------ | -------------------------------------------------- | ----------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `BB_APP_URL`                   | `bb-app config`                                    | Optional for remote use | Human-facing app URL used for generated links, allowed browser origins, and the allowed DNS hostname for requests. Leave empty for local-only use. Live when set with `bb-app config`.                                                                                     |
 | `BB_EXTERNAL_URL`              | `bb-app env`, or environment                       | Startup-only            | Internet-facing HTTPS base URL for generated public links; the fallback for `machineServerUrl`.                                                                                                                                                                            |
-| `BB_MARKETPLACE_URL`           | `bb-app env`, or environment                       | Startup-only testing    | Manifest URL of the reserved `bb-community` marketplace. Default `https://getbb.app/marketplace/v2/marketplace.json` (falls back to v1 on 404); a custom URL is requested without fallback. Changes only `bb-community`.                                                   |
 | `BB_CONNECT_GATE_KEYS_URL`     | `bb-app env`, or environment                       | Startup-only testing    | Public key set the bb connect next tunnel ingress verifies gate assertions with. Default `https://getbb.app/.well-known/bb-connect-gate-keys.json`. See [connect-next.md](connect-next.md).                                                                                |
 | `BB_SERVER_URL`                | `bb-app config`                                    | Remote CLI/host use     | Server targeted by the standalone `bb` CLI and `host-daemon` commands on this machine. Defaults to `http://127.0.0.1:38886`. It does not change where `npx bb-app` binds.                                                                                                  |
 | `BB_SERVER_BIND_HOST`          | `bb-app env`, environment, or `--server-bind-host` | Startup-only            | Server listener host: `127.0.0.1` (default) or `0.0.0.0`. Not a `bb-app config` key. See [Startup Flags](#startup-flags).                                                                                                                                                  |
@@ -288,20 +286,20 @@ voice transcripts come from AI services that plugins register. Each task
 (`thread-title`, `commit-message`, `voice`) is `automatic` (default), `off`,
 or a service id; set it in Settings → AI services or with
 `bb settings ai-services set <task> <value> [--plugin <plugin-id>]` (see
-`bb guide customization`). Automatic tries bb cloud (the `bb-ai` plugin, for a
-signed-in bb account) first, then every other registered service supporting
+`bb guide customization`). Automatic tries the service of the thread's provider
+(Claude Code or Codex) first, then every other registered service supporting
 the task in lexicographic order of plugin id and service id; unavailable
-services and failed requests fall through. A picked service is used alone; if
+services and failed requests fall through. No service runs on a hosted bb
+server. A picked service is used alone; if
 it fails, titles fall back to the start of the prompt and commits to
-`bb: automated commit`. `bb ai off|on` turns bb cloud off and on; see the
-`bb-cloud-ai` skill.
+`bb: automated commit`.
 
 The removed `BB_INFERENCE`, `BB_INFERENCE_FALLBACK`, and `BB_TRANSCRIPTION`
 keys are ignored with a warning in `~/.bb/config.json`, and `bb-app config set`
 refuses them.
 
 bb accepts voice recordings up to 25 MB; a service may set a lower limit, and
-Codex transcribes up to 20 MB and bb cloud up to 10 MB. With a ChatGPT
+Codex transcribes up to 20 MB. With a ChatGPT
 subscription login, Codex transcription can be blocked by Cloudflare bot
 protection on some networks; run `codex login --with-api-key` on the primary
 machine or pick another voice service.
@@ -925,15 +923,14 @@ Plugin state lives under the data dir:
 <dataDir>/plugins/<id>/secrets/    Secret settings and the plugin HTTP token
 <dataDir>/plugins/<id>/logs/       bb.log output (plugin.log, JSONL, rotated
                                    at 5MB; read with `bb plugin logs <id>`)
-<dataDir>/plugins/git/, npm/       Managed installs for git:/npm: sources
+<dataDir>/plugins/git/            Managed installs for git: sources
 <dataDir>/marketplaces/staging/    Throwaway checkouts for git: marketplace
                                    refreshes
 <dataDir>/skills-generated/        Server-generated skills (the
                                    plugin-commands skill)
 ```
 
-Marketplace catalogs live in the bb database. The reserved `bb-community`
-marketplace comes from `BB_MARKETPLACE_URL`. A `git:` marketplace reads
+Marketplace catalogs live in the bb database. A `git:` marketplace reads
 `marketplace.json` from the repository root, or from the directory saved with
 `bb marketplace add --subdirectory <relative-path>`. The server checks installed
 plugins for updates every 6 hours but never applies them.
@@ -1040,9 +1037,8 @@ all-or-selected host list, set on its autosaving plugin page or with
 
 ### Push notifications
 
-The builtin Push notifications plugin's `mobileEnabled`, `webEnabled`, and
-`desktopEnabled` booleans default to `true`. `expoPushUrl` (default
-`https://exp.host/--/api/v2/push/send`) is the relay URL, read on every send.
+The builtin Push notifications plugin's `webEnabled` and `desktopEnabled`
+booleans default to `true`.
 `defaultLevel` (default `all`) and `childLevel` (default `input-only`) set
 top-level and child thread levels. Set them with
 `bb plugin config push-notifications set <key> <value>`. Web and desktop
@@ -1208,7 +1204,7 @@ in and the `share-server-links` skill for `bb connect` and port shares.
 `http://bb.localhost:<port>` in a development build).
 
 Settings → Mobile pairs the bb mobile app (`bb connect machine-code`, see `bb guide machines`). Mobile
-builds, the optional `GOOGLE_SERVICES_JSON` Firebase config, and publishing
+builds, and publishing
 are documented in [`apps/mobile/README.md`](../apps/mobile/README.md).
 
 ### Connect next (beta)
@@ -1232,17 +1228,6 @@ every enrolled machine's daemon also serves the ports shared from it with
 | ------------------------ | --------------------------------------------------------------------------------------------------------------------------------- |
 | `BB_CONNECT_FRPC`        | Path of an `frpc` binary to run instead of the frp 0.71.0 release the plugin (or a host daemon) downloads and verifies.           |
 | `BB_CONNECT_NEXT_SERVER` | `ws://host:port` or `wss://host:port` of the frp server to dial instead of `wss://tunnel.<next domain>` derived from the account. |
-
-### Modal machines
-
-The Modal sandbox plugin creates machines on Modal. Its settings:
-`tokenId` and `tokenSecret` (secret; a Modal API token), `appName` (default
-`bb-sandboxes`), and `idleMinutes` (default 15; `0` disables idle suspension,
-maximum 1440). Sandboxes run for at most Modal's 24-hour sandbox lifetime.
-Without a size preset, a new machine reserves 1 CPU and 2 GiB. The plugin page
-also holds named image definitions (the bundled Standard Dockerfile, extra
-Dockerfiles, or Modal image IDs) and CPU/memory presets; a saved image applies
-to the next new machine. See the `modal-sandboxes` skill.
 
 ### Browser Automation
 
@@ -1300,8 +1285,7 @@ with orange icons and package `app.getbb.mobile.dev`. Output is
 `apps/mobile/build-output/bb-dev.apk`; append `-- x86_64` for an Intel emulator.
 The build command sets `BB_MOBILE_VARIANT=dev` for Expo configuration. Direct
 Expo commands accept `BB_MOBILE_VARIANT=production` (the default) or `dev`;
-other values fail validation. The dev variant omits production Firebase and
-HTTPS app-link registration. See [mobile build instructions](../apps/mobile/README.md#android-local-apk-and-verification).
+other values fail validation. The dev variant omits HTTPS app-link registration. See [mobile build instructions](../apps/mobile/README.md#android-local-apk-and-verification).
 
 For source development only, `pnpm dev`, `pnpm start:worktree`,
 `pnpm start:worktree-remote`, and `pnpm start` load the repo-root

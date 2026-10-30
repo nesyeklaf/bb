@@ -118,12 +118,11 @@ caveats as a browser. What the phone cannot do is listed in
 
 ### Push notifications on a self-hosted server
 
-The built-in Push notifications plugin sends each notification's thread title
-and a short plain-text preview through Expo, so a self-hosted server must reach
-`https://exp.host`; it needs no Apple or Google key. An Expo push token can only
-send notifications to one app installation, but treat it as private. Device
-commands are in the `push-notifications` plugin skill; the relay URL and proxy
-settings are in [configuration.md](configuration.md).
+The built-in Push notifications plugin notifies connected web and desktop
+clients over bb's own live connection, so a self-hosted server makes no
+outbound request for it. The bb mobile app receives no push notifications yet.
+Channel settings are in [configuration.md](configuration.md) and the
+`push-notifications` plugin skill.
 
 ## Point the desktop app at another bb
 

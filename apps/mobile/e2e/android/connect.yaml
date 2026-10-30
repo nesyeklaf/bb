@@ -40,13 +40,8 @@ appId: app.getbb.mobile
 - tapOn:
     id: "connect-submit"
 - extendedWaitUntil:
-    visible: ".*(Paired with bb connect|Not now).*"
+    visible: ".*Paired with bb connect.*"
     timeout: 30000
-- runFlow:
-    when:
-      visible: "Not now"
-    commands:
-      - tapOn: "Not now"
 - extendedWaitUntil:
     visible:
       id: "connect-session-authenticated"

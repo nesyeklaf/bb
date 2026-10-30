@@ -18,7 +18,11 @@ import {
 } from "@bb/text-utils";
 import type { AppDeps, LoggedWorkSessionDeps } from "../../types.js";
 import { ApiError } from "../../errors.js";
-import { runTextAiTask, type AiTaskFailureReason } from "../ai/ai-tasks.js";
+import {
+  preferredAiPluginId,
+  runTextAiTask,
+  type AiTaskFailureReason,
+} from "../ai/ai-tasks.js";
 import type { CommandResultSideEffectsDeps } from "../../internal/command-result-side-effects.js";
 import { parseStoredTurnRequestEvent } from "./thread-events.js";
 import { listLatestTurnFinalAgentReplies } from "./thread-data.js";
@@ -291,11 +295,16 @@ export async function generateThreadMetadataWithOutcome(
     return complete(null, "too-short");
   }
 
+  const preferredPluginId = preferredAiPluginId(
+    deps,
+    getThread(deps.db, args.threadId)?.providerId ?? null,
+  );
   const outcome = await runTextAiTask(deps, {
     task: "thread-title",
     label: "Thread title generation",
     logContext: { threadId: args.threadId },
     prompt,
+    ...(preferredPluginId === undefined ? {} : { preferredPluginId }),
   });
   if (!outcome.ok) {
     return complete(
@@ -404,11 +413,13 @@ export async function regenerateThreadTitle(
       "This thread has no task message to generate a title from",
     );
   }
+  const preferredPluginId = preferredAiPluginId(deps, args.thread.providerId);
   const outcome = await runTextAiTask(deps, {
     task: "thread-title",
     label: "Thread title regeneration",
     logContext: { threadId: args.thread.id },
     prompt,
+    ...(preferredPluginId === undefined ? {} : { preferredPluginId }),
   });
   if (!outcome.ok) {
     throw titleRegenerationError(outcome.reason, outcome.message);

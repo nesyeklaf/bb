@@ -73,8 +73,8 @@ bb settings reload Reload bb-managed configuration
 AI services: `bb settings ai-services` shows which AI service writes thread
 titles (and so branch names), commit messages, and voice transcripts, plus
 every service a plugin registers and whether it is ready. `set` picks
-`automatic` (bb cloud first, then all other compatible services by plugin id
-and service id in lexicographic order, including third-party plugins), `off`,
+`automatic` (the thread provider's service first, then all other compatible services by
+plugin id and service id in lexicographic order, including third-party plugins), `off`,
 or one service id; a picked service is never swapped for another. A service is
 identified by its plugin and its id, so two plugins may use the same id; pass
 `--plugin <plugin-id>` when they do. `test` runs a sample title or commit

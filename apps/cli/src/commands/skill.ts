@@ -1,8 +1,6 @@
 import { readFile } from "node:fs/promises";
 import { Command } from "commander";
 import { PERSONAL_PROJECT_ID } from "@bb/domain";
-import type { RegistryRanking, RegistrySkill } from "@bb/server-contract";
-import type { SkillsRegistryArea } from "@bb/sdk";
 import { action } from "../action.js";
 import { createCliBbSdk } from "../client.js";
 import { resolveMachineId, selectMachines } from "./machine.js";
@@ -33,11 +31,6 @@ interface SkillInstallCliSkillsOptions extends JsonOutputOptions {
   machine: string[];
 }
 
-interface SkillSearchOptions extends JsonOutputOptions {
-  page?: string;
-  perPage?: string;
-}
-
 function projectId(
   options: SkillWorkspaceOptions,
   context: ContextSnapshot,
@@ -47,15 +40,6 @@ function projectId(
 
 function environmentId(options: SkillWorkspaceOptions): string | null {
   return options.environment ?? null;
-}
-
-function parseNonnegativeInteger(value: string | undefined, fallback: number) {
-  if (value === undefined) return fallback;
-  const parsed = Number(value);
-  if (!Number.isSafeInteger(parsed) || parsed < 0) {
-    throw new Error(`Expected a nonnegative integer, received "${value}".`);
-  }
-  return parsed;
 }
 
 function addWorkspaceOptions(command: Command): Command {
@@ -68,97 +52,6 @@ function addWorkspaceOptions(command: Command): Command {
     .option("--json", "Print machine-readable JSON output");
 }
 
-const REGISTRY_ENRICH_CONCURRENCY = 6;
-const REGISTRY_ENRICH_LIMIT = 48;
-
-async function mapWithConcurrency<T, R>(
-  items: readonly T[],
-  limit: number,
-  run: (item: T) => Promise<R>,
-): Promise<R[]> {
-  const results: R[] = new Array(items.length);
-  let next = 0;
-  const workers = Array.from(
-    { length: Math.max(1, Math.min(limit, items.length)) },
-    async () => {
-      while (next < items.length) {
-        const index = next++;
-        results[index] = await run(items[index]!);
-      }
-    },
-  );
-  await Promise.all(workers);
-  return results;
-}
-
-async function enrichRegistryStars(
-  registry: SkillsRegistryArea,
-  skills: readonly RegistrySkill[],
-): Promise<RegistrySkill[]> {
-  const sources = [
-    ...new Map(
-      skills
-        .filter((skill) => skill.stars === null)
-        .map((skill) => [skill.source.toLowerCase(), skill.source]),
-    ).entries(),
-  ].slice(0, REGISTRY_ENRICH_LIMIT);
-  const starsBySource = new Map(
-    await mapWithConcurrency(
-      sources,
-      REGISTRY_ENRICH_CONCURRENCY,
-      async ([sourceKey, source]) => {
-        const stars = await registry
-          .repositoryStars({ source })
-          .then((result) => result.stars)
-          .catch(() => null);
-        return [sourceKey, stars] as const;
-      },
-    ),
-  );
-  return skills.map((skill) => {
-    if (skill.stars !== null) return skill;
-    const stars = starsBySource.get(skill.source.toLowerCase());
-    return stars === null || stars === undefined ? skill : { ...skill, stars };
-  });
-}
-
-interface EnrichedRegistrySkill extends RegistrySkill {
-  lifetimeInstalls: number | null;
-}
-
-async function enrichRegistryEntries(
-  registry: SkillsRegistryArea,
-  skills: readonly RegistrySkill[],
-  ranking: RegistryRanking,
-): Promise<EnrichedRegistrySkill[]> {
-  const needsLifetimeInstalls = ranking === "trending";
-  const missing = skills
-    .filter((skill) => skill.summary === null || needsLifetimeInstalls)
-    .slice(0, REGISTRY_ENRICH_LIMIT);
-  const entryById = new Map(
-    await mapWithConcurrency(
-      missing,
-      REGISTRY_ENRICH_CONCURRENCY,
-      async (skill) => {
-        const entry = await registry
-          .get({ registrySkillId: skill.id })
-          .catch(() => null);
-        return [skill.id, entry] as const;
-      },
-    ),
-  );
-  return skills.map((skill) => {
-    const entry = entryById.get(skill.id) ?? null;
-    return {
-      ...skill,
-      summary: entry?.summary ?? skill.summary,
-      lifetimeInstalls: needsLifetimeInstalls
-        ? (entry?.installs ?? null)
-        : skill.installs,
-    };
-  });
-}
-
 export function registerSkillCommands(
   program: Command,
   getUrl: () => string,
@@ -166,7 +59,7 @@ export function registerSkillCommands(
 ): void {
   const skill = program
     .command("skill")
-    .description("List, inspect, edit, install, and remove skills");
+    .description("List, inspect, edit, and remove skills");
 
   addWorkspaceOptions(skill.command("list"))
     .description("List installed and discovered skills")
@@ -276,119 +169,6 @@ export function registerSkillCommands(
         });
         if (outputJson(options, result)) return;
         console.log(`Deleted ${result.deletedPath}`);
-      }),
-    );
-
-  skill
-    .command("search [query]")
-    .description(
-      "Search the skills.sh registry, or list what is trending with no query",
-    )
-    .option("--page <number>", "Zero-based result page", "0")
-    .option(
-      "--per-page <number>",
-      `Results per page; above ${REGISTRY_ENRICH_LIMIT} leaves lifetime install counts unresolved`,
-      "24",
-    )
-    .option("--json", "Print machine-readable JSON output")
-    .action(
-      action(async (query: string | undefined, options: SkillSearchOptions) => {
-        const registry = createCliBbSdk(getUrl()).skills.registry;
-        const result = await registry.search({
-          query,
-          page: parseNonnegativeInteger(options.page, 0),
-          perPage: parseNonnegativeInteger(options.perPage, 24),
-        });
-        const enrichedSkills = await enrichRegistryEntries(
-          registry,
-          await enrichRegistryStars(registry, result.skills),
-          result.ranking,
-        );
-        const enrichedResult = { ...result, skills: enrichedSkills };
-        const unresolvedCount = enrichedSkills.filter(
-          (entry) => entry.lifetimeInstalls === null,
-        ).length;
-        if (unresolvedCount > 0) {
-          console.error(
-            `Lifetime install counts unresolved for ${unresolvedCount} of ` +
-              `${enrichedSkills.length} skills — a detail page could not be ` +
-              `fetched, or the page exceeds the ${REGISTRY_ENRICH_LIMIT}-row ` +
-              `enrichment cap. Those rows carry lifetimeInstalls: null and ` +
-              `print as "—"; installs still counts the ranking's window.`,
-          );
-        }
-        if (outputJson(options, enrichedResult)) return;
-        console.log(
-          renderBorderlessTable(
-            {
-              head: ["ID", "INSTALLS", "STARS", "SUMMARY"],
-              colWidths: [48, 12, 10, 48],
-              trimTrailingWhitespace: true,
-            },
-            enrichedResult.skills.map((entry) => [
-              entry.id,
-              entry.lifetimeInstalls === null
-                ? "—"
-                : String(entry.lifetimeInstalls),
-              entry.stars === null ? "—" : String(entry.stars),
-              entry.summary ?? "",
-            ]),
-          ),
-        );
-      }),
-    );
-
-  skill
-    .command("registry")
-    .description("Inspect skills.sh registry entries")
-    .command("detail <registry-skill-id>")
-    .description("Show registry metadata and the bounded file preview")
-    .option("--json", "Print machine-readable JSON output")
-    .action(
-      action(async (registrySkillId: string, options: JsonOutputOptions) => {
-        const registry = createCliBbSdk(getUrl()).skills.registry;
-        const skillEntry = await registry.get({ registrySkillId });
-        const [detail, [enrichedSkillEntry]] = await Promise.all([
-          registry.detail({
-            source: skillEntry.source,
-            skillId: skillEntry.skillId,
-          }),
-          enrichRegistryStars(registry, [skillEntry]),
-        ]);
-        const result = { skill: enrichedSkillEntry ?? skillEntry, detail };
-        if (outputJson(options, result)) return;
-        console.log(`Name: ${result.skill.name}`);
-        console.log(`ID: ${result.skill.id}`);
-        console.log(`Source: ${result.skill.source}`);
-        console.log(`Installs: ${result.skill.installs}`);
-        console.log(`Stars: ${result.skill.stars ?? "—"}`);
-        console.log(`URL: ${result.skill.url}`);
-        if (result.skill.summary)
-          console.log(`Summary: ${result.skill.summary}`);
-        console.log(`Revision: ${detail.hash ?? "unknown"}`);
-        if (detail.files === null) {
-          console.log("Files: unavailable");
-          return;
-        }
-        for (const file of detail.files) {
-          console.log(`\n--- ${file.path} ---`);
-          process.stdout.write(file.contents);
-          if (!file.contents.endsWith("\n")) process.stdout.write("\n");
-        }
-      }),
-    );
-
-  skill
-    .command("install <registry-skill-id>")
-    .description("Install a canonical skills.sh entry into bb user skills")
-    .option("--json", "Print machine-readable JSON output")
-    .action(
-      action(async (registrySkillId: string, options: JsonOutputOptions) => {
-        const result = await createCliBbSdk(getUrl()).skills.registry.install({
-          registrySkillId,
-        });
-        if (outputJson(options, result)) return;
-        console.log(`Installed ${result.filePath}`);
       }),
     );
 

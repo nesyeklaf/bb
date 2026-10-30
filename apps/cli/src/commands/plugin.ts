@@ -1,7 +1,7 @@
 import { watch } from "node:fs";
 import { homedir } from "node:os";
 import { access, readFile, realpath } from "node:fs/promises";
-import { dirname, join, relative, resolve } from "node:path";
+import { join, relative, resolve } from "node:path";
 import { createInterface } from "node:readline/promises";
 import { setTimeout as sleep } from "node:timers/promises";
 import { Command, Option } from "commander";
@@ -264,158 +264,6 @@ async function requirePluginManifest(
   return manifest;
 }
 
-const scaffoldPackageSchema = z.object({
-  dependencies: z.record(z.string(), z.string()).default({}),
-  devDependencies: z.record(z.string(), z.string()).default({}),
-});
-
-async function unresolvedScaffoldPackages(
-  targetDir: string,
-): Promise<string | null> {
-  let declared: string[];
-  try {
-    const manifest = scaffoldPackageSchema.parse(
-      JSON.parse(await readFile(join(targetDir, "package.json"), "utf8")),
-    );
-    declared = [
-      ...Object.keys(manifest.dependencies),
-      ...Object.keys(manifest.devDependencies),
-    ];
-  } catch {
-    return "the generated package.json could not be read back";
-  }
-  const missing: string[] = [];
-  for (const name of declared) {
-    if (!(await isPackageInstalled(targetDir, name))) {
-      missing.push(name);
-    }
-  }
-  return missing.length === 0
-    ? null
-    : `${missing.sort().join(", ")} missing from node_modules`;
-}
-
-async function isPackageInstalled(
-  targetDir: string,
-  name: string,
-): Promise<boolean> {
-  const segments = name.split("/");
-  let dir = targetDir;
-  for (;;) {
-    try {
-      await access(join(dir, "node_modules", ...segments));
-      return true;
-    } catch {
-      const parent = dirname(dir);
-      if (parent === dir) return false;
-      dir = parent;
-    }
-  }
-}
-
-async function warnIfSdkVersionUnpublished(): Promise<void> {
-  const status = await probeSdkVersionPublished();
-  if (status === "published") return;
-  if (status === "unknown") {
-    console.warn(
-      `Warning: could not reach the npm registry to verify that @get-bb/plugin-sdk ${PLUGIN_SDK_VERSION} — this bb's SDK version — is published.`,
-    );
-    console.warn(
-      "  If `npm install` fails to resolve it, the version may not be on your registry yet.",
-    );
-    return;
-  }
-  console.warn(
-    `Warning: @get-bb/plugin-sdk ${PLUGIN_SDK_VERSION} — this bb's SDK version — was not found on npm.`,
-  );
-  console.warn(
-    "  `npm install` in the new plugin will fail until that version publishes.",
-  );
-  console.warn(
-    "  To work around it, pack the SDK from a bb checkout and point the",
-  );
-  console.warn("  devDependency at the tarball:");
-  console.warn("    (cd <bb-repo>/packages/plugin-sdk && npm pack)");
-  console.warn(
-    '    npm pkg set devDependencies.@get-bb/plugin-sdk="file:/abs/path/to/get-bb-plugin-sdk-' +
-      `${PLUGIN_SDK_VERSION}.tgz"`,
-  );
-}
-
-async function execNpm(
-  args: readonly string[],
-  options: { cwd?: string; timeout?: number; killSignal?: NodeJS.Signals },
-): Promise<{ stdout: string; stderr: string }> {
-  const { execHostFile } = await import("@bb/process-utils");
-  return execHostFile("npm", args, options);
-}
-
-async function probeSdkVersionPublished(): Promise<
-  "published" | "missing" | "unknown"
-> {
-  try {
-    const { stdout } = await execNpm(
-      ["view", `@get-bb/plugin-sdk@${PLUGIN_SDK_VERSION}`, "version", "--json"],
-      { timeout: 5_000, killSignal: "SIGKILL" },
-    );
-    return stdout.trim().length === 0 ? "missing" : "published";
-  } catch (error) {
-    const detail = [
-      (error as { stderr?: unknown }).stderr,
-      (error as { stdout?: unknown }).stdout,
-      error instanceof Error ? error.message : "",
-    ]
-      .map((part) => (typeof part === "string" ? part : ""))
-      .join("\n");
-    return detail.includes("E404") || detail.includes("404 Not Found")
-      ? "missing"
-      : "unknown";
-  }
-}
-
-const NPM_FAILURE_DETAIL_LINES = 8;
-
-function npmOutputTail(output: unknown): string {
-  if (typeof output !== "string") return "";
-  return output.trim().split("\n").slice(-NPM_FAILURE_DETAIL_LINES).join("\n");
-}
-
-function npmFailureDetail(cause: unknown): string {
-  if (typeof cause !== "object" || cause === null) return "";
-  const stderr = "stderr" in cause ? npmOutputTail(cause.stderr) : "";
-  const stdout = "stdout" in cause ? npmOutputTail(cause.stdout) : "";
-  const text = stderr || stdout;
-  if (text === "") return "";
-  return `\n${text
-    .split("\n")
-    .map((line) => `  ${line}`)
-    .join("\n")}`;
-}
-
-async function installScaffoldDependencies(
-  targetDir: string,
-): Promise<boolean> {
-  try {
-    await execNpm(["install", "--include=dev", "--no-fund", "--no-audit"], {
-      cwd: targetDir,
-    });
-  } catch (cause) {
-    console.warn(
-      `Could not run npm install — run it in the plugin directory before \`bb plugin build\`.${npmFailureDetail(cause)}`,
-    );
-    return false;
-  }
-  const problem = await unresolvedScaffoldPackages(targetDir);
-  if (problem !== null) {
-    console.warn(
-      `npm install reported success but ${problem} — run \`npm install --include=dev\` in the plugin directory before \`bb plugin build\`.`,
-    );
-    return false;
-  }
-  console.log("Installed dependencies (npm install).");
-  return true;
-}
-
 type PluginSettingDescriptor = z.infer<typeof pluginSettingDescriptorSchema>;
 type PluginSettingsResult = z.infer<typeof pluginSettingsResultSchema>;
 
@@ -506,7 +354,7 @@ function formatAbsoluteDate(value: number): string {
 function dualInterpretationError(source: string): string {
   return (
     `Could not resolve "${source}" as either a catalog plugin or a path on disk. ` +
-    "Use a Git repository URL, path:<path>, npm:<package>, git:<url>[@<ref>], or " +
+    "Use a Git repository URL, path:<path>, git:<url>[@<ref>], or " +
     "git:<url>@<semver-range> to choose an interpretation explicitly."
   );
 }
@@ -566,9 +414,7 @@ async function resolveInstallIntent(
   input: string,
 ): Promise<InstallIntent> {
   if (
-    ["path:", "npm:", "git:", "builtin:"].some((prefix) =>
-      input.startsWith(prefix),
-    )
+    ["path:", "git:", "builtin:"].some((prefix) => input.startsWith(prefix))
   ) {
     if (input.startsWith("path:")) {
       const path = resolve(input.slice(5));
@@ -626,15 +472,6 @@ async function resolveInstallIntent(
 }
 
 function resolvedSourceLines(source: PluginCatalogResolvedSource): string[] {
-  if (source.kind === "npm") {
-    const spec = source.range ?? source.tag ?? "latest";
-    return [
-      `  npm package: ${source.package}@${spec}`,
-      ...(source.registry === undefined
-        ? []
-        : [`  registry: ${source.registry}`]),
-    ];
-  }
   const lines = [`  git repository: ${source.url}`];
   if (source.subdir !== undefined) {
     lines.push(`  subdirectory: ${source.subdir}`);
@@ -909,7 +746,7 @@ export function registerPluginCommands(
   plugin
     .command("search <query>")
     .description(
-      "Search every plugin the store lists: the plugins bundled with the app, the reserved bb-community marketplace catalog BB reviews, and any third-party marketplace added on this host. The Marketplace column names the source; only bb-community is reviewed by BB",
+      "Search every plugin the store lists: the plugins bundled with the app, and any third-party marketplace added on this host. The Marketplace column names the source",
     )
     .option("--json", "Output JSON")
     .action(
@@ -1013,8 +850,6 @@ export function registerPluginCommands(
         if (source.resolvedTag !== undefined) {
           console.log(`  tag: ${source.resolvedTag}`);
         }
-        if (source.registry) console.log(`  registry: ${source.registry}`);
-        if (source.integrity) console.log(`  integrity: ${source.integrity}`);
         if (source.engines.bb) {
           console.log(`  engines.bb: ${source.engines.bb}`);
         }
@@ -1040,7 +875,7 @@ export function registerPluginCommands(
   plugin
     .command("install <source>")
     .description(
-      "Install a catalog entry by name or <entry>@<marketplace>, a Git repository URL, a local path, builtin:<name>, git:<url>[@<ref|semver-range>], or npm:<name>@<version>. A catalog entry from a third-party marketplace is not reviewed by BB, so its confirmation names the marketplace, the author, and the exact resolved source (managed sources validate engines ranges and build artifacts; bundled plugin ids are reserved)",
+      "Install a catalog entry by name or <entry>@<marketplace>, a Git repository URL, a local path, builtin:<name>, or git:<url>[@<ref|semver-range>]. A catalog entry from a third-party marketplace is not reviewed by BB, so its confirmation names the marketplace, the author, and the exact resolved source (managed sources validate engines ranges and build artifacts; bundled plugin ids are reserved)",
     )
     .option(
       "--subdirectory <path>",
@@ -1386,7 +1221,7 @@ export function registerPluginCommands(
             if (!shouldAttempt) {
               if (result.outcome === "pinned") {
                 console.log(
-                  `${result.id}: skipped — pinned${detail ? ` (${detail})` : ""}; remove and reinstall with a tracking npm range, git branch, or git semver range to receive updates (remove deletes the plugin's settings, secrets, and schedules). A local path plugin updates with \`bb plugin reload\`; move it with \`bb plugin install path:<new directory>\`.`,
+                  `${result.id}: skipped — pinned${detail ? ` (${detail})` : ""}; remove and reinstall with a tracking git branch or git semver range to receive updates (remove deletes the plugin's settings, secrets, and schedules). A local path plugin updates with \`bb plugin reload\`; move it with \`bb plugin install path:<new directory>\`.`,
                 );
               } else if (result.outcome === "incompatible") {
                 console.log(
@@ -1471,13 +1306,9 @@ export function registerPluginCommands(
           bbVersion: resolveBbCliVersion(),
         });
         console.log(`Created ${directoryName}/ (${packageName}).`);
-        await warnIfSdkVersionUnpublished();
-        const installed = await installScaffoldDependencies(targetDir);
         console.log("Next steps:");
         console.log(`  cd ${directoryName}`);
-        if (!installed) {
-          console.log("  npm install --include=dev");
-        }
+        console.log("  npm install --include=dev");
         console.log("  bb plugin install .");
       }),
     );
@@ -1561,7 +1392,6 @@ export function registerPluginCommands(
               `${shim.name}: ${shim.from ?? "(not declared)"} → ${shim.to} in devDependencies${shim.movedFromDependencies ? " (moved from dependencies)" : ""}.`,
             );
           }
-          await warnIfSdkVersionUnpublished();
           console.log(
             "Run `npm install` in the plugin directory to install the pinned declarations.",
           );
@@ -1624,7 +1454,6 @@ export function registerPluginCommands(
             `Warning: ${join(rootDir, "types")} still exists — a file appeared in it during the migration, so it was left in place along with the tsconfig "types" include.`,
           );
         }
-        await warnIfSdkVersionUnpublished();
         console.log(
           "Run `npm install` in the plugin directory to install the pinned declarations.",
         );
@@ -2060,7 +1889,7 @@ export function registerPluginCommands(
     .command("remove <id>")
     .alias("uninstall")
     .description(
-      "Remove an installed plugin and delete its settings, secrets, and schedules (git:/npm: managed files are deleted; local path sources stay on disk). To move a local plugin to another directory, install the new path instead",
+      "Remove an installed plugin and delete its settings, secrets, and schedules (git: managed files are deleted; local path sources stay on disk). To move a local plugin to another directory, install the new path instead",
     )
     .option("--json", "Output JSON")
     .addOption(new Option("--yes").hideHelp())

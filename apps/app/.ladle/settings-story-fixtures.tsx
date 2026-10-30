@@ -70,9 +70,9 @@ const STORY_AI_SERVICES: SystemAiServicesResponse = {
   },
   services: [
     {
-      id: "bb",
-      displayName: "bb cloud",
-      pluginId: "bb-ai",
+      id: "claude-code",
+      displayName: "Claude Code",
+      pluginId: "provider-claude-code",
       tasks: ["thread-title", "commit-message", "voice"],
       automaticRank: 0,
       status: { ready: true },

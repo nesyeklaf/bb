@@ -53,6 +53,7 @@ interface RunAiTaskArgs<T> {
   logContext?: JsonObject;
   timeoutMs?: number;
   signal?: AbortSignal;
+  preferredPluginId?: string;
   call: (service: AiServiceRegistration, signal: AbortSignal) => Promise<T>;
   accept: (value: T) => T | null;
 }
@@ -70,26 +71,37 @@ function compareIds(a: string, b: string): number {
   return a < b ? -1 : a > b ? 1 : 0;
 }
 
+export function preferredAiPluginId(
+  deps: Pick<LoggedWorkSessionDeps, "providerRegistry">,
+  providerId: string | null,
+): string | undefined {
+  return providerId === null
+    ? undefined
+    : (deps.providerRegistry.get(providerId)?.pluginId ?? undefined);
+}
+
 export function orderedAiServices(
   deps: Pick<AiTaskDeps, "aiServices">,
 ): AiServiceRegistration[] {
   return deps.aiServices
     .list()
     .sort(
-      (a, b) =>
-        Number(b.pluginId === "bb-ai") - Number(a.pluginId === "bb-ai") ||
-        compareIds(a.pluginId, b.pluginId) ||
-        compareIds(a.id, b.id),
+      (a, b) => compareIds(a.pluginId, b.pluginId) || compareIds(a.id, b.id),
     );
 }
 
 export function automaticAiServices(
   deps: Pick<AiTaskDeps, "aiServices">,
   task: AiTask,
+  preferredPluginId?: string,
 ): AiServiceRegistration[] {
-  return orderedAiServices(deps).filter((service) =>
+  const supporting = orderedAiServices(deps).filter((service) =>
     aiServiceSupportsTask(service, task),
   );
+  return [
+    ...supporting.filter((service) => service.pluginId === preferredPluginId),
+    ...supporting.filter((service) => service.pluginId !== preferredPluginId),
+  ];
 }
 
 export function selectedAiService(
@@ -107,9 +119,12 @@ export function aiTaskServices(
   deps: Pick<AiTaskDeps, "aiServices">,
   task: AiTask,
   selection: AiServiceSelection,
+  preferredPluginId?: string,
 ): AiServiceRegistration[] {
   if (selection.mode === "off") return [];
-  if (selection.mode === "automatic") return automaticAiServices(deps, task);
+  if (selection.mode === "automatic") {
+    return automaticAiServices(deps, task, preferredPluginId);
+  }
   const service = selectedAiService(deps, task, selection);
   return service === null ? [] : [service];
 }
@@ -195,7 +210,12 @@ export async function runAiTask<T>(
   if (args.signal?.aborted) {
     return fail("cancelled", REQUEST_CANCELLED_MESSAGE);
   }
-  const services = aiTaskServices(deps, args.task, selection);
+  const services = aiTaskServices(
+    deps,
+    args.task,
+    selection,
+    args.preferredPluginId,
+  );
   if (services.length === 0) {
     return fail(
       "unavailable",
@@ -290,11 +310,15 @@ export function runTextAiTask(
     logContext?: JsonObject;
     timeoutMs?: number;
     signal?: AbortSignal;
+    preferredPluginId?: string;
   },
 ): Promise<AiTaskOutcome<string>> {
   return runAiTask(deps, {
     task: args.task,
     label: args.label,
+    ...(args.preferredPluginId === undefined
+      ? {}
+      : { preferredPluginId: args.preferredPluginId }),
     ...(args.logContext === undefined ? {} : { logContext: args.logContext }),
     ...(args.timeoutMs === undefined ? {} : { timeoutMs: args.timeoutMs }),
     ...(args.signal === undefined ? {} : { signal: args.signal }),

@@ -229,7 +229,6 @@ export async function createTestAppHarness(
     featureFlags: defaultFeatureFlags,
     performanceDiagnosticsAvailable: false,
     hostDaemonPort: 3001,
-    marketplaceUrl: "https://marketplace.invalid/marketplace.json",
     connectGateKeysUrl: "https://gate-keys.invalid/bb-connect-gate-keys.json",
     inheritedSkillsRootPaths: [],
     isDevelopment: true,

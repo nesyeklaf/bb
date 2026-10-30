@@ -12,8 +12,6 @@ const V2_ICON_URL_PATTERN =
   /^(?!http:)(?:[Hh][Tt][Tt][Pp][Ss]:\/\/)?[^\s]+\.(?:[Ss][Vv][Gg]|[Pp][Nn][Gg]|[Ww][Ee][Bb][Pp])$/u;
 const SCREENSHOT_URL_PATTERN =
   /^(?:[Hh][Tt][Tt][Pp][Ss]:\/\/[^\s]+\.(?:[Pp][Nn][Gg]|[Jj][Pp][Ee]?[Gg]|[Ww][Ee][Bb][Pp])|\.\/screenshots\/[a-z0-9][a-z0-9-]*\/[A-Za-z0-9][A-Za-z0-9._-]*\.(?:[Pp][Nn][Gg]|[Jj][Pp][Ee]?[Gg]|[Ww][Ee][Bb][Pp]))$/u;
-const NPM_PACKAGE_PATTERN =
-  /^(?:@[a-z0-9][a-z0-9._~-]*\/)?[a-z0-9][a-z0-9._~-]*$/u;
 const GIT_SUBDIR_PATTERN =
   /^(?![A-Za-z]:)(?!\/)(?!(?:[^/]+\/)*(?:\.|\.\.|\.git)(?:\/|$))[^/\\]+(?:\/[^/\\]+)*$/u;
 const GIT_REF_PATTERN =
@@ -77,27 +75,6 @@ function marketplaceAuthorSchema() {
   });
 }
 
-function marketplaceNpmSourceSchema() {
-  const npm = z
-    .object({
-      package: z
-        .string()
-        .regex(NPM_PACKAGE_PATTERN, "must be an unambiguous npm package name"),
-      range: semverRangeV2Schema.optional(),
-      tag: z
-        .string()
-        .regex(/^[A-Za-z][A-Za-z0-9._-]*$/u)
-        .optional(),
-      registry: httpsUrlSchema.optional(),
-    })
-    .refine((value) => value.range === undefined || value.tag === undefined, {
-      message: "range and tag are mutually exclusive",
-    });
-  const nested = npm.strict();
-  const object = z.object({ npm: nested });
-  return object.strict();
-}
-
 function marketplaceGitSourceSchema() {
   const base = {
     url: httpsUrlSchema,
@@ -133,7 +110,6 @@ function marketplaceBundledSourceSchema() {
 
 function marketplaceSourceSchema() {
   return z.union([
-    marketplaceNpmSourceSchema(),
     marketplaceGitSourceSchema(),
     marketplaceBundledSourceSchema(),
   ]);

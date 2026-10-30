@@ -55,7 +55,6 @@ import { registerPluginCatalogRoutes } from "./routes/plugin-catalog.js";
 import { registerPluginInstallJobRoutes } from "./routes/plugin-install-jobs.js";
 import { createPluginInstallJobs } from "./services/plugins/plugin-install-jobs.js";
 import { registerPromptHistoryRoutes } from "./routes/prompt-history.js";
-import { registerSkillsRegistryRoutes } from "./routes/skills-registry.js";
 import {
   createPluginService,
   type PluginService,
@@ -87,9 +86,7 @@ import {
   setAuthenticatedDaemon,
   verifyAuthenticatedDaemon,
 } from "./internal/auth.js";
-import {
-  captureTrustedRemoteAddress,
-} from "./request-context.js";
+import { captureTrustedRemoteAddress } from "./request-context.js";
 import { runEventLoopWork } from "./services/system/event-loop-work.js";
 import {
   onClientSocketClose,
@@ -911,7 +908,6 @@ export function createApp(
   const pluginCatalogService = createPluginCatalogService({
     db: deps.db,
     appVersion: deps.config.appVersion,
-    marketplaceUrl: deps.config.marketplaceUrl,
     dataDir: deps.config.dataDir,
     plugins: pluginService,
     notifyCatalogChanged: () => deps.hub.notifySystem(["plugins-changed"]),
@@ -956,7 +952,6 @@ export function createApp(
     pluginUpdateJobs,
     upgradeWebSocket,
   );
-  registerSkillsRegistryRoutes(publicApi, deps);
   registerServerMoveRoutes(publicApi, deps, serverMove);
   app.route("/api/v1", publicApi);
   app.use("/api/v1/*", () => {

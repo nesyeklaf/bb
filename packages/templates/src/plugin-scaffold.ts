@@ -1340,7 +1340,7 @@ git installs) so people installing your plugin never need npm.
   is for types and tooling only (BB shims React, the portal primitives, and
   \`@get-bb/plugin-sdk\` at runtime — never bundle them).
 
-Run \`bb plugin build\` before publishing git/npm installs. It writes
+Run \`bb plugin build\` before publishing git installs. It writes
 \`dist/server.js\` + \`server.meta.json\` and \`app.js\` / \`app.css\` /
 \`app.meta.json\`. Each \`*.meta.json\` stamps SDK major/version,
 \`artifactFormatVersion\`, \`pluginId\`, \`pluginVersion\`, and

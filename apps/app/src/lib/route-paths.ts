@@ -3,8 +3,6 @@ import {
   PLUGIN_DETAIL_ROUTE_PATH,
   PLUGINS_ROUTE_PATH,
   PLUGIN_PANEL_ROUTE_PATH,
-  REGISTRY_SKILL_DETAIL_ROUTE_PATH,
-  REGISTRY_SKILLS_ROUTE_PATH,
   ROUTE_PATTERNS,
   SKILL_DETAIL_ROUTE_PATH,
   SKILLS_ROUTE_PATH,
@@ -25,14 +23,10 @@ export {
   PLUGIN_DETAIL_ROUTE_PATH,
   SKILLS_ROUTE_PATH,
   SKILL_DETAIL_ROUTE_PATH,
-  REGISTRY_SKILLS_ROUTE_PATH,
-  REGISTRY_SKILL_DETAIL_ROUTE_PATH,
   TOOLS_ROUTE_PATH,
   TOOLS_SKILLS_ROUTE_PATH,
   TOOLS_SKILL_DETAIL_ROUTE_PATH,
   LEGACY_TOOLS_SKILL_DETAIL_ROUTE_PATH,
-  TOOLS_REGISTRY_SKILLS_ROUTE_PATH,
-  TOOLS_REGISTRY_SKILL_DETAIL_ROUTE_PATH,
   TOOLS_PLUGINS_ROUTE_PATH,
   TOOLS_PLUGIN_BROWSE_ROUTE_PATH,
   TOOLS_PLUGIN_DETAIL_ROUTE_PATH,
@@ -62,9 +56,7 @@ export {
   getSettingsMachineRoutePath,
   getSettingsProjectRoutePath,
   getSkillsRoutePath,
-  getRegistrySkillsRoutePath,
   getSkillDetailRoutePath,
-  getRegistrySkillDetailRoutePath,
   getPluginsRoutePath,
   getPluginDetailRoutePath,
   getPluginConfigurationRoutePath,
@@ -112,9 +104,7 @@ export function isPluginsRoutePath(pathname: string): boolean {
 export function isSkillsRoutePath(pathname: string): boolean {
   return (
     matchPath(SKILLS_ROUTE_PATH, pathname) !== null ||
-    matchPath(REGISTRY_SKILLS_ROUTE_PATH, pathname) !== null ||
-    matchPath(SKILL_DETAIL_ROUTE_PATH, pathname) !== null ||
-    matchPath(REGISTRY_SKILL_DETAIL_ROUTE_PATH, pathname) !== null
+    matchPath(SKILL_DETAIL_ROUTE_PATH, pathname) !== null
   );
 }
 

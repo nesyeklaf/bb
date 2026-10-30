@@ -5,7 +5,6 @@ import { z } from "zod";
 import {
   BUNDLED_MARKETPLACE_NAME,
   entryOverview,
-  entryScreenshotUrls,
   entryRepositoryUrl,
   entrySourceDisplay,
   marketplaceEntryCategory,
@@ -17,9 +16,6 @@ import {
   resolvedEntrySource,
   type MarketplaceEntry,
 } from "../../../src/services/plugin-catalog/marketplace-manifest.js";
-
-const MANIFEST_URL = "https://getbb.app/marketplace/v1/marketplace.json";
-const MANIFEST_V2_URL = "https://getbb.app/marketplace/v2/marketplace.json";
 
 const publishedSchemaShape = z.object({
   $defs: z.object({
@@ -169,14 +165,6 @@ describe("marketplace manifest schema", () => {
           pluginIds: ["widgets"],
         },
       ]);
-      expect(
-        entryScreenshotUrls(parsedEntry, {
-          kind: "url",
-          manifestUrl: MANIFEST_V2_URL,
-        }),
-      ).toEqual([
-        "https://getbb.app/marketplace/v2/screenshots/widgets/widgets.png",
-      ]);
     });
 
     it("keeps an overview text at the cap and drops a longer one with a warning", () => {
@@ -232,9 +220,10 @@ describe("marketplace manifest schema", () => {
           manifestV2([
             entry({
               source: {
-                npm: {
-                  package: "bb-plugin-widgets",
-                  regsitry: "https://npm.test/",
+                git: {
+                  url: "https://github.com/acme/plugins.git",
+                  ref: "v1.0.0",
+                  futureField: true,
                 },
               },
             }),
@@ -251,7 +240,10 @@ describe("marketplace manifest schema", () => {
           entry({
             id: "invalid-range",
             source: {
-              npm: { package: "bb-plugin-invalid", range: "not-semver" },
+              git: {
+                url: "https://github.com/acme/plugins.git",
+                range: "not-semver",
+              },
             },
           }),
           entry(),
@@ -263,31 +255,6 @@ describe("marketplace manifest schema", () => {
       expect(parsed.plugins.map((plugin) => plugin.id)).toEqual(["widgets"]);
       expect(warnings).toEqual([
         expect.stringContaining('entry "invalid-range" was skipped'),
-      ]);
-    });
-
-    it("skips a relative screenshot for a git or path marketplace", () => {
-      const warnings: string[] = [];
-      const parsed = parseMarketplaceManifest(
-        manifestV2([
-          entry({
-            screenshots: ["./screenshots/widgets/widgets.png"],
-          }),
-        ]),
-        "manifest",
-      );
-      const parsedEntry = parsed.plugins[0];
-      if (parsedEntry === undefined) throw new Error("entry missing");
-
-      expect(
-        entryScreenshotUrls(
-          parsedEntry,
-          { kind: "dir", root: "/tmp/marketplace" },
-          (message) => warnings.push(message),
-        ),
-      ).toEqual([]);
-      expect(warnings).toEqual([
-        expect.stringContaining("relative screenshots require an https"),
       ]);
     });
 
@@ -374,24 +341,6 @@ describe("marketplace manifest schema", () => {
       expect(() => parse([entry({ icon: "./icons/widgets.svg" })])).toThrow();
     });
 
-    it("resolves a relative URL against the manifest URL", () => {
-      expect(
-        resolveEntryIcon(
-          firstEntry([entry({ icon: { url: "./icons/widgets.svg" } })]),
-          { kind: "url", manifestUrl: MANIFEST_URL },
-        ),
-      ).toEqual({
-        kind: "remote",
-        url: "https://getbb.app/marketplace/v1/icons/widgets.svg",
-      });
-      expect(
-        resolveEntryIcon(firstEntry([entry()]), {
-          kind: "url",
-          manifestUrl: MANIFEST_URL,
-        }),
-      ).toBe(null);
-    });
-
     it("reads a relative URL beside the manifest for a local marketplace", () => {
       expect(
         resolveEntryIcon(
@@ -399,18 +348,17 @@ describe("marketplace manifest schema", () => {
           { kind: "dir", root: "/checkout" },
         ),
       ).toEqual({
-        kind: "local",
         path: join("/checkout", "icons", "widgets.svg"),
         relativePath: "icons/widgets.svg",
       });
-      expect(
+      expect(() =>
         resolveEntryIcon(
           firstEntry([
             entry({ icon: { url: "https://cdn.example/widgets.svg" } }),
           ]),
           { kind: "dir", root: "/checkout" },
         ),
-      ).toEqual({ kind: "remote", url: "https://cdn.example/widgets.svg" });
+      ).toThrow(/must be a path inside the marketplace/u);
     });
   });
 
@@ -443,34 +391,6 @@ describe("marketplace manifest schema", () => {
   });
 
   describe("sources", () => {
-    it("rejects npm package names the install pipeline cannot parse", () => {
-      for (const packageName of ["../plugin", "name@version", "--registry"]) {
-        expect(() =>
-          parse([
-            entry({
-              source: { npm: { package: packageName, range: "^1.0.0" } },
-            }),
-          ]),
-        ).toThrow(/npm package|ambiguous/);
-      }
-    });
-
-    it("rejects an npm entry that sets both range and tag", () => {
-      expect(() =>
-        parse([
-          entry({
-            source: {
-              npm: {
-                package: "bb-plugin-widgets",
-                range: "^1.0.0",
-                tag: "beta",
-              },
-            },
-          }),
-        ]),
-      ).toThrow(/mutually exclusive/);
-    });
-
     it("rejects a git subdir that escapes the repository", () => {
       for (const subdir of ["../evil", "/abs/path", "plugins/../../evil"]) {
         expect(() =>
@@ -583,23 +503,6 @@ describe("marketplace manifest schema", () => {
       expect(entrySourceDisplay(git)).toBe(
         "git:https://github.com/acme/plugins.git@v1.0.0#plugins/widgets",
       );
-
-      const npm = firstEntry([
-        entry({
-          source: {
-            npm: {
-              package: "bb-plugin-widgets",
-              range: "^1.0.0",
-              registry: "https://npm.acme.test",
-            },
-          },
-        }),
-      ]);
-      expect(resolvedEntrySource(npm)).toEqual({
-        source: "npm:bb-plugin-widgets@^1.0.0",
-        selection: { kind: "root" },
-        npmRegistry: "https://npm.acme.test",
-      });
     });
   });
 
@@ -653,29 +556,6 @@ describe("marketplace manifest schema", () => {
       expect(entryRepositoryUrl(reserved)).toBe(
         "https://github.com/acme/plugins/tree/HEAD/plugins/c%23/what%3F",
       );
-    });
-
-    it("links the public npm page only for the default registry", () => {
-      const publicPackage = firstEntry([
-        entry({
-          source: { npm: { package: "@acme/widgets", range: "^1.0.0" } },
-        }),
-      ]);
-      expect(entryRepositoryUrl(publicPackage)).toBe(
-        "https://www.npmjs.com/package/@acme/widgets",
-      );
-      const privatePackage = firstEntry([
-        entry({
-          source: {
-            npm: {
-              package: "bb-plugin-widgets",
-              range: "^1.0.0",
-              registry: "https://npm.acme.test",
-            },
-          },
-        }),
-      ]);
-      expect(entryRepositoryUrl(privatePackage)).toBeNull();
     });
   });
 

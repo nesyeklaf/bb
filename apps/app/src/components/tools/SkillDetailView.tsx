@@ -96,7 +96,7 @@ function SkillPath({ path, href }: { path: string; href?: string }) {
           )}
         </TooltipTrigger>
         <TooltipContent>
-          {href ? "Open on skills.sh" : copied ? "Copied" : "Copy path"}
+          {href ? "Open source" : copied ? "Copied" : "Copy path"}
         </TooltipContent>
       </Tooltip>
     </TooltipProvider>

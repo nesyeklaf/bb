@@ -11,7 +11,6 @@ import type { Context } from "hono";
 import {
   CUSTOM_THEME_CSS_MAX_LENGTH,
   deepFreezePluginMetadata,
-  derivePluginId,
   formatPluginThemeId,
   parsePersistedPluginMetadata,
   type DeclaredCodeTheme,
@@ -113,7 +112,6 @@ import {
 } from "./app-bundle.js";
 import { readPluginThemeCodeTheme } from "../system/code-themes.js";
 import {
-  npmInstallPrefix,
   parsePluginSource,
   recoverInterruptedGitPluginPromotion,
 } from "./install-sources.js";
@@ -195,6 +193,7 @@ import type {
   PluginResolvedProviderEnv,
   PluginResolvedProviderEnvHealth,
 } from "./plugin-service-internal.js";
+import { removeRetiredOutgoingConnectionState } from "./retired-outgoing-state.js";
 import type { PluginMachineProviderBridge } from "./plugin-machine-provider-registry.js";
 import { fillPluginPresentation } from "./plugin-presentation.js";
 export type {
@@ -280,20 +279,8 @@ export interface PluginService {
     pluginId: string;
     source: string;
     selection: PluginSourceSelection;
-    npmRegistry?: string;
     expectedGitCommit?: string;
-    expectedNpmVersion?: string;
-    expectedNpmIntegrity?: string;
   }): Promise<InstalledPlugin>;
-  resolveCatalogNpmSource(args: {
-    packageName: string;
-    registry?: string;
-    requestedSpec: string;
-    specKind: "default" | "exact" | "tag" | "range";
-  }): Promise<
-    | { outcome: "resolved"; version: string; integrity: string }
-    | { outcome: "unavailable"; detail: string }
-  >;
   installPath(path: string): Promise<InstalledPlugin>;
   checkForUpdates(id?: string): Promise<PluginUpdateCheckEntry[]>;
   startPeriodicUpdateChecks(): void;
@@ -721,7 +708,6 @@ export function createPluginService(deps: PluginServiceDeps): PluginService {
     installBuiltinSource,
     installPathSource,
     installedUpdateVersion,
-    npmIntentForRow,
     provenanceForRow,
     reconcileBundled,
     registerInstalled,
@@ -785,7 +771,7 @@ export function createPluginService(deps: PluginServiceDeps): PluginService {
     activateManagedUpdate,
   });
   managedValidateInstallDir = managedPluginArtifacts.validateInstallDir;
-  const { installGitSource, installNpmSource } = managedPluginArtifacts;
+  const { installGitSource } = managedPluginArtifacts;
 
   const pluginUpdates = createPluginUpdates({
     deps,
@@ -795,7 +781,6 @@ export function createPluginService(deps: PluginServiceDeps): PluginService {
     withPluginOperationLock,
     notifyPluginsChanged,
     installedUpdateVersion,
-    npmIntentForRow,
     managedArtifacts: managedPluginArtifacts,
     runArtifactGc,
   });
@@ -929,9 +914,8 @@ export function createPluginService(deps: PluginServiceDeps): PluginService {
   }
 
   function updateTrackingForRow(row: InstalledPluginRow): string {
-    return (row.sourceKind === "npm" && row.sourceNpmSpecKind !== "exact") ||
-      (row.sourceKind === "git" &&
-        (row.sourceGitRefKind === "branch" || row.sourceGitRange !== null))
+    return row.sourceKind === "git" &&
+      (row.sourceGitRefKind === "branch" || row.sourceGitRange !== null)
       ? "tracks compatible"
       : "pinned";
   }
@@ -941,9 +925,6 @@ export function createPluginService(deps: PluginServiceDeps): PluginService {
       return `path · ${compactPath(row.sourcePath ?? row.rootDir)}`;
     }
     if (row.sourceKind === "builtin") return `builtin · ${row.id}`;
-    if (row.sourceKind === "npm") {
-      return `npm · ${row.sourceNpmPackage ?? row.id} · ${updateTrackingForRow(row)}`;
-    }
     const range = row.sourceGitRange === null ? "" : ` · ${row.sourceGitRange}`;
     return `git · ${row.sourceGitUrl ?? row.source}${range} · ${updateTrackingForRow(row)}`;
   }
@@ -1326,10 +1307,23 @@ export function createPluginService(deps: PluginServiceDeps): PluginService {
     }
   }
 
+  async function removeNpmSourcedPlugins(): Promise<void> {
+    for (const row of listInstalledPlugins(deps.db)) {
+      if (row.sourceKind !== "npm" && !row.source.startsWith("npm:")) continue;
+      await deleteRemovedPluginData(row, pluginProviderIds(row));
+      deleteAllPluginKvValues(deps.db, row.id);
+      deleteInstalledPlugin(deps.db, row.id);
+      logger.warn(
+        `plugin ${row.id} removed because npm plugin sources are no longer supported (${row.source}); reinstall it from a git repository or a local path`,
+      );
+    }
+  }
+
   async function removeUnbundledBuiltins(): Promise<void> {
     for (const row of listInstalledPlugins(deps.db)) {
       if (!isOrphanedBuiltinRow(row)) continue;
       await deleteRemovedPluginData(row, pluginProviderIds(row));
+      deleteAllPluginKvValues(deps.db, row.id);
       deleteInstalledPlugin(deps.db, row.id);
       logger.info(
         `plugin ${row.id} removed because bb no longer bundles ${row.source}; its settings, secrets, and schedules were deleted`,
@@ -1497,6 +1491,13 @@ export function createPluginService(deps: PluginServiceDeps): PluginService {
       setLoadHold(options?.hold ?? null);
       loadPassActive = true;
       try {
+        const retired = removeRetiredOutgoingConnectionState(deps.db);
+        if (retired !== null) {
+          logger.info(
+            `removed retired outgoing-connection state: ${JSON.stringify(retired)}`,
+          );
+        }
+        await removeNpmSourcedPlugins();
         await backfillNormalizedPluginRegistrations();
         await withPluginOperationLock(REGISTRATION_MUTATION_KEY, async () => {
           for (const artifact of listPendingGitPluginArtifacts(deps.db)) {
@@ -1652,9 +1653,7 @@ export function createPluginService(deps: PluginServiceDeps): PluginService {
             `install refused: ${selection.kind === "entry" ? "--plugin" : "--subdirectory"} applies to git: and path: sources only`,
           );
         }
-        if (parsed.kind === "builtin") return installBuiltinSource(parsed);
-        refuseBuiltinShadow(derivePluginId(parsed.name));
-        return installNpmSource(parsed, source);
+        return installBuiltinSource(parsed);
       });
     },
 
@@ -1678,18 +1677,9 @@ export function createPluginService(deps: PluginServiceDeps): PluginService {
             entryId: entry.entryId,
           },
           expectedPluginId: entry.pluginId,
-          ...(entry.npmRegistry === undefined
-            ? {}
-            : { npmRegistry: entry.npmRegistry }),
           ...(entry.expectedGitCommit === undefined
             ? {}
             : { expectedGitCommit: entry.expectedGitCommit }),
-          ...(entry.expectedNpmVersion === undefined
-            ? {}
-            : { expectedNpmVersion: entry.expectedNpmVersion }),
-          ...(entry.expectedNpmIntegrity === undefined
-            ? {}
-            : { expectedNpmIntegrity: entry.expectedNpmIntegrity }),
         };
         if (parsed.kind === "git") {
           return installGitSource(
@@ -1699,23 +1689,11 @@ export function createPluginService(deps: PluginServiceDeps): PluginService {
             context,
           );
         }
-        if (parsed.kind === "npm") {
-          if (entry.selection.kind !== "root") {
-            throw new Error(
-              `catalog entry "${entry.entryId}" selects a subdirectory of an npm package`,
-            );
-          }
-          refuseBuiltinShadow(derivePluginId(parsed.name));
-          return installNpmSource(parsed, entry.source, context);
-        }
         throw new Error(
           `catalog entry "${entry.entryId}" has an unsupported source "${entry.source}"`,
         );
       });
     },
-
-    resolveCatalogNpmSource: (args) =>
-      managedPluginArtifacts.resolveNpmCandidateForPlan(args),
 
     installPath: (path) =>
       withPluginOperationLock(REGISTRATION_MUTATION_KEY, () =>
@@ -1748,16 +1726,7 @@ export function createPluginService(deps: PluginServiceDeps): PluginService {
           const managedDir =
             row.activeArtifactId === null && row.sourceKind === "git"
               ? row.rootDir
-              : row.activeArtifactId === null &&
-                  row.sourceKind === "npm" &&
-                  row.sourceNpmPackage !== null &&
-                  row.sourceNpmRequestedSpec !== null
-                ? npmInstallPrefix(
-                    deps.dataDir,
-                    row.sourceNpmPackage,
-                    row.sourceNpmRequestedSpec || "latest",
-                  )
-                : undefined;
+              : undefined;
           if (managedDir !== undefined) {
             await rm(managedDir, { recursive: true, force: true });
           }

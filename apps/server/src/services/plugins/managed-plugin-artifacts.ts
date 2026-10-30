@@ -1,7 +1,6 @@
 import { randomUUID } from "node:crypto";
-import { mkdir, readFile, rm, stat } from "node:fs/promises";
+import { mkdir, readFile, rm } from "node:fs/promises";
 import { dirname, join, relative, sep } from "node:path";
-import { derivePluginId } from "@bb/domain";
 import {
   createPluginArtifact,
   getInstalledPlugin,
@@ -22,12 +21,6 @@ import {
   buildPluginHost,
   buildPluginServer,
 } from "@bb/plugin-build";
-import {
-  assertPublicMarketplaceUrl,
-  boundedResponseJson,
-  publicMarketplaceFetch,
-  MARKETPLACE_PACKUMENT_MAX_BYTES,
-} from "../plugin-catalog/marketplace-http.js";
 import { installGitDependencies } from "./git-plugin-dependencies.js";
 import { getPluginBuildToolchain } from "./build-toolchain.js";
 import { validatePluginArtifactMeta } from "./app-bundle.js";
@@ -40,12 +33,9 @@ import {
   gitArtifactCacheDir,
   hashInstallDir,
   nestedPluginRoots,
-  npmArtifactCacheDir,
-  npmPackageRoot,
   parsePluginSource,
   pluginRootDir,
   promoteGitPluginArtifact,
-  promoteImmutableDir,
   realPathInside,
   runInstallCommand,
 } from "./install-sources.js";
@@ -53,17 +43,12 @@ import { readPluginManifest, type PluginManifest } from "./manifest.js";
 import type { PluginServiceDeps } from "./plugin-service-internal.js";
 import { logPluginBuildWarnings } from "./plugin-log.js";
 import {
-  createNpmResolverRun,
   evaluateCompatibility,
   resolveGitRange,
   resolveGitRef,
-  selectNpmCandidate,
   type CompatibilityProblem,
   type GitCandidateProbeResult,
   type GitSemverTag,
-  type NpmResolvedCandidate,
-  type NpmSourceIntentForResolution,
-  type NpmSpecKind,
 } from "./update-resolver.js";
 
 export interface InstallRegistrationIdentity {
@@ -86,9 +71,6 @@ export interface InstallContext {
   provenance: PluginProvenance;
   expectedPluginId?: string;
   expectedGitCommit?: string;
-  npmRegistry?: string;
-  expectedNpmVersion?: string;
-  expectedNpmIntegrity?: string;
 }
 
 interface ActivateManagedUpdateArgs {
@@ -105,11 +87,11 @@ interface ActivateManagedUpdateArgs {
 interface ManagedPluginArtifactsContext {
   deps: PluginServiceDeps;
   withArtifactLock: <T>(key: string, fn: () => Promise<T>) => Promise<T>;
-  sourceKind: (source: string) => "path" | "git" | "npm" | "builtin";
+  sourceKind: (source: string) => "path" | "git" | "builtin";
   checkEngineRange: (manifest: PluginManifest) => string | undefined;
   checkPluginSdkRange: (manifest: PluginManifest) => string | undefined;
   isPackagedBuiltinEntry: (args: {
-    kind: "path" | "git" | "npm" | "builtin";
+    kind: "path" | "git" | "builtin";
     manifest: PluginManifest;
     rootDir: string;
     artifact: "app" | "server" | "host";
@@ -122,27 +104,6 @@ interface ManagedPluginArtifactsContext {
   ) => void;
   refuseBuiltinShadow: (pluginId: string) => void;
   activateManagedUpdate: (args: ActivateManagedUpdateArgs) => Promise<void>;
-}
-
-async function installNpmCandidate(args: {
-  stagingPrefix: string;
-  registry: string;
-  packageName: string;
-  candidate: NpmResolvedCandidate;
-}): Promise<void> {
-  await runInstallCommand("npm", [
-    "install",
-    "--prefix",
-    args.stagingPrefix,
-    "--ignore-scripts",
-    "--omit=optional",
-    "--no-audit",
-    "--no-fund",
-    "--registry",
-    args.registry,
-    "--",
-    `${args.packageName}@${args.candidate.version}`,
-  ]);
 }
 
 async function cloneGitCommit(
@@ -176,30 +137,6 @@ async function cloneGitCommit(
   await rm(join(stagingDir, ".git"), { recursive: true, force: true });
 }
 
-function npmSourceString(intent: NpmSourceIntentForResolution): string {
-  return intent.specKind === "default"
-    ? `npm:${intent.packageName}`
-    : `npm:${intent.packageName}@${intent.requestedSpec}`;
-}
-
-export function createListedRegistryNpmResolverRun(listedRegistry: string) {
-  return createNpmResolverRun({
-    fetch: (input, init) => {
-      assertPublicMarketplaceUrl(listedRegistry);
-      return publicMarketplaceFetch(input, {
-        ...init,
-        redirect: "error",
-      });
-    },
-    readJson: (response) =>
-      boundedResponseJson(
-        response,
-        MARKETPLACE_PACKUMENT_MAX_BYTES,
-        "npm registry metadata",
-      ),
-  });
-}
-
 export function createManagedPluginArtifacts(
   context: ManagedPluginArtifactsContext,
 ) {
@@ -218,12 +155,6 @@ export function createManagedPluginArtifacts(
   const directInstallContext: InstallContext = {
     provenance: { kind: "direct" },
   };
-
-  function npmResolverRun(listedRegistry: string | undefined) {
-    if (listedRegistry === undefined) return createNpmResolverRun();
-    assertPublicMarketplaceUrl(listedRegistry);
-    return createListedRegistryNpmResolverRun(listedRegistry);
-  }
 
   function assertExpectedPluginId(
     context: InstallContext,
@@ -265,21 +196,12 @@ export function createManagedPluginArtifacts(
   }): Promise<PluginManifest> {
     const manifest = await validateManifestOnly(args);
     const kind = sourceKind(args.source);
-    const managed = kind === "git" || kind === "npm";
+    const managed = kind === "git";
     if (kind === "git") {
       await installGitDependencies(args.rootDir);
     }
     if (manifest.appEntry !== undefined) {
-      if (kind === "npm") {
-        const jsPresent = await stat(join(args.rootDir, "dist", "app.js"))
-          .then(() => true)
-          .catch(() => false);
-        if (!jsPresent) {
-          throw new Error(
-            `install refused: npm plugins with a frontend (bb.app) must publish a prebuilt bundle — "${manifest.id}" is missing dist/app.js + dist/app.meta.json`,
-          );
-        }
-      } else if (
+      if (
         !isPackagedBuiltinEntry({
           kind,
           manifest,
@@ -370,84 +292,13 @@ export function createManagedPluginArtifacts(
     if (managed) {
       await validateArtifact("server", kind === "git");
       if (manifest.appEntry !== undefined) {
-        await validateArtifact("app", kind === "npm");
+        await validateArtifact("app", false);
       }
       if (manifest.hostEntry !== undefined) {
         await validateArtifact("host", true);
       }
     }
     return manifest;
-  }
-
-  async function readNpmIntegrity(
-    prefix: string,
-    packageName: string,
-  ): Promise<string | null> {
-    let value: unknown;
-    try {
-      value = JSON.parse(
-        await readFile(join(prefix, "package-lock.json"), "utf8"),
-      );
-    } catch {
-      return null;
-    }
-    if (typeof value !== "object" || value === null) return null;
-    const lock = value as Record<string, unknown>;
-    const packages = lock.packages;
-    if (typeof packages === "object" && packages !== null) {
-      const entry = (packages as Record<string, unknown>)[
-        `node_modules/${packageName}`
-      ];
-      if (typeof entry === "object" && entry !== null && "integrity" in entry) {
-        if (typeof entry.integrity === "string") return entry.integrity;
-      }
-    }
-    const dependencies = lock.dependencies;
-    if (typeof dependencies !== "object" || dependencies === null) return null;
-    const dependency = (dependencies as Record<string, unknown>)[packageName];
-    if (
-      typeof dependency !== "object" ||
-      dependency === null ||
-      !("integrity" in dependency)
-    ) {
-      return null;
-    }
-    return typeof dependency.integrity === "string"
-      ? dependency.integrity
-      : null;
-  }
-
-  async function resolveNpmRegistry(
-    prefix: string,
-    packageName: string,
-  ): Promise<string> {
-    const scope = packageName.startsWith("@")
-      ? packageName.slice(0, packageName.indexOf("/"))
-      : null;
-    const keys =
-      scope === null ? ["registry"] : [`${scope}:registry`, "registry"];
-    for (const key of keys) {
-      const value = await runInstallCommand("npm", [
-        "config",
-        "get",
-        key,
-        "--prefix",
-        prefix,
-      ]);
-      if (value.length > 0 && value !== "undefined" && value !== "null") {
-        return value;
-      }
-    }
-    throw new Error(`npm did not resolve a registry for ${packageName}`);
-  }
-
-  async function npmRegistryFor(
-    listed: string | undefined,
-    packageName: string,
-  ): Promise<string> {
-    const registryProbe = join(deps.dataDir, "plugins", "npm", ".registry");
-    await mkdir(registryProbe, { recursive: true });
-    return listed ?? (await resolveNpmRegistry(registryProbe, packageName));
   }
 
   async function reusableArtifact(
@@ -883,223 +734,6 @@ export function createManagedPluginArtifacts(
     });
   }
 
-  async function resolveNpmCandidateForPlan(args: {
-    packageName: string;
-    registry?: string;
-    requestedSpec: string;
-    specKind: NpmSpecKind;
-  }): Promise<
-    | { outcome: "resolved"; version: string; integrity: string }
-    | { outcome: "unavailable"; detail: string }
-  > {
-    const registry = await npmRegistryFor(args.registry, args.packageName);
-    const selected = await selectNpmCandidate({
-      intent: {
-        packageName: args.packageName,
-        registry,
-        requestedSpec: args.requestedSpec,
-        specKind: args.specKind,
-      },
-      appVersion: deps.appVersion,
-      run: npmResolverRun(args.registry),
-    });
-    if (selected.outcome === "selected") {
-      return {
-        outcome: "resolved",
-        version: selected.candidate.version,
-        integrity: selected.candidate.integrity,
-      };
-    }
-    return {
-      outcome: "unavailable",
-      detail:
-        selected.outcome === "unavailable"
-          ? selected.detail
-          : `${selected.newest.display} ${selected.reasons.map((problem) => problem.message).join("; ")}`,
-    };
-  }
-
-  async function installNpmSource(
-    parsed: Extract<ReturnType<typeof parsePluginSource>, { kind: "npm" }>,
-    source: string,
-    context: InstallContext = directInstallContext,
-  ): Promise<InstalledPlugin> {
-    const listedRegistry = context.npmRegistry;
-    const registry = await npmRegistryFor(listedRegistry, parsed.name);
-    const intent: NpmSourceIntentForResolution = {
-      packageName: parsed.name,
-      registry,
-      requestedSpec: parsed.spec,
-      specKind: parsed.specKind,
-    };
-    const registrationIdentity: InstallRegistrationIdentity = {
-      provenance: context.provenance,
-      sourceIntent: { kind: "npm", ...intent },
-    };
-    const pluginId = derivePluginId(parsed.name);
-    assertExpectedPluginId(context, pluginId, source);
-    assertInstallRegistrationAvailable(
-      getInstalledPlugin(deps.db, pluginId),
-      registrationIdentity,
-      pluginId,
-    );
-    const selected = await selectNpmCandidate({
-      intent,
-      appVersion: deps.appVersion,
-      run: npmResolverRun(listedRegistry),
-    });
-    if (selected.outcome === "unavailable") {
-      throw new Error(`install failed: ${selected.detail}`);
-    }
-    if (selected.outcome === "incompatible") {
-      throw new Error(
-        `install refused: ${selected.newest.display} ${selected.reasons.map((problem) => problem.message).join("; ")}`,
-      );
-    }
-    const candidate = selected.candidate;
-    if (
-      context.expectedNpmVersion !== undefined &&
-      candidate.version !== context.expectedNpmVersion
-    ) {
-      throw new Error(
-        `install refused: the npm source changed after confirmation; expected ${parsed.name}@${context.expectedNpmVersion}, resolved ${candidate.display}`,
-      );
-    }
-    if (
-      context.expectedNpmIntegrity !== undefined &&
-      candidate.integrity !== context.expectedNpmIntegrity
-    ) {
-      throw new Error(
-        `install refused: the npm integrity changed after confirmation; expected ${context.expectedNpmIntegrity}, resolved ${candidate.integrity}`,
-      );
-    }
-    const prefix = npmArtifactCacheDir(
-      deps.dataDir,
-      parsed.name,
-      candidate.version,
-    );
-    const rootDir = npmPackageRoot(prefix, parsed.name);
-    return withArtifactLock(prefix, async () => {
-      const stagingPrefix = `${prefix}.staging`;
-      await rm(stagingPrefix, { recursive: true, force: true });
-      const cachedManifest = await readPluginManifest(rootDir).catch(
-        () => null,
-      );
-      const existingArtifact =
-        cachedManifest === null
-          ? undefined
-          : getPluginArtifactByResolution(deps.db, {
-              sourceKind: "npm",
-              pluginId: cachedManifest.id,
-              path: rootDir,
-              version: candidate.version,
-              integrity: candidate.integrity,
-            });
-      const reusable = await reusableArtifact(existingArtifact, prefix);
-      if (reusable !== undefined) {
-        return registerInstalled({
-          rootDir,
-          source,
-          ...registrationIdentity,
-          exactResolution: {
-            kind: "npm",
-            version: candidate.version,
-            integrity: candidate.integrity,
-          },
-          refuseEngineMismatch: true,
-          validated: true,
-          activeArtifactId: reusable.id,
-        });
-      }
-      await mkdir(stagingPrefix, { recursive: true });
-      try {
-        deps.onArtifactMaterialize?.({ path: rootDir });
-        await installNpmCandidate({
-          stagingPrefix,
-          registry,
-          packageName: parsed.name,
-          candidate,
-        });
-        const stagedRoot = npmPackageRoot(stagingPrefix, parsed.name);
-        await validateInstallDir({
-          rootDir: stagedRoot,
-          source,
-          refuseEngineMismatch: true,
-        });
-        const installedIntegrity = await readNpmIntegrity(
-          stagingPrefix,
-          parsed.name,
-        );
-        if (
-          candidate.integrity.length > 0 &&
-          installedIntegrity !== null &&
-          installedIntegrity !== candidate.integrity
-        ) {
-          throw new Error(
-            `install failed: integrity for ${candidate.display} did not match registry metadata`,
-          );
-        }
-        const manifest = await readPluginManifest(stagedRoot);
-        const contentHash = await hashInstallDir(stagingPrefix);
-        const artifact = ownedOrCreatedArtifact({
-          owned:
-            existingArtifact ??
-            getPluginArtifactByResolution(deps.db, {
-              sourceKind: "npm",
-              pluginId: manifest.id,
-              path: rootDir,
-              version: candidate.version,
-              integrity: candidate.integrity,
-            }),
-          create: {
-            id: randomUUID(),
-            pluginId: manifest.id,
-            sourceKind: "npm",
-            npmResolvedVersion: candidate.version,
-            gitResolvedCommit: null,
-            gitCheckoutRoot: null,
-            path: rootDir,
-            integrity: candidate.integrity,
-            contentHash,
-            validationResult: "pending",
-            validatedAt: null,
-          },
-          resetExisting: true,
-        });
-        return registerInstalled({
-          rootDir,
-          source,
-          ...registrationIdentity,
-          exactResolution: {
-            kind: "npm",
-            version: candidate.version,
-            integrity: candidate.integrity,
-          },
-          refuseEngineMismatch: true,
-          validated: true,
-          activeArtifactId: artifact.id,
-          preparedManifest: manifest,
-          beforePersist: async () => {
-            await promoteImmutableDir({
-              stagingDir: stagingPrefix,
-              targetDir: prefix,
-              contentHash,
-            });
-            await deps.afterArtifactPromoted?.({
-              pluginId: manifest.id,
-              artifactId: artifact.id,
-              path: rootDir,
-            });
-            markArtifactValid(artifact.id, contentHash);
-          },
-        });
-      } catch (error) {
-        await rm(stagingPrefix, { recursive: true, force: true });
-        throw error;
-      }
-    });
-  }
-
   async function stageGitCandidate(args: {
     row: InstalledPluginRow;
     commit: string;
@@ -1347,140 +981,8 @@ export function createManagedPluginArtifacts(
     }
   }
 
-  async function applyNpmCandidate(args: {
-    row: InstalledPluginRow;
-    selectionIntent: NpmSourceIntentForResolution;
-    candidate: NpmResolvedCandidate;
-  }): Promise<void> {
-    const targetPrefix = npmArtifactCacheDir(
-      deps.dataDir,
-      args.selectionIntent.packageName,
-      args.candidate.version,
-    );
-    const targetRoot = npmPackageRoot(
-      targetPrefix,
-      args.selectionIntent.packageName,
-    );
-    return withArtifactLock(targetPrefix, async () => {
-      const existingArtifact = getPluginArtifactByResolution(deps.db, {
-        sourceKind: "npm",
-        pluginId: args.row.id,
-        path: targetRoot,
-        version: args.candidate.version,
-        integrity: args.candidate.integrity,
-      });
-      const reusable = await reusableArtifact(existingArtifact, targetPrefix);
-      if (reusable !== undefined) {
-        const manifest = await readPluginManifest(targetRoot);
-        await activateManagedUpdate({
-          row: args.row,
-          rootDir: targetRoot,
-          manifest,
-          source: npmSourceString(args.selectionIntent),
-          sourceIntent: { kind: "npm", ...args.selectionIntent },
-          exactResolution: {
-            kind: "npm",
-            version: args.candidate.version,
-            integrity: args.candidate.integrity,
-          },
-          artifactId: reusable.id,
-        });
-        return;
-      }
-      const stagingPrefix = `${targetPrefix}.staging`;
-      await rm(stagingPrefix, { recursive: true, force: true });
-      await mkdir(stagingPrefix, { recursive: true });
-      try {
-        deps.onArtifactMaterialize?.({ path: targetRoot });
-        await installNpmCandidate({
-          stagingPrefix,
-          registry: args.selectionIntent.registry,
-          packageName: args.selectionIntent.packageName,
-          candidate: args.candidate,
-        });
-        const stagedRoot = npmPackageRoot(
-          stagingPrefix,
-          args.selectionIntent.packageName,
-        );
-        const manifest = await validateInstallDir({
-          rootDir: stagedRoot,
-          source: args.row.source,
-          refuseEngineMismatch: true,
-        });
-        if (manifest.id !== args.row.id) {
-          throw new Error(
-            `update refused: candidate manifest id changed from "${args.row.id}" to "${manifest.id}"`,
-          );
-        }
-        const installedIntegrity = await readNpmIntegrity(
-          stagingPrefix,
-          args.selectionIntent.packageName,
-        );
-        if (
-          args.candidate.integrity.length > 0 &&
-          installedIntegrity !== null &&
-          installedIntegrity !== args.candidate.integrity
-        ) {
-          throw new Error(
-            `update refused: integrity for ${args.candidate.display} did not match registry metadata`,
-          );
-        }
-        const contentHash = await hashInstallDir(stagingPrefix);
-        const artifact = ownedOrCreatedArtifact({
-          owned: existingArtifact,
-          create: {
-            id: randomUUID(),
-            pluginId: args.row.id,
-            sourceKind: "npm",
-            npmResolvedVersion: args.candidate.version,
-            gitResolvedCommit: null,
-            gitCheckoutRoot: null,
-            path: targetRoot,
-            integrity: args.candidate.integrity,
-            contentHash,
-            validationResult: "pending",
-            validatedAt: null,
-          },
-          resetExisting: false,
-        });
-        await activateManagedUpdate({
-          row: args.row,
-          rootDir: targetRoot,
-          manifest,
-          source: npmSourceString(args.selectionIntent),
-          sourceIntent: { kind: "npm", ...args.selectionIntent },
-          exactResolution: {
-            kind: "npm",
-            version: args.candidate.version,
-            integrity: args.candidate.integrity,
-          },
-          artifactId: artifact.id,
-          beforePersist: async () => {
-            await promoteImmutableDir({
-              stagingDir: stagingPrefix,
-              targetDir: targetPrefix,
-              contentHash,
-            });
-            await deps.afterArtifactPromoted?.({
-              pluginId: args.row.id,
-              artifactId: artifact.id,
-              path: targetRoot,
-            });
-            markArtifactValid(artifact.id, contentHash);
-          },
-        });
-      } catch (error) {
-        await rm(stagingPrefix, { recursive: true, force: true });
-        throw error;
-      }
-    });
-  }
-
   return {
-    applyNpmCandidate,
     installGitSource,
-    installNpmSource,
-    resolveNpmCandidateForPlan,
     stageGitCandidate,
     validateInstallDir,
   };

@@ -27,8 +27,6 @@ type FetchLike = typeof fetch;
 interface PluginSourceDetail {
   requested: string;
   resolved: string;
-  integrity: string | null;
-  registry: string | null;
   engines: { bb: string | null; bbPluginSdk: string | null };
   installedAt: number | null;
   history: { version: string; activatedAt: number | null }[];
@@ -40,8 +38,6 @@ function toPluginSourceDetail(
   return {
     requested: source.requested,
     resolved: source.resolved,
-    integrity: source.integrity ?? null,
-    registry: source.registry ?? null,
     engines: {
       bb: source.engines.bb ?? null,
       bbPluginSdk: source.engines.bbPluginSdk ?? null,

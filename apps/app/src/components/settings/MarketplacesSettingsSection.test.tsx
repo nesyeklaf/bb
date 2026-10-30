@@ -10,12 +10,12 @@ import { createQueryClientTestHarness } from "@/test/queryClientTestHarness";
 import { MarketplacesSettingsSection } from "./MarketplacesSettingsSection";
 
 const OFFICIAL = {
-  name: "bb-community",
-  displayName: "BB Community",
+  name: "bb-official",
+  displayName: "BB Official",
   description: null,
   official: true,
-  sourceKind: "https",
-  source: "https://getbb.app/marketplace/v1/marketplace.json",
+  sourceKind: "path",
+  source: "path:/bundled",
   resolvedCommit: null,
   entryCount: 3,
   lastRefreshAt: 1_700_000_000_000,
@@ -28,7 +28,7 @@ const ACME = {
   name: "acme-plugins",
   displayName: "Acme Plugins",
   official: false,
-  source: "https://acme.test/marketplace.json",
+  source: "path:/work/acme-marketplace",
   entryCount: 2,
 };
 
@@ -78,7 +78,7 @@ describe("MarketplacesSettingsSection", () => {
     render(<MarketplacesSettingsSection />, { wrapper });
 
     fireEvent.change(screen.getByLabelText("Marketplace source"), {
-      target: { value: " https://acme.test/marketplace.json " },
+      target: { value: " path:/work/acme-marketplace " },
     });
     fireEvent.click(screen.getByRole("button", { name: "Add" }));
 
@@ -89,7 +89,7 @@ describe("MarketplacesSettingsSection", () => {
           request.init?.method === "POST",
       );
       expect(JSON.parse(String(post?.init?.body))).toEqual({
-        source: "https://acme.test/marketplace.json",
+        source: "path:/work/acme-marketplace",
       });
     });
   });
@@ -133,7 +133,7 @@ describe("MarketplacesSettingsSection", () => {
       target: { value: "bb" },
     });
     fireEvent.change(screen.getByLabelText("Marketplace source"), {
-      target: { value: "https://acme.test/marketplace.json" },
+      target: { value: "path:/work/acme-marketplace" },
     });
     expect(screen.queryByLabelText("Marketplace subdirectory")).toBe(null);
     fireEvent.click(screen.getByRole("button", { name: "Add" }));
@@ -145,7 +145,7 @@ describe("MarketplacesSettingsSection", () => {
           request.init?.method === "POST",
       );
       expect(JSON.parse(String(post?.init?.body))).toEqual({
-        source: "https://acme.test/marketplace.json",
+        source: "path:/work/acme-marketplace",
       });
     });
   });
@@ -196,13 +196,13 @@ describe("MarketplacesSettingsSection", () => {
     });
   });
 
-  it("offers Remove only for marketplaces other than bb-community", async () => {
+  it("offers Remove only for marketplaces other than bb-official", async () => {
     stubFetch([OFFICIAL, ACME]);
     const { wrapper } = createQueryClientTestHarness();
     render(<MarketplacesSettingsSection />, { wrapper });
 
     await screen.findByText("Acme Plugins");
-    expect(screen.queryByRole("button", { name: "Remove BB Community" })).toBe(
+    expect(screen.queryByRole("button", { name: "Remove BB Official" })).toBe(
       null,
     );
     expect(

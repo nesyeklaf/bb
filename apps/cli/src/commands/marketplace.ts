@@ -46,7 +46,7 @@ export function registerMarketplaceCommands(
   marketplace
     .command("add <source>")
     .description(
-      "Add a marketplace from an https manifest URL, git:<url>[@<ref>], or path:<directory> (validates and caches the catalog; installs nothing)",
+      "Add a marketplace from git:<url>[@<ref>] or path:<directory> (validates and caches the catalog; installs nothing)",
     )
     .option(
       "--subdirectory <path>",
@@ -157,7 +157,7 @@ export function registerMarketplaceCommands(
   marketplace
     .command("remove <name>")
     .description(
-      "Forget a marketplace. bb-official and bb-community cannot be removed. Installed plugins keep their direct sources",
+      "Forget a marketplace. bb-official cannot be removed. Installed plugins keep their direct sources",
     )
     .option("--json", "Output JSON")
     .action(

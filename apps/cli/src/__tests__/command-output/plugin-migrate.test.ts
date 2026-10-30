@@ -16,7 +16,6 @@ import {
   runCommand,
   setupCommandOutputTestEnvironment,
 } from "../helpers/command-output-harness.js";
-import { installFakeNpm } from "../helpers/fake-npm.js";
 import { registerPluginCommands } from "../../commands/plugin.js";
 
 const register = (program: Parameters<typeof registerPluginCommands>[0]) => {
@@ -26,18 +25,14 @@ const register = (program: Parameters<typeof registerPluginCommands>[0]) => {
 setupCommandOutputTestEnvironment();
 
 let rootDir: string;
-let toolsDir: string;
 
 beforeEach(async () => {
   rootDir = await mkdtemp(join(tmpdir(), "bb-cli-migrate-"));
-  toolsDir = await mkdtemp(join(tmpdir(), "bb-cli-migrate-tools-"));
-  await installFakeNpm(toolsDir);
   vi.spyOn(console, "warn").mockImplementation(() => {});
 });
 
 afterEach(async () => {
   await rm(rootDir, { recursive: true, force: true });
-  await rm(toolsDir, { recursive: true, force: true });
 });
 
 async function writeManifest(value: Record<string, unknown>): Promise<void> {

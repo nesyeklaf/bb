@@ -54,7 +54,7 @@ export function connectEnrollHref(params: ConnectEnrollHrefParams = {}): Href {
   });
 }
 
-type SettingsSectionRoute = "device" | "appearance" | "notifications";
+type SettingsSectionRoute = "device" | "appearance";
 
 export function settingsSectionHref(section: SettingsSectionRoute): Href {
   return untypedHref(`/settings/${section}`);

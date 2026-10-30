@@ -13,7 +13,6 @@ import type { WebView, WebViewMessageEvent } from "react-native-webview";
 import { describeError } from "@/lib/describe-error";
 import { haptic } from "@/lib/haptics";
 import { buildBridgeSharePayload, isExternallyOpenable } from "@/lib/shell";
-import { updateAppBadgeCount } from "@/notifications/AppBadgeSync";
 
 export interface ShellBridgeCallbacks {
   onReady(path: string): void;
@@ -61,7 +60,6 @@ export function useShellBridge(
           haptic(message.kind);
           return;
         case "badge":
-          updateAppBadgeCount(message.count);
           return;
         case "open-native":
           callbacksRef.current.onOpenNative(message.screen);

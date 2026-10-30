@@ -13,7 +13,7 @@ afterEach(cleanup);
 
 describe("resource page title identity", () => {
   it.each([
-    { path: "/skills", title: "Skills", icon: "Zap", leaf: "Browse" },
+    { path: "/skills", title: "Skills", icon: "Zap", leaf: "My skills" },
     {
       path: "/skills?view=library",
       title: "Skills",

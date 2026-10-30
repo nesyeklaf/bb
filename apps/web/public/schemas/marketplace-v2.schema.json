@@ -166,9 +166,6 @@
         "source": {
           "oneOf": [
             {
-              "$ref": "#/$defs/npmSource"
-            },
-            {
               "$ref": "#/$defs/gitRefSource"
             },
             {
@@ -203,40 +200,6 @@
         "updatedAt": {
           "type": "string",
           "format": "date-time"
-        }
-      }
-    },
-    "npmSource": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": ["npm"],
-      "properties": {
-        "npm": {
-          "type": "object",
-          "additionalProperties": false,
-          "required": ["package"],
-          "$comment": "Do not use range and tag together.",
-          "not": {
-            "required": ["range", "tag"]
-          },
-          "properties": {
-            "package": {
-              "type": "string",
-              "pattern": "^(?:@[a-z0-9][a-z0-9._~-]*/)?[a-z0-9][a-z0-9._~-]*$"
-            },
-            "range": {
-              "type": "string",
-              "minLength": 1
-            },
-            "tag": {
-              "type": "string",
-              "pattern": "^[A-Za-z][A-Za-z0-9._-]*$"
-            },
-            "registry": {
-              "type": "string",
-              "pattern": "^https://"
-            }
-          }
         }
       }
     },

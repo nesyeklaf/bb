@@ -164,8 +164,6 @@ describe("READ_ONLY_COMMAND_PATHS", () => {
       "skill cli-skills-status",
       "skill files",
       "skill list",
-      "skill registry detail",
-      "skill search",
       "skill show",
       "status",
       "terminal list",

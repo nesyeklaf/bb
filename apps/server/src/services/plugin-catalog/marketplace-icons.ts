@@ -6,12 +6,7 @@ import {
   type UpsertPluginMarketplaceIconInput,
 } from "@bb/db";
 import { assertValidPluginCompactIconSvg } from "@bb/plugin-build";
-import {
-  assertPublicMarketplaceUrl,
-  boundedResponseBytes,
-  marketplaceErrorMessage,
-  type MarketplaceFetch,
-} from "./marketplace-http.js";
+import { marketplaceErrorMessage } from "./marketplace-http.js";
 import { brandingAssetHash } from "../plugins/app-bundle.js";
 import { realPathInside } from "../plugins/install-sources.js";
 import {
@@ -71,14 +66,7 @@ function isWebp(bytes: Uint8Array): boolean {
   return ascii(0, "RIFF") && ascii(8, "WEBP");
 }
 
-export function marketplaceIconContentType(
-  iconUrl: string,
-  bytes: Uint8Array,
-): string {
-  return marketplaceIconContentTypeForPath(new URL(iconUrl).pathname, bytes);
-}
-
-function marketplaceIconContentTypeForPath(
+export function marketplaceIconContentTypeForPath(
   filePath: string,
   bytes: Uint8Array,
 ): string {
@@ -103,13 +91,11 @@ function marketplaceIconContentTypeForPath(
   throw new Error("icon must be a .svg, .png, or .webp file");
 }
 
-export async function fetchMarketplaceIcons(args: {
+export async function readMarketplaceIcons(args: {
   db: DbConnection;
   marketplaceName: string;
   base: MarketplaceIconBase;
   entries: readonly MarketplaceEntry[];
-  onlyMissing: boolean;
-  fetch: MarketplaceFetch;
   warn?: (message: string) => void;
 }): Promise<UpsertPluginMarketplaceIconInput[]> {
   const wanted = new Map<string, MarketplaceIconLocation>();
@@ -142,36 +128,16 @@ export async function fetchMarketplaceIcons(args: {
     const sourceUrl = iconSourceUrl(icon);
     const cached = cachedByEntryId.get(entryId);
     const unchangedUrl = cached?.sourceUrl === sourceUrl;
-    if (
-      args.onlyMissing &&
-      icon.kind === "remote" &&
-      cached !== undefined &&
-      unchangedUrl
-    ) {
-      resolved.set(entryId, iconInputFromRow(cached));
-      return;
-    }
     try {
-      const refreshed =
-        icon.kind === "local"
-          ? await readOneLocalIcon({
-              marketplaceName: args.marketplaceName,
-              entryId,
-              icon,
-              base: args.base,
-            })
-          : await fetchOneIcon({
-              marketplaceName: args.marketplaceName,
-              entryId,
-              iconUrl: icon.url,
-              cached,
-              fetch: args.fetch,
-            });
-      if (refreshed !== null) {
-        resolved.set(entryId, refreshed);
-      } else if (cached !== undefined && unchangedUrl) {
-        resolved.set(entryId, iconInputFromRow(cached));
-      }
+      resolved.set(
+        entryId,
+        await readOneLocalIcon({
+          marketplaceName: args.marketplaceName,
+          entryId,
+          icon,
+          base: args.base,
+        }),
+      );
     } catch (error) {
       args.warn?.(
         `marketplace ${args.marketplaceName} entry "${entryId}" icon ${sourceUrl} was rejected: ${marketplaceErrorMessage(error)}`,
@@ -204,18 +170,15 @@ export async function fetchMarketplaceIcons(args: {
 }
 
 function iconSourceUrl(icon: MarketplaceIconLocation): string {
-  return icon.kind === "remote" ? icon.url : `file:${icon.relativePath}`;
+  return `file:${icon.relativePath}`;
 }
 
 async function readOneLocalIcon(args: {
   marketplaceName: string;
   entryId: string;
-  icon: Extract<MarketplaceIconLocation, { kind: "local" }>;
+  icon: MarketplaceIconLocation;
   base: MarketplaceIconBase;
 }): Promise<UpsertPluginMarketplaceIconInput> {
-  if (args.base.kind !== "dir") {
-    throw new Error("local icons require a directory base");
-  }
   const path = await realPathInside(
     args.base.root,
     args.icon.path,
@@ -241,49 +204,4 @@ function iconInputFromRow(
 ): UpsertPluginMarketplaceIconInput {
   const { updatedAt: _updatedAt, ...input } = row;
   return input;
-}
-
-async function fetchOneIcon(args: {
-  marketplaceName: string;
-  entryId: string;
-  iconUrl: string;
-  cached: PluginMarketplaceIconRow | undefined;
-  fetch: MarketplaceFetch;
-}): Promise<UpsertPluginMarketplaceIconInput | null> {
-  assertPublicMarketplaceUrl(args.iconUrl);
-  const cached = args.cached;
-  const unchangedUrl =
-    cached !== undefined && cached.sourceUrl === args.iconUrl;
-  const headers = new Headers({ accept: "image/*" });
-  if (unchangedUrl && cached.etag !== null) {
-    headers.set("if-none-match", cached.etag);
-  }
-  const response = await args.fetch(args.iconUrl, {
-    method: "GET",
-    headers,
-    redirect: "error",
-  });
-  if (response.status === 304 && unchangedUrl) {
-    await response.body?.cancel();
-    return null;
-  }
-  if (!response.ok) {
-    await response.body?.cancel();
-    throw new Error(`request failed with HTTP ${response.status}`);
-  }
-  const bytes = await boundedResponseBytes(
-    response,
-    MARKETPLACE_ICON_MAX_BYTES,
-    "icon",
-  );
-  const contentType = marketplaceIconContentType(args.iconUrl, bytes);
-  return {
-    marketplaceName: args.marketplaceName,
-    entryId: args.entryId,
-    sourceUrl: args.iconUrl,
-    contentType,
-    etag: response.headers.get("etag"),
-    contentHash: brandingAssetHash(bytes),
-    bytes: Buffer.from(bytes),
-  };
 }

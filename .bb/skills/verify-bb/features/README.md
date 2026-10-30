@@ -59,7 +59,6 @@ were excluded. See the [audit](../MAINTENANCE.md) and
 | [Scheduled agent and script automations](plugin-automations.md) | 8 | 8 passed |
 | [Agent concurrency limits](plugin-concurrency-limit.md) | 5 | 4 passed, 1 partial/blocked |
 | [bb account sign-in](plugin-bb-account.md) | 5 | 5 not run |
-| [bb cloud AI](plugin-bb-ai.md) | 5 | 5 not run |
 | [Remote Connect and port sharing](plugin-connect.md) | 7 | 5 passed, 2 partial/blocked |
 | [Custom agent instructions](plugin-custom-instructions.md) | 3 | 2 passed, 1 partial/blocked |
 | [Docs vaults and editing](plugin-docs.md) | 9 | 7 passed, 2 partial/blocked |
@@ -77,7 +76,7 @@ were excluded. See the [audit](../MAINTENANCE.md) and
 | [Pi provider](plugin-provider-pi.md) | 5 | 2 passed, 3 partial/blocked |
 | [Automatic provider retry](plugin-provider-retry.md) | 5 | 5 partial/blocked |
 | [Provider usage limits](plugin-provider-usage.md) | 3 | 2 passed, 1 partial/blocked |
-| [Web, desktop, and mobile notifications](plugin-push-notifications.md) | 6 | 1 passed, 5 partial/blocked |
+| [Web and desktop notifications](plugin-push-notifications.md) | 5 | 1 passed, 5 partial/blocked |
 | [Scheduled messages](plugin-scheduled-send.md) | 5 | 2 passed, 3 partial/blocked |
 | [Secure credential requests](plugin-secrets.md) | 5 | 4 passed, 1 partial/blocked |
 | [Side chats](plugin-side-chat.md) | 4 | 3 passed, 1 partial/blocked |

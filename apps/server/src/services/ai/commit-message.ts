@@ -1,7 +1,7 @@
 import { renderTemplate } from "@bb/templates";
 import { truncateToWidthAtWordBoundary } from "@bb/text-utils";
 import type { LoggedWorkSessionDeps } from "../../types.js";
-import { runTextAiTask } from "./ai-tasks.js";
+import { preferredAiPluginId, runTextAiTask } from "./ai-tasks.js";
 
 const MAX_COMMIT_SUBJECT_WIDTH = 72;
 
@@ -34,11 +34,14 @@ export function sanitizeGeneratedCommitMessage(value: string): string | null {
 export async function generateCommitMessage(
   deps: LoggedWorkSessionDeps,
   args: GenerateCommitMessageArgs,
+  providerId: string | null,
 ): Promise<string | null> {
+  const preferredPluginId = preferredAiPluginId(deps, providerId);
   const outcome = await runTextAiTask(deps, {
     task: "commit-message",
     label: "Commit message generation",
     prompt: buildCommitMessagePrompt(args),
+    ...(preferredPluginId === undefined ? {} : { preferredPluginId }),
   });
   return outcome.ok ? sanitizeGeneratedCommitMessage(outcome.value) : null;
 }

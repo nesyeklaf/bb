@@ -14,9 +14,13 @@ import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
+  getAiServiceSelections,
   getInstalledPluginRegistration,
   getPluginSettingsValues,
+  listPluginKvKeys,
   listPluginSchedules,
+  setAiServiceSelection,
+  setPluginKvValue,
   setPluginSettingsValues,
   upsertPluginSchedule,
   type DbConnection,
@@ -264,7 +268,6 @@ describe("builtin plugin reconciliation", () => {
   it("keeps official plugins bundled but out of the auto-install builtins", () => {
     const optionalNames = OFFICIAL_PLUGINS.map((plugin) => plugin.name);
     expect(optionalNames).toEqual([
-      "environment-modal-sandbox",
       "browser-automation",
       "github",
       "docs",
@@ -410,7 +413,6 @@ describe("builtin plugin reconciliation", () => {
     const legacyRows = [
       ["legacy-path", `path:${fixtureRoot}`, 1, 101],
       ["legacy-builtin", "builtin:fixture", 0, 102],
-      ["legacy-npm", "npm:bb-plugin-legacy@1.2.3", 1, 103],
       ["legacy-git", `git:github.com/acme/bb-plugin-legacy@${sha}`, 0, 104],
     ] as const;
     const insert = db.$client.prepare(
@@ -440,14 +442,6 @@ describe("builtin plugin reconciliation", () => {
       sourceKind: "builtin",
       sourceBuiltinName: "fixture",
     });
-    expect(getInstalledPluginRegistration(db, "legacy-npm")).toMatchObject({
-      enabled: true,
-      removedAt: 103,
-      sourceKind: "npm",
-      sourceNpmPackage: "bb-plugin-legacy",
-      sourceNpmRequestedSpec: "1.2.3",
-      npmResolvedVersion: "1.2.3",
-    });
     expect(getInstalledPluginRegistration(db, "legacy-git")).toMatchObject({
       enabled: false,
       removedAt: 104,
@@ -466,6 +460,103 @@ describe("builtin plugin reconciliation", () => {
     expect(
       legacyRows.map(([id]) => getInstalledPluginRegistration(db, id)),
     ).toEqual(once);
+  });
+
+  it("removes retired outgoing-connection state once on upgrade and leaves local plugins intact", async () => {
+    const legacyRoot = join(workDir, "missing-legacy-root");
+    db.$client
+      .prepare(
+        `INSERT INTO plugins
+         (id, source, root_dir, version, enabled, installed_at, updated_at)
+         VALUES ('local-tool', ?, ?, '0.1.0', 1, 10, 20)`,
+      )
+      .run(`path:${fixtureRoot}`, legacyRoot);
+    setAiServiceSelection(db, "thread-title", {
+      mode: "service",
+      pluginId: "bb-ai",
+      serviceId: "cloud",
+    });
+    setAiServiceSelection(db, "commit-message", {
+      mode: "service",
+      pluginId: "provider-claude-code",
+      serviceId: "claude",
+    });
+    setAiServiceSelection(db, "voice", { mode: "off" });
+    setPluginKvValue(db, "push-notifications", "subscription:a", "{}");
+    setPluginKvValue(db, "push-notifications", "subscription:b", "{}");
+    setPluginKvValue(db, "push-notifications", "last-send-outcome", "{}");
+    setPluginKvValue(db, "bb-account", "credential", "{}");
+    setPluginKvValue(db, "bb-account", "profile", "{}");
+    setPluginKvValue(db, "bb-account", "revision", "3");
+    setPluginKvValue(db, "bb-ai", "state", "{}");
+    setPluginSettingsValues(db, "bb-ai", { enabled: "true" });
+    setPluginKvValue(db, "environment-modal-sandbox", "state", "{}");
+    setPluginSettingsValues(db, "environment-modal-sandbox", { token: "x" });
+    setPluginKvValue(db, "local-tool", "keep", "1");
+
+    service = createService({ db, dataDir: join(workDir, "data") });
+    await service.start();
+
+    expect(getAiServiceSelections(db)).toEqual({
+      "thread-title": { mode: "automatic" },
+      "commit-message": {
+        mode: "service",
+        pluginId: "provider-claude-code",
+        serviceId: "claude",
+      },
+      voice: { mode: "off" },
+    });
+    expect(listPluginKvKeys(db, "push-notifications")).toEqual([
+      "last-send-outcome",
+    ]);
+    expect(listPluginKvKeys(db, "bb-account")).toEqual([]);
+    expect(listPluginKvKeys(db, "bb-ai")).toEqual([]);
+    expect(getPluginSettingsValues(db, "bb-ai")).toEqual({});
+    expect(listPluginKvKeys(db, "environment-modal-sandbox")).toEqual([]);
+    expect(getPluginSettingsValues(db, "environment-modal-sandbox")).toEqual(
+      {},
+    );
+    expect(getInstalledPluginRegistration(db, "local-tool")).toMatchObject({
+      sourceKind: "path",
+      enabled: true,
+    });
+    expect(listPluginKvKeys(db, "local-tool")).toEqual(["keep"]);
+
+    setPluginKvValue(db, "bb-account", "credential", '{"again":true}');
+    await service.stop();
+    service = createService({ db, dataDir: join(workDir, "data") });
+    await service.start();
+    expect(listPluginKvKeys(db, "bb-account")).toEqual(["credential"]);
+  });
+
+  it("removes installed plugins that came from an npm source and keeps the others", async () => {
+    const legacyRoot = join(workDir, "missing-legacy-root");
+    db.$client
+      .prepare(
+        `INSERT INTO plugins
+         (id, source, root_dir, version, enabled, installed_at, updated_at)
+         VALUES (?, ?, ?, '1.0.0', 1, 10, 20)`,
+      )
+      .run("from-npm", "npm:bb-plugin-from-npm@1.0.0", legacyRoot);
+    db.$client
+      .prepare(
+        `INSERT INTO plugins
+         (id, source, root_dir, version, enabled, installed_at, updated_at)
+         VALUES (?, ?, ?, '1.0.0', 1, 10, 20)`,
+      )
+      .run("from-path", `path:${fixtureRoot}`, legacyRoot);
+    setPluginKvValue(db, "from-npm", "state", "1");
+    setPluginSettingsValues(db, "from-npm", { mode: "fast" });
+
+    service = createService({ db, dataDir: join(workDir, "data") });
+    await service.start();
+
+    expect(getInstalledPluginRegistration(db, "from-npm")).toBeUndefined();
+    expect(listPluginKvKeys(db, "from-npm")).toEqual([]);
+    expect(getPluginSettingsValues(db, "from-npm")).toEqual({});
+    expect(getInstalledPluginRegistration(db, "from-path")).toMatchObject({
+      sourceKind: "path",
+    });
   });
 
   it("keeps an offline legacy git ref unclassified", async () => {

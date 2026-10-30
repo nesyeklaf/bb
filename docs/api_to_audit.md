@@ -329,8 +329,8 @@ the lease length suits throttled background tabs.
 ## Plugin cache pruning
 
 `bb.sdk.plugins.experimental_pruneCache({ dryRun? })`
-(`POST /plugins/cache/prune`) deletes cached git and npm plugin versions
-under `<data>/plugins/cache` that no installed plugin uses and returns
+(`POST /plugins/cache/prune`) deletes cached git plugin versions and
+leftover npm-era cache entries under `<data>/plugins/cache` that no installed plugin uses and returns
 `{ dryRun, removed, bytes }`; each removed entry has `pluginId` (null for an
 unrecorded directory), `version`, `path`, and `bytes`, counting a shared
 monorepo checkout once. It removes every non-active version regardless of
@@ -2508,8 +2508,8 @@ Docs: `backend-cli-agents.md`, [provider-plugin-api.md](provider-plugin-api.md) 
    instead of waiting for the next poll.
 3. **Voice payloads.** `transcribe` receives the whole `File` in process
    (25 MB cap). Decide whether streaming matters for long recordings.
-4. **Automatic order as policy.** Core prioritizes bb cloud, then sorts
-   by plugin id and service id, including third-party plugins. Decide whether
+4. **Automatic order as policy.** Core prioritizes the thread provider's
+   service, then sorts by plugin id and service id, including third-party plugins. Decide whether
    this order and automatic inclusion should become user-editable settings.
 5. **Several services per plugin.** Confirm the id-per-registration shape and
    the per-plugin id scope (plugin id plus service id).

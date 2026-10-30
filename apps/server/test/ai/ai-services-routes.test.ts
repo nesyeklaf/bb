@@ -46,8 +46,8 @@ describe("AI services routes", () => {
     await withTestHarness({}, async (harness) => {
       registerServices(harness);
       registerFakeAiService(harness.deps.aiServices, {
-        pluginId: "bb-ai",
-        id: "bb",
+        pluginId: "provider-claude-code",
+        id: "claude-code",
         builtin: true,
       });
       const response = await harness.app.request("/api/v1/system/ai-services");
@@ -62,17 +62,21 @@ describe("AI services routes", () => {
           automaticRank,
         })),
       ).toEqual([
-        { pluginId: "bb-ai", id: "bb", automaticRank: 0 },
-        { pluginId: "helper-plugin", id: "helper", automaticRank: 1 },
-        { pluginId: "listener-plugin", id: "listener", automaticRank: 2 },
+        { pluginId: "helper-plugin", id: "helper", automaticRank: 0 },
+        { pluginId: "listener-plugin", id: "listener", automaticRank: 1 },
+        {
+          pluginId: "provider-claude-code",
+          id: "claude-code",
+          automaticRank: 2,
+        },
       ]);
       const test = await postTest(harness, { task: "thread-title" });
       expect(
         testAiServiceResponseSchema.parse(await readJson(test)),
       ).toMatchObject({
         ok: true,
-        pluginId: "bb-ai",
-        serviceId: "bb",
+        pluginId: "helper-plugin",
+        serviceId: "helper",
       });
     });
   });

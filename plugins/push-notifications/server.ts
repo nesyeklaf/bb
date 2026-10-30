@@ -5,14 +5,9 @@ import {
   defineCli,
   type BbPluginApi,
 } from "@get-bb/plugin-sdk";
-import { z } from "zod";
 import {
-  addPushSubscriptionInputSchema,
   CLIENT_NOTIFICATION_CHANNEL,
   clientChannelSchema,
-  DEFAULT_EXPO_PUSH_URL,
-  DEVICE_LABEL_MAX_LENGTH,
-  EXPO_PUSH_TOKEN_MAX_LENGTH,
   NOTIFICATION_BODY_MAX_LENGTH,
   NOTIFICATION_TITLE_MAX_LENGTH,
   pushNotificationsRpcContract,
@@ -20,7 +15,6 @@ import {
   sendNotificationRpcContract,
   type ClientNotification,
   type DeliveryChannel,
-  type PushSubscriptionSummary,
 } from "./contract.js";
 import {
   createNotificationPreferences,
@@ -33,28 +27,19 @@ import {
 import {
   createPushSender,
   SendNotificationError,
-  type CreatePushSenderArgs,
-  type LastSendOutcome,
 } from "./sender.js";
-import { createPushSubscriptionStore } from "./subscriptions.js";
 
 interface PushNotificationsPluginOptions {
   coalesceMs?: number;
-  createId?: () => string;
-  fetch?: CreatePushSenderArgs["fetch"];
   now?: () => number;
 }
 
 interface StatusView {
   enabled: true;
-  subscriptionCount: number;
-  mobileEnabled: boolean;
   webEnabled: boolean;
   desktopEnabled: boolean;
   defaultLevel: string;
   childLevel: string;
-  relayUrl: string;
-  lastSendOutcome: LastSendOutcome;
 }
 
 const JSON_OPTION = {
@@ -62,43 +47,13 @@ const JSON_OPTION = {
   description: "Emit machine-readable JSON",
 } as const;
 
-function formatSubscriptions(
-  subscriptions: readonly PushSubscriptionSummary[],
-): string {
-  if (subscriptions.length === 0) return "No push devices registered";
-  return [
-    "ID\tDevice\tPlatform\tLast seen\tToken suffix",
-    ...subscriptions.map((subscription) =>
-      [
-        subscription.id,
-        subscription.deviceLabel,
-        subscription.platform,
-        new Date(subscription.lastSeenAt).toISOString(),
-        subscription.tokenSuffix,
-      ].join("\t"),
-    ),
-  ].join("\n");
-}
-
-function formatLastOutcome(outcome: LastSendOutcome): string {
-  if (outcome.status === "never") return "Never";
-  if (outcome.status === "sent") {
-    return `Sent ${outcome.sentCount} at ${new Date(outcome.at).toISOString()}`;
-  }
-  return `Failed at ${new Date(outcome.at).toISOString()}: ${outcome.reason}`;
-}
-
 function formatStatus(status: StatusView): string {
   return [
     `Enabled: ${status.enabled}`,
-    `Mobile: ${status.mobileEnabled}`,
     `Web: ${status.webEnabled}`,
     `Desktop: ${status.desktopEnabled}`,
     `Default level: ${status.defaultLevel}`,
     `Child thread level: ${status.childLevel}`,
-    `Subscriptions: ${status.subscriptionCount}`,
-    `Relay URL: ${status.relayUrl}`,
-    `Last send: ${formatLastOutcome(status.lastSendOutcome)}`,
   ].join("\n");
 }
 
@@ -127,13 +82,6 @@ export function createPushNotificationsPlugin(
     bb: BbPluginApi,
   ): Promise<void> {
     const settings = bb.settings.define({
-      mobileEnabled: {
-        type: "boolean",
-        label: "Mobile notifications",
-        description:
-          "Send push messages to your registered phones and tablets.",
-        default: true,
-      },
       webEnabled: {
         type: "boolean",
         label: "Web notifications",
@@ -177,13 +125,6 @@ export function createPushNotificationsPlugin(
         default: "input-only",
         experimental_schema: ownNotificationLevelSchema,
       },
-      expoPushUrl: {
-        type: "string",
-        label: "Expo push relay URL",
-        description: "The Expo push relay endpoint used for mobile delivery.",
-        default: DEFAULT_EXPO_PUSH_URL,
-        experimental_schema: z.string().url(),
-      },
     });
     const preferences = createNotificationPreferences({
       bb,
@@ -197,17 +138,10 @@ export function createPushNotificationsPlugin(
       publish: (threadIds) =>
         bb.rpc.experimental_invalidate(threadIds.map((id) => `thread:${id}`)),
     });
-    const subscriptions = createPushSubscriptionStore(bb, {
-      ...(options.now === undefined ? {} : { now: options.now }),
-      ...(options.createId === undefined ? {} : { createId: options.createId }),
-    });
     const sender = createPushSender({
       bb,
-      subscriptions,
       getDeliverySettings: () => settings.get(),
-      getExpoPushUrl: async () => (await settings.get()).expoPushUrl,
       getNotificationLevel: (thread) => preferences.effectiveLevel(thread),
-      ...(options.fetch === undefined ? {} : { fetch: options.fetch }),
       ...(options.coalesceMs === undefined
         ? {}
         : { coalesceMs: options.coalesceMs }),
@@ -215,27 +149,14 @@ export function createPushNotificationsPlugin(
     });
 
     async function status(): Promise<StatusView> {
-      const [
-        {
-          expoPushUrl,
-          mobileEnabled,
-          webEnabled,
-          desktopEnabled,
-          defaultLevel,
-          childLevel,
-        },
-        rows,
-      ] = await Promise.all([settings.get(), subscriptions.list()]);
+      const { webEnabled, desktopEnabled, defaultLevel, childLevel } =
+        await settings.get();
       return {
         enabled: true,
-        subscriptionCount: rows.length,
-        mobileEnabled,
         webEnabled,
         desktopEnabled,
         defaultLevel,
         childLevel,
-        relayUrl: expoPushUrl,
-        lastSendOutcome: sender.getLastOutcome(),
       };
     }
 
@@ -265,22 +186,12 @@ export function createPushNotificationsPlugin(
       {
         experimental_discoverable: true,
         experimental_description:
-          "Notifications on bb's mobile, web and desktop channels.",
+          "Notifications on bb's web and desktop channels.",
       },
     );
 
     bb.rpc.register(pushNotificationsRpcContract, {
       "notifications.test": ({ channel }) => sendTest(channel),
-      "pushSubscriptions.list": async () => ({
-        subscriptions: await subscriptions.listSummaries(),
-      }),
-      "pushSubscriptions.add": (input) => subscriptions.add(input),
-      "pushSubscriptions.remove": async ({ id }) => {
-        if (!(await subscriptions.remove(id))) {
-          throw new Error(`Push subscription not found: ${id}`);
-        }
-        return { ok: true as const };
-      },
       "threadNotifications.keyed": async ({ keys }) => {
         const rows = await preferences.list(keys);
         return Object.fromEntries(
@@ -300,9 +211,9 @@ export function createPushNotificationsPlugin(
     bb.cli.register(
       defineCli({
         name: "push-notifications",
-        summary: "Manage mobile, web, and desktop notifications",
+        summary: "Manage web and desktop notifications",
         description:
-          "Mobile devices receive Expo push messages; web and desktop clients receive system notifications while they are open.",
+          "Web and desktop clients receive system notifications while they are open.",
         commands: {
           test: cliCommand({
             summary:
@@ -322,7 +233,6 @@ export function createPushNotificationsPlugin(
               if (!channel.success) {
                 throw new PluginCliError("Use web or desktop", {
                   code: "invalid_channel",
-                  hint: "Mobile devices are tested from the phone itself; this command only reaches web and desktop clients.",
                 });
               }
               try {
@@ -346,7 +256,7 @@ export function createPushNotificationsPlugin(
           }),
           send: cliCommand({
             summary: "Send a notification to every enabled channel",
-            description: `Uses the same delivery as thread notifications: connected web and desktop clients with permission, and every registered mobile device. The title is cut to ${NOTIFICATION_TITLE_MAX_LENGTH} characters and the body to ${NOTIFICATION_BODY_MAX_LENGTH}. With --thread, a click opens that thread; otherwise it opens bb.`,
+            description: `Uses the same delivery as thread notifications: connected web and desktop clients with permission. The title is cut to ${NOTIFICATION_TITLE_MAX_LENGTH} characters and the body to ${NOTIFICATION_BODY_MAX_LENGTH}. With --thread, a click opens that thread; otherwise it opens bb.`,
             options: {
               title: {
                 type: "string",
@@ -404,7 +314,7 @@ export function createPushNotificationsPlugin(
                   "No channel received the notification",
                   {
                     code: "not_delivered",
-                    hint: "Run `bb push-notifications status` to see which channels are on, how many devices are registered, and the last mobile send.",
+                    hint: "Run `bb push-notifications status` to see which channels are on.",
                   },
                 );
               }
@@ -413,93 +323,6 @@ export function createPushNotificationsPlugin(
                 stdout: input.options.json
                   ? JSON.stringify({ ok: true, channels })
                   : formatSent(channels),
-              };
-            },
-          }),
-          list: cliCommand({
-            summary: "List registered push devices",
-            options: { json: JSON_OPTION },
-            async run(input) {
-              const rows = await subscriptions.listSummaries();
-              return {
-                exitCode: 0,
-                stdout: input.options.json
-                  ? JSON.stringify({ subscriptions: rows })
-                  : formatSubscriptions(rows),
-              };
-            },
-          }),
-          add: cliCommand({
-            summary: "Register or refresh an Expo push device",
-            options: {
-              token: {
-                type: "string",
-                required: true,
-                placeholder: "expo-push-token",
-                aliases: ["expo-token", "push-token", "expo-push-token"],
-                description: `Expo push token the device reported, at most ${EXPO_PUSH_TOKEN_MAX_LENGTH} characters`,
-              },
-              platform: {
-                type: "enum",
-                required: true,
-                values: ["ios", "android"],
-                aliases: ["os"],
-                description: "Device operating system",
-              },
-              label: {
-                type: "string",
-                required: true,
-                placeholder: "device-label",
-                aliases: ["device-label", "device", "name"],
-                description: `Name shown for the device, at most ${DEVICE_LABEL_MAX_LENGTH} characters`,
-              },
-              json: JSON_OPTION,
-            },
-            async run(input) {
-              const parsed = addPushSubscriptionInputSchema.safeParse({
-                expoPushToken: input.options.token,
-                platform: input.options.platform,
-                deviceLabel: input.options.label,
-              });
-              if (!parsed.success) {
-                throw new PluginCliError(
-                  parsed.error.issues.map((issue) => issue.message).join("; "),
-                  { code: "invalid_device" },
-                );
-              }
-              const result = await subscriptions.add(parsed.data);
-              return {
-                exitCode: 0,
-                stdout: input.options.json
-                  ? JSON.stringify(result)
-                  : `${result.created ? "Registered" : "Refreshed"} push device ${result.id}`,
-              };
-            },
-          }),
-          remove: cliCommand({
-            summary: "Remove a registered push device",
-            positionals: [
-              {
-                name: "id",
-                description:
-                  "Subscription id, as `bb push-notifications list` prints it",
-                required: true,
-              },
-            ],
-            options: { json: JSON_OPTION },
-            async run(input) {
-              const id = input.positionals.id;
-              if (!(await subscriptions.remove(id))) {
-                throw new PluginCliError(`Push subscription not found: ${id}`, {
-                  code: "subscription_not_found",
-                  hint: "Run `bb push-notifications list` for the registered ids.",
-                });
-              }
-              return {
-                exitCode: 0,
-                stdout: input.options.json
-                  ? JSON.stringify({ id, removed: true })
-                  : `Removed push device ${id}`,
               };
             },
           }),
@@ -579,7 +402,7 @@ export function createPushNotificationsPlugin(
     );
     bb.background.service("push-sender", {
       async start(signal) {
-        await sender.start();
+        sender.start();
         try {
           await waitForAbort(signal);
         } finally {
