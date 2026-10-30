@@ -30,6 +30,16 @@ export const INFERENCE_PROCESSES = new Set([
   "ssh",
 ]);
 
+export const THIRD_PARTY_PROCESSES = new Set([
+  ...INFERENCE_PROCESSES,
+  "opencode",
+  "hermes",
+  "gemini",
+  "chromium",
+  "chrome",
+  "headless_shell",
+]);
+
 export function parseExtraHosts(value: string): string[] {
   return value
     .split(/[\s,]+/)

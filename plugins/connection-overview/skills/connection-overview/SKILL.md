@@ -18,7 +18,7 @@ bb connections incoming --since 24h
 
 `--since` takes a duration (`30m`, `24h`, `7d`) or an ISO time.
 
-States: `allowed` (local network, system resolver, or a listed host bound to the socket), `inferred` (a provider CLI or git socket whose IP only matches a fresh resolution of a listed host), `yellow` (shared by listed and unlisted names, or a stale resolution), `red` (anything else), `unverifiable` (incoming over loopback: Tailscale Serve, the old connect tunnel and local processes look the same), `undetermined` (direction unknown).
+States: `allowed` (local network, system resolver, or a listed host bound to the socket), `inferred` (a provider CLI or git socket whose IP only matches a fresh resolution of a listed host), `yellow` (shared by listed and unlisted names, or a stale resolution), `red` (anything else), `unverifiable` (incoming over loopback: Tailscale Serve, the old connect tunnel and local processes look the same), `undetermined` (direction unknown), `third-party` (an outgoing socket of a program bb starts but does not control, such as a provider or agent CLI, git or the browser-automation Chromium, that would otherwise be yellow or red; shown, never counted as red).
 
 An empty red list proves nothing on its own. Check that the measurement is alive first: start a short fetch to an unlisted host from a bb child process, see it red with `bb connections list --red --since <control start>`, then evaluate a later window that starts after the control ended with `bb connections status --since <evaluation start>`, and confirm at least one provider row in it.
 

@@ -3,7 +3,11 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { createFakePluginHost } from "@get-bb/plugin-sdk/testing";
 import { afterEach, describe, expect, it } from "vitest";
-import { INFERENCE_PROCESSES, allowedHostSet } from "./allowlist.js";
+import {
+  INFERENCE_PROCESSES,
+  THIRD_PARTY_PROCESSES,
+  allowedHostSet,
+} from "./allowlist.js";
 import {
   createCollector,
   type Cursor,
@@ -43,6 +47,7 @@ async function harness() {
       resolvers: new Set(),
       bindSubnets: [],
       inferenceProcesses: INFERENCE_PROCESSES,
+      thirdPartyProcesses: THIRD_PARTY_PROCESSES,
     }),
     loadCursor: (sourceId) => cursors.get(sourceId) ?? null,
     saveCursor: (sourceId, cursor) => cursors.set(sourceId, cursor),

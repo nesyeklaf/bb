@@ -14,7 +14,8 @@ export type ConnectionState =
   | "yellow"
   | "red"
   | "unverifiable"
-  | "undetermined";
+  | "undetermined"
+  | "third-party";
 
 export interface Resolution {
   name: string;
@@ -27,6 +28,7 @@ export interface ClassifyContext {
   resolvers: ReadonlySet<string>;
   bindSubnets: readonly Cidr[];
   inferenceProcesses: ReadonlySet<string>;
+  thirdPartyProcesses: ReadonlySet<string>;
   resolutionsFor(ip: string): readonly Resolution[];
   now: number;
 }
@@ -101,10 +103,29 @@ export function classify(
     return { direction, state: "allowed", reason: "system resolver" };
   if (direction === "undetermined")
     return { direction, state: "undetermined", reason: "direction unknown" };
+  const judged = judgeOutgoing(row.comm, ip, hostname, context);
+  if (
+    (judged.state === "red" || judged.state === "yellow") &&
+    context.thirdPartyProcesses.has(row.comm)
+  )
+    return {
+      direction,
+      state: "third-party",
+      reason: `${row.comm} is not bb: ${judged.reason}`,
+    };
+  return { direction, ...judged };
+}
+
+function judgeOutgoing(
+  comm: string,
+  ip: string,
+  hostname: string | null,
+  context: ClassifyContext,
+): Omit<Classification, "direction"> {
   if (hostname !== null) {
     return context.allowedHosts.has(normalizeHost(hostname))
-      ? { direction, state: "allowed", reason: "listed host" }
-      : { direction, state: "red", reason: "unlisted host" };
+      ? { state: "allowed", reason: "listed host" }
+      : { state: "red", reason: "unlisted host" };
   }
   const resolutions = context.resolutionsFor(ip);
   const listed = resolutions.filter((entry) =>
@@ -117,12 +138,11 @@ export function classify(
     (entry) => context.now - entry.at <= RESOLUTION_MAX_AGE_MS,
   );
   if (
-    context.inferenceProcesses.has(row.comm) &&
+    context.inferenceProcesses.has(comm) &&
     freshListed.length > 0 &&
     unlisted.length === 0
   )
     return {
-      direction,
       state: "inferred",
       reason:
         "resolves to " +
@@ -130,7 +150,6 @@ export function classify(
     };
   if (listed.length > 0 && (unlisted.length > 0 || freshListed.length === 0))
     return {
-      direction,
       state: "yellow",
       reason:
         unlisted.length > 0
@@ -139,7 +158,6 @@ export function classify(
     };
   if (unlisted.length > 0)
     return {
-      direction,
       state: "red",
       reason:
         "resolves to unlisted " +
@@ -147,9 +165,8 @@ export function classify(
     };
   if (freshListed.length > 0)
     return {
-      direction,
       state: "red",
       reason: "listed address from a process that is not a provider CLI",
     };
-  return { direction, state: "red", reason: "unknown address" };
+  return { state: "red", reason: "unknown address" };
 }

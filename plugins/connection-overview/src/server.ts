@@ -5,6 +5,7 @@ import fs from "node:fs/promises";
 import { z } from "zod";
 import {
   INFERENCE_PROCESSES,
+  THIRD_PARTY_PROCESSES,
   allowedHostSet,
   parseResolvConf,
   validateExtraHosts,
@@ -110,6 +111,7 @@ export default function connectionOverview(bb: BbPluginApi) {
       resolvers,
       bindSubnets,
       inferenceProcesses: INFERENCE_PROCESSES,
+      thirdPartyProcesses: THIRD_PARTY_PROCESSES,
     }),
     loadCursor: (sourceId) => {
       const parsed = cursorSchema.safeParse(store.loadCursor(sourceId));

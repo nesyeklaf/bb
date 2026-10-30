@@ -5,6 +5,7 @@ import {
   parseResolvConf,
   validateExtraHosts,
   INFERENCE_PROCESSES,
+  THIRD_PARTY_PROCESSES,
 } from "./allowlist.js";
 import {
   classify,
@@ -25,6 +26,7 @@ function context(
     resolvers: new Set(["100.100.100.100"]),
     bindSubnets: [],
     inferenceProcesses: INFERENCE_PROCESSES,
+    thirdPartyProcesses: THIRD_PARTY_PROCESSES,
     resolutionsFor: (ip) => resolutions[ip] ?? [],
     now: NOW,
     ...extra,
@@ -138,10 +140,20 @@ describe("classify, first match wins", () => {
       ],
     };
     expect(
-      classify(out("104.18.2.2", 443, "codex"), null, context(shared)),
+      classify(
+        out("104.18.2.2", 443, "node-MainThread"),
+        null,
+        context(shared),
+      ),
     ).toMatchObject({
       state: "yellow",
       reason: "shared by listed and unlisted names",
+    });
+    expect(
+      classify(out("104.18.2.2", 443, "codex"), null, context(shared)),
+    ).toMatchObject({
+      state: "third-party",
+      reason: "codex is not bb: shared by listed and unlisted names",
     });
     const stale = {
       "1.2.3.4": [
@@ -153,13 +165,16 @@ describe("classify, first match wins", () => {
       ],
     };
     expect(
-      classify(out("1.2.3.4", 443, "codex"), null, context(stale)),
+      classify(out("1.2.3.4", 443, "node-MainThread"), null, context(stale)),
     ).toMatchObject({ state: "yellow", reason: "stale resolution" });
   });
 
   it("marks everything else red", () => {
     expect(
-      classify(out("203.0.113.9", 443, "claude"), null, context()),
+      classify(out("203.0.113.9", 443, "node-MainThread"), null, context()),
+    ).toMatchObject({ state: "red", reason: "unknown address" });
+    expect(
+      classify(out("203.0.113.9", 443, "curl"), null, context()),
     ).toMatchObject({ state: "red", reason: "unknown address" });
   });
 
@@ -206,5 +221,48 @@ describe("allowlist settings", () => {
         "# x\nnameserver 100.100.100.100\nsearch tail.ts.net\nnameserver fd7a::53\n",
       ),
     ).toEqual(["100.100.100.100", "fd7a::53"]);
+  });
+});
+
+describe("third-party programs bb launches", () => {
+  it("marks a browser or agent CLI socket to an unknown address third-party, not red", () => {
+    for (const comm of ["chromium", "opencode", "hermes", "claude"])
+      expect(
+        classify(out("2a00:1450:4001:c13::65", 443, comm), null, context()),
+      ).toMatchObject({
+        state: "third-party",
+        reason: `${comm} is not bb: unknown address`,
+      });
+  });
+
+  it("keeps bb's own node processes red for the same address", () => {
+    expect(
+      classify(
+        out("2a00:1450:4001:c13::65", 443, "node-MainThread"),
+        null,
+        context(),
+      ),
+    ).toMatchObject({ state: "red", reason: "unknown address" });
+  });
+
+  it("still shows a provider CLI socket to a listed host as inferred", () => {
+    const resolutions = {
+      "160.79.104.10": [
+        { name: "api.anthropic.com", ip: "160.79.104.10", at: NOW },
+      ],
+    };
+    expect(
+      classify(out("160.79.104.10", 443, "claude"), null, context(resolutions)),
+    ).toMatchObject({ state: "inferred" });
+  });
+
+  it("judges incoming connections to a third-party program like any other", () => {
+    expect(
+      classify(
+        { ...out("203.0.113.9", 51000, "chromium"), localListening: true },
+        null,
+        context(),
+      ),
+    ).toMatchObject({ state: "red", reason: "external peer" });
   });
 });
