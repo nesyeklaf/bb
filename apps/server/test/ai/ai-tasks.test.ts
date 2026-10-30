@@ -12,13 +12,13 @@ import { withTestHarness } from "../helpers/test-app.js";
 const PROMPT = "Write a title for: fix the flaky login test";
 
 describe("AI task routing", () => {
-  it("tries bb cloud before other Automatic services", async () => {
+  it("tries the thread provider's service first, then the other provider's", async () => {
     await withTestHarness({}, async (harness) => {
-      const cloud = registerFakeAiService(harness.deps.aiServices, {
-        id: "bb",
-        pluginId: "bb-ai",
+      const claude = registerFakeAiService(harness.deps.aiServices, {
+        id: "claude-code",
+        pluginId: "provider-claude-code",
         builtin: true,
-        complete: async () => "Cloud title",
+        complete: async () => "Claude title",
       });
       const codex = registerFakeAiService(harness.deps.aiServices, {
         id: "codex",
@@ -27,15 +27,65 @@ describe("AI task routing", () => {
         complete: async () => "Codex title",
       });
 
-      const outcome = await runTextAiTask(harness.deps, {
+      const preferred = await runTextAiTask(harness.deps, {
+        task: "thread-title",
+        label: "test",
+        prompt: PROMPT,
+        preferredPluginId: "provider-codex",
+      });
+      expect(preferred).toMatchObject({ ok: true, value: "Codex title" });
+      expect(codex.completeCalls.map((call) => call.prompt)).toEqual([PROMPT]);
+      expect(claude.completeCalls).toEqual([]);
+
+      const unpreferred = await runTextAiTask(harness.deps, {
         task: "thread-title",
         label: "test",
         prompt: PROMPT,
       });
+      expect(unpreferred).toMatchObject({ ok: true, value: "Claude title" });
+    });
+  });
 
-      expect(outcome).toMatchObject({ ok: true, value: "Cloud title" });
-      expect(cloud.completeCalls.map((call) => call.prompt)).toEqual([PROMPT]);
-      expect(codex.completeCalls).toEqual([]);
+  it("falls back to the other provider's service when the thread provider's is not ready", async () => {
+    await withTestHarness({}, async (harness) => {
+      registerFakeAiService(harness.deps.aiServices, {
+        id: "codex",
+        pluginId: "provider-codex",
+        builtin: true,
+        status: async () => ({ ready: false, message: "Sign in to Codex" }),
+      });
+      registerFakeAiService(harness.deps.aiServices, {
+        id: "claude-code",
+        pluginId: "provider-claude-code",
+        builtin: true,
+        complete: async () => "Claude title",
+      });
+
+      await expect(
+        runTextAiTask(harness.deps, {
+          task: "commit-message",
+          label: "test",
+          prompt: PROMPT,
+          preferredPluginId: "provider-codex",
+        }),
+      ).resolves.toMatchObject({ ok: true, value: "Claude title" });
+    });
+  });
+
+  it("reports no service available when no provider registers one", async () => {
+    await withTestHarness({}, async (harness) => {
+      await expect(
+        runTextAiTask(harness.deps, {
+          task: "thread-title",
+          label: "test",
+          prompt: PROMPT,
+          preferredPluginId: "provider-codex",
+        }),
+      ).resolves.toMatchObject({
+        ok: false,
+        reason: "unavailable",
+        message: "No AI service is available",
+      });
     });
   });
 
@@ -48,8 +98,8 @@ describe("AI task routing", () => {
         status: async () => ({ ready: false, message: "Sign in to Codex" }),
       });
       registerFakeAiService(harness.deps.aiServices, {
-        id: "bb",
-        pluginId: "bb-ai",
+        id: "claude-code",
+        pluginId: "provider-claude-code",
         builtin: true,
         complete: async () => {
           throw new Error("upstream down");
@@ -184,7 +234,6 @@ describe("AI task routing", () => {
           },
           { pluginId: "a-plugin", id: "a-service", ready: true, reply: null },
           { pluginId: "0-plugin", id: "helper", ready: false, reply: "Unused" },
-          { pluginId: "bb-ai", id: "bb", ready: true, reply: null },
         ];
         for (const registration of registrations) {
           const answer = async () => {
@@ -194,7 +243,7 @@ describe("AI task routing", () => {
           };
           registerFakeAiService(harness.deps.aiServices, {
             ...registration,
-            builtin: registration.pluginId === "bb-ai",
+            builtin: false,
             complete: answer,
             transcribe: answer,
             status: async () =>
@@ -222,7 +271,6 @@ describe("AI task routing", () => {
         });
         expect(outcome).toMatchObject({ ok: true, value: "Third-party reply" });
         expect(calls).toEqual([
-          "bb-ai/bb",
           "a-plugin/a-service",
           "a-plugin/z-service",
         ]);
@@ -379,8 +427,8 @@ describe("AI task routing", () => {
         status: async () => ({ ready: true }),
       });
       registerFakeAiService(harness.deps.aiServices, {
-        id: "bb",
-        pluginId: "bb-ai",
+        id: "claude-code",
+        pluginId: "provider-claude-code",
         builtin: true,
         complete: null,
         transcribe: async () => "hello",
@@ -393,15 +441,15 @@ describe("AI task routing", () => {
         serviceId: "codex",
       });
       await harness.deps.aiServices.status({
-        pluginId: "bb-ai",
-        serviceId: "bb",
+        pluginId: "provider-claude-code",
+        serviceId: "claude-code",
       });
       expect(isAiTaskAvailable(harness.deps, "voice")).toBe(true);
 
       setAiServiceSelection(harness.deps.db, "voice", {
         mode: "service",
-        pluginId: "bb-ai",
-        serviceId: "bb",
+        pluginId: "provider-claude-code",
+        serviceId: "claude-code",
       });
       expect(isAiTaskAvailable(harness.deps, "voice")).toBe(false);
     });

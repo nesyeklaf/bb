@@ -203,7 +203,7 @@ export function AiServicesSettingsSection() {
   return (
     <SettingsSection
       title="AI services"
-      description="Choose services for thread titles, commit messages, and voice input. Automatic prefers bb cloud, then other available services. A service you choose stays selected."
+      description="Choose services for thread titles, commit messages, and voice input. Automatic uses the service of the thread's provider, then the other provider's. A service you choose stays selected."
     >
       <div className="space-y-5">
         {AI_TASK_ROWS.map((row) => {

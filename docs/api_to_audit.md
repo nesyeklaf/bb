@@ -2508,8 +2508,8 @@ Docs: `backend-cli-agents.md`, [provider-plugin-api.md](provider-plugin-api.md) 
    instead of waiting for the next poll.
 3. **Voice payloads.** `transcribe` receives the whole `File` in process
    (25 MB cap). Decide whether streaming matters for long recordings.
-4. **Automatic order as policy.** Core prioritizes bb cloud, then sorts
-   by plugin id and service id, including third-party plugins. Decide whether
+4. **Automatic order as policy.** Core prioritizes the thread provider's
+   service, then sorts by plugin id and service id, including third-party plugins. Decide whether
    this order and automatic inclusion should become user-editable settings.
 5. **Several services per plugin.** Confirm the id-per-registration shape and
    the per-plugin id scope (plugin id plus service id).

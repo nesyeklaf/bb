@@ -288,20 +288,20 @@ voice transcripts come from AI services that plugins register. Each task
 (`thread-title`, `commit-message`, `voice`) is `automatic` (default), `off`,
 or a service id; set it in Settings → AI services or with
 `bb settings ai-services set <task> <value> [--plugin <plugin-id>]` (see
-`bb guide customization`). Automatic tries bb cloud (the `bb-ai` plugin, for a
-signed-in bb account) first, then every other registered service supporting
+`bb guide customization`). Automatic tries the service of the thread's provider
+(Claude Code or Codex) first, then every other registered service supporting
 the task in lexicographic order of plugin id and service id; unavailable
-services and failed requests fall through. A picked service is used alone; if
+services and failed requests fall through. No service runs on a hosted bb
+server. A picked service is used alone; if
 it fails, titles fall back to the start of the prompt and commits to
-`bb: automated commit`. `bb ai off|on` turns bb cloud off and on; see the
-`bb-cloud-ai` skill.
+`bb: automated commit`.
 
 The removed `BB_INFERENCE`, `BB_INFERENCE_FALLBACK`, and `BB_TRANSCRIPTION`
 keys are ignored with a warning in `~/.bb/config.json`, and `bb-app config set`
 refuses them.
 
 bb accepts voice recordings up to 25 MB; a service may set a lower limit, and
-Codex transcribes up to 20 MB and bb cloud up to 10 MB. With a ChatGPT
+Codex transcribes up to 20 MB. With a ChatGPT
 subscription login, Codex transcription can be blocked by Cloudflare bot
 protection on some networks; run `codex login --with-api-key` on the primary
 machine or pick another voice service.
