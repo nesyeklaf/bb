@@ -36,6 +36,11 @@ const REPO_PLUGINS_DIRECTORY_NAME = "plugins";
 
 export const BUILTIN_PLUGINS = [
   {
+    name: "connection-overview",
+    pluginId: "bb--connection-overview",
+    defaultEnabled: true,
+  },
+  {
     name: "storage-retention",
     pluginId: "bb--storage-retention",
     defaultEnabled: false,

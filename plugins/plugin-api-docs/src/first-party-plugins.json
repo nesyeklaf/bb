@@ -140,6 +140,11 @@
     "icon": "SideChat"
   },
   {
+    "id": "bb--connection-overview",
+    "name": "Connection overview [Experimental]",
+    "icon": null
+  },
+  {
     "id": "bb--storage-retention",
     "name": "Storage & retention [Experimental]",
     "icon": null
