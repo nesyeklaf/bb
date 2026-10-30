@@ -181,10 +181,10 @@ function RowsTable({
             <tbody className="divide-y divide-border">
               {rows.map((row) => (
                 <tr key={row.key}>
-                  <td className="px-3 py-2">
+                  <td className="px-3 py-2 whitespace-nowrap">
                     <StateBadge state={row.state} />
                   </td>
-                  <td className="px-3 py-2 break-all">
+                  <td className="px-3 py-2 whitespace-nowrap">
                     {row.hostname ?? row.ip}
                   </td>
                   <td className="px-3 py-2 whitespace-nowrap tabular-nums">
@@ -195,14 +195,16 @@ function RowsTable({
                       ...new Set(row.attributions.map((entry) => entry.comm)),
                     ].join(", ")}
                   </td>
-                  <td className="px-3 py-2">{row.sourceId}</td>
+                  <td className="px-3 py-2 whitespace-nowrap">
+                    {row.sourceId}
+                  </td>
                   <td className="px-3 py-2 text-right tabular-nums">
                     {row.count}
                   </td>
                   <td className="px-3 py-2 whitespace-nowrap text-muted-foreground">
                     {formatAge(now - row.lastSeen)}
                   </td>
-                  <td className="px-3 py-2 text-muted-foreground">
+                  <td className="min-w-64 px-3 py-2 text-muted-foreground">
                     {row.reason}
                   </td>
                 </tr>

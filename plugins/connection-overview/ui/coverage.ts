@@ -25,7 +25,9 @@ export function describeCoverage(
       headline: "Not measured: the overview could not be read",
       details: [],
     };
-  const details = [...overview.problems];
+  const details = overview.problems.filter(
+    (problem) => !/^\d+ red destination\(s\)$/.test(problem),
+  );
   if (refreshFailed)
     details.push("The last refresh failed; this is older data");
   const expired = now >= staleAt(overview);
