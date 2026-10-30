@@ -702,9 +702,6 @@ host_daemon_port_temp="$host_daemon_port_file.$$.tmp"
 mv "$host_daemon_port_temp" "$host_daemon_port_file"
 complete_step "Using local host-daemon port $host_daemon_port"
 
-# The server's own build is always installed when it offers one: version
-# strings cannot distinguish unpublished builds, so an existing bb-app is
-# trusted only when the server provides no package (404) or is unreachable.
 package_url="${server_url%/}/install/bb-app.tgz"
 package_dir=$(mktemp -d "${TMPDIR:-/tmp}/bb-app.XXXXXX")
 package_file="$package_dir/bb-app.tgz"
@@ -814,14 +811,6 @@ elif [ "$package_status" -ge 200 ] && [ "$package_status" -lt 300 ]; then
   fi
   bb_app_npm_prefix=$machine_npm_prefix
   complete_step "Installed the server's bb-app build"
-elif command -v bb-app >/dev/null 2>&1; then
-  rm -f "$host_artifact_digest_file"
-  bb_app=$(command -v bb-app)
-  if [ "$package_status" = 404 ]; then
-    warning_step "The server does not provide its bb-app package; using bb-app at $bb_app"
-  else
-    warning_step "Could not download the server's bb-app package (HTTP $package_status); using bb-app at $bb_app"
-  fi
 elif [ "$package_status" = 404 ]; then
   rm -rf "$package_dir"
   rm -f "$host_artifact_digest_file"
@@ -863,8 +852,7 @@ fi
 
 if [ "$adopt" = no ]; then
   bb_cli="${bb_app%/*}/bb"
-  if [ ! -x "$bb_cli" ]; then bb_cli=$(command -v bb || true); fi
-  if [ -z "$bb_cli" ]; then
+  if [ ! -x "$bb_cli" ]; then
     fail_step "The installed build does not provide the machine enrollment CLI."
     exit 1
   fi

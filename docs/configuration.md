@@ -649,8 +649,9 @@ An explicit provider must be installed and available. Set them with
 `bb settings general defaultMachineAccess <provider-id-or-null>`.
 
 **Daemon updates.** Machines install the host package from the owning server
-(falling back to npm only when the server has no package route) under the
-machine's bb data directory, so enrollment needs no `sudo`. Installed services
+under the machine's bb data directory, so enrollment needs no `sudo`. A server
+without a package route fails the install; there is no fallback to npm or to a
+`bb-app` already on PATH. Installed services
 run with `--auto-update`: daemons follow newer server protocols, never
 downgrade, and retry failures with backoff from 5 seconds to 5 minutes. Remove
 the flag from the launchd plist or systemd user unit and reload the service to

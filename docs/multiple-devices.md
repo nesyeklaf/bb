@@ -160,10 +160,10 @@ machine the new machine will depend on.
 
 The installer always installs the exact host-only `bb-app` package exposed by
 that server at `/install/bb-app.tgz`: the host daemon, provider/plugin workers,
-native host dependencies, and bundled `bb` CLI, but no web app or server. A
-`bb-app` already on PATH is used only when the server provides no package
-(Linux and macOS); without either, the install fails with a clear message and
-never falls back to the npm registry. The installer verifies the route's SHA-256 digest and
+native host dependencies, and bundled `bb` CLI, but no web app or server. When
+the server provides no package, or the download fails, the install fails with a
+clear message; it never uses a `bb-app` already on PATH and never falls back to
+the npm registry. The installer verifies the route's SHA-256 digest and
 skips reinstalling an identical artifact. Like `/install.sh`, the package route
 is public. npm installs the package into the machine's bb data directory, not
 its system-wide global prefix, so enrollment needs neither `sudo` nor a PATH
