@@ -103,45 +103,6 @@ const authorSchema = z
   })
   .strict();
 
-const npmSourceSchema = z
-  .object({
-    npm: z
-      .object({
-        package: z
-          .string()
-          .min(1)
-          .superRefine((value, ctx) => {
-            try {
-              const parsed = parsePluginSource(`npm:${value}`);
-              if (
-                parsed.kind !== "npm" ||
-                parsed.name !== value ||
-                parsed.spec.length !== 0
-              ) {
-                throw new Error("package name is ambiguous");
-              }
-            } catch (error) {
-              ctx.addIssue({
-                code: "custom",
-                message: error instanceof Error ? error.message : String(error),
-              });
-            }
-          }),
-        range: semverRange.optional(),
-        tag: z
-          .string()
-          .min(1)
-          .regex(/^[A-Za-z][A-Za-z0-9._-]*$/u)
-          .optional(),
-        registry: httpsUrl.optional(),
-      })
-      .strict()
-      .refine((npm) => npm.range === undefined || npm.tag === undefined, {
-        message: "range and tag are mutually exclusive",
-      }),
-  })
-  .strict();
-
 const gitSubdirSchema = z
   .string()
   .min(1)
@@ -227,7 +188,7 @@ const marketplaceEntryV1Schema = z
     icon: iconSchema,
     tags: z.array(z.string().max(32).regex(TAG_PATTERN)).max(10).optional(),
     author: authorSchema,
-    source: z.union([npmSourceSchema, gitSourceSchema]),
+    source: gitSourceSchema,
   })
   .strict();
 
@@ -412,11 +373,7 @@ function parseMarketplaceManifestWithBundledPolicy(
   const plugins = parsed.data.plugins.filter((entry) => {
     if ("bundled" in entry.source) return true;
     const range =
-      "npm" in entry.source
-        ? entry.source.npm.range
-        : "range" in entry.source.git
-          ? entry.source.git.range
-          : undefined;
+      "range" in entry.source.git ? entry.source.git.range : undefined;
     if (range === undefined || semver.validRange(range) !== null) return true;
     warn?.(
       `marketplace entry "${entry.id}" was skipped because source range ${JSON.stringify(range)} is not valid semver`,
@@ -597,11 +554,6 @@ export function resolveEntryIcon(
 
 export function entryRepositoryUrl(entry: MarketplaceEntry): string | null {
   if ("bundled" in entry.source) return null;
-  if ("npm" in entry.source) {
-    return entry.source.npm.registry === undefined
-      ? `https://www.npmjs.com/package/${entry.source.npm.package}`
-      : null;
-  }
   const git = entry.source.git;
   const repository = git.url.replace(/\.git$/u, "");
   if (git.subdir === undefined) return repository;
@@ -615,14 +567,6 @@ export function entrySourceDisplay(entry: MarketplaceEntry): string {
   if ("bundled" in entry.source) {
     return `builtin:${entry.source.bundled.plugin}`;
   }
-  if ("npm" in entry.source) {
-    const spec = entry.source.npm.range ?? entry.source.npm.tag ?? "";
-    const registry =
-      entry.source.npm.registry === undefined
-        ? ""
-        : ` (registry ${entry.source.npm.registry})`;
-    return `npm:${entry.source.npm.package}${spec.length === 0 ? "" : `@${spec}`}${registry}`;
-  }
   const git = entry.source.git;
   const subdir = git.subdir === undefined ? "" : `#${git.subdir}`;
   if ("ref" in git) return `git:${git.url}@${git.ref}${subdir}`;
@@ -633,7 +577,6 @@ export function entrySourceDisplay(entry: MarketplaceEntry): string {
 interface ResolvedEntrySource {
   source: string;
   selection: PluginSourceSelection;
-  npmRegistry?: string;
 }
 
 export function resolvedEntrySource(
@@ -643,16 +586,6 @@ export function resolvedEntrySource(
     return {
       source: `builtin:${entry.source.bundled.plugin}`,
       selection: ROOT_PLUGIN_SOURCE_SELECTION,
-    };
-  }
-  if ("npm" in entry.source) {
-    const spec = entry.source.npm.range ?? entry.source.npm.tag ?? "";
-    return {
-      source: `npm:${entry.source.npm.package}${spec.length === 0 ? "" : `@${spec}`}`,
-      selection: ROOT_PLUGIN_SOURCE_SELECTION,
-      ...(entry.source.npm.registry === undefined
-        ? {}
-        : { npmRegistry: entry.source.npm.registry }),
     };
   }
   const git = entry.source.git;

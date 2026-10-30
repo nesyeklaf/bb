@@ -62,10 +62,6 @@ describe("plugin catalog routes", () => {
         installCatalogPlugin: async () => {
           throw new Error("unexpected catalog install");
         },
-        resolveCatalogNpmSource: async () => ({
-          outcome: "unavailable" as const,
-          detail: "no registry in this test",
-        }),
       },
     });
     const app = new Hono();
@@ -223,7 +219,10 @@ describe("plugin catalog routes", () => {
             icon: "Zap",
             author: { name: "Acme" },
             source: {
-              npm: { package: "bb-plugin-notes", range: "^1.0.0" },
+              git: {
+                url: "https://example.com/acme/notes.git",
+                ref: "1234567890abcdef1234567890abcdef12345678",
+              },
             },
           },
         ],
@@ -347,12 +346,13 @@ describe("plugin catalog routes", () => {
           kind: "marketplace",
           marketplace: "acme-plugins",
           official: false,
-          source: "npm:bb-plugin-notes@^1.0.0",
+          source:
+            "git:https://example.com/acme/notes.git@1234567890abcdef1234567890abcdef12345678",
           resolvedSource: {
-            kind: "npm",
-            package: "bb-plugin-notes",
-            range: "^1.0.0",
-            unresolvedReason: "no registry in this test",
+            kind: "git",
+            url: "https://example.com/acme/notes.git",
+            ref: "1234567890abcdef1234567890abcdef12345678",
+            resolvedCommit: "1234567890abcdef1234567890abcdef12345678",
           },
         },
       });
@@ -374,15 +374,15 @@ describe("plugin catalog routes", () => {
         entryId: "notes",
         marketplace: "acme-plugins",
         confirmedSource: {
-          kind: "npm",
-          package: "bb-plugin-notes",
-          range: "^1.0.0",
-          unresolvedReason: "no registry in this test",
+          kind: "git",
+          url: "https://example.com/acme/notes.git",
+          ref: "1234567890abcdef1234567890abcdef12345678",
+          resolvedCommit: "abcdef1234567890abcdef1234567890abcdef12",
         },
       });
       expect(install.status).toBe(422);
       await expect(install.json()).resolves.toMatchObject({
-        error: expect.stringContaining("the npm source could not be resolved"),
+        error: expect.stringContaining("source changed after confirmation"),
       });
 
       const unknownMarketplace = await postJson(

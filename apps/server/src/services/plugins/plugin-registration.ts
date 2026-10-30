@@ -7,7 +7,6 @@ import {
   getInstalledPluginRegistration,
   listUnnormalizedPluginRegistrations,
   normalizeInstalledPluginRegistration,
-  setInstalledPluginSourceClassification,
   upsertInstalledPlugin,
   type InstalledPluginRow,
   type LegacyPluginExactResolution,
@@ -53,7 +52,6 @@ import {
   gitResolvedVersion,
   resolveGitRef,
   type GitRefKind,
-  type NpmSourceIntentForResolution,
   type PluginResolvedUpdateVersion,
 } from "./update-resolver.js";
 
@@ -436,58 +434,9 @@ export function createPluginRegistration(context: PluginRegistrationContext) {
     });
   }
 
-  function npmIntentForRow(
-    row: InstalledPluginRow,
-  ): NpmSourceIntentForResolution {
-    if (
-      row.sourceKind !== "npm" ||
-      row.sourceNpmPackage === null ||
-      row.sourceNpmRegistry === null ||
-      row.sourceNpmRequestedSpec === null
-    ) {
-      throw new Error(`plugin "${row.id}" has corrupt normalized npm state`);
-    }
-    let specKind = row.sourceNpmSpecKind;
-    if (specKind === null) {
-      const parsed = parsePluginSource(
-        row.sourceNpmRequestedSpec.length === 0
-          ? `npm:${row.sourceNpmPackage}`
-          : `npm:${row.sourceNpmPackage}@${row.sourceNpmRequestedSpec}`,
-      );
-      if (parsed.kind !== "npm") {
-        throw new Error(`plugin "${row.id}" has corrupt normalized npm state`);
-      }
-      specKind = parsed.specKind;
-      if (
-        !setInstalledPluginSourceClassification(deps.db, row.id, {
-          kind: "npm",
-          specKind,
-        })
-      ) {
-        throw new Error(`plugin "${row.id}" disappeared during normalization`);
-      }
-    }
-    return {
-      packageName: row.sourceNpmPackage,
-      registry: row.sourceNpmRegistry,
-      requestedSpec: row.sourceNpmRequestedSpec,
-      specKind,
-    };
-  }
-
   function installedUpdateVersion(
     row: InstalledPluginRow,
   ): PluginResolvedUpdateVersion {
-    if (row.sourceKind === "npm") {
-      if (row.sourceNpmPackage === null || row.npmResolvedVersion === null) {
-        throw new Error(`plugin "${row.id}" has corrupt normalized npm state`);
-      }
-      return {
-        version: row.npmResolvedVersion,
-        label: row.npmResolvedVersion,
-        display: `${row.sourceNpmPackage}@${row.npmResolvedVersion}`,
-      };
-    }
     if (row.sourceKind === "git") {
       const ref = gitRefNameForRow(row);
       if (
@@ -530,8 +479,6 @@ export function createPluginRegistration(context: PluginRegistrationContext) {
     if (row.sourceKind === "builtin" && row.sourceBuiltinName !== null) {
       return { kind: "builtin", name: row.sourceBuiltinName };
     }
-    if (row.sourceKind === "npm")
-      return { kind: "npm", ...npmIntentForRow(row) };
     if (row.sourceKind === "git") {
       const selector = gitSelectorForRow(row);
       if (row.sourceGitUrl !== null && selector !== null) {
@@ -551,17 +498,6 @@ export function createPluginRegistration(context: PluginRegistrationContext) {
   ): PluginExactResolution {
     if (row.sourceKind === "path" || row.sourceKind === "builtin") {
       return { kind: row.sourceKind };
-    }
-    if (
-      row.sourceKind === "npm" &&
-      row.npmResolvedVersion !== null &&
-      row.npmIntegrity !== null
-    ) {
-      return {
-        kind: "npm",
-        version: row.npmResolvedVersion,
-        integrity: row.npmIntegrity,
-      };
     }
     if (row.sourceKind === "git" && row.gitResolvedCommit !== null) {
       return { kind: "git", commit: row.gitResolvedCommit };
@@ -710,6 +646,7 @@ export function createPluginRegistration(context: PluginRegistrationContext) {
 
   async function backfillNormalizedPluginRegistrations(): Promise<void> {
     for (const row of listUnnormalizedPluginRegistrations(deps.db)) {
+      if (row.source.startsWith("npm:")) continue;
       const parsed = parsePluginSource(row.source);
       let sourceIntent: NormalizeLegacyInstalledPluginInput["sourceIntent"];
       let exactResolution: LegacyPluginExactResolution;
@@ -721,20 +658,6 @@ export function createPluginRegistration(context: PluginRegistrationContext) {
         provenance = { kind: "builtin" };
         sourceIntent = { kind: "builtin", name: parsed.name };
         exactResolution = { kind: "builtin" };
-      } else if (parsed.kind === "npm") {
-        sourceIntent = {
-          kind: "npm",
-          packageName: parsed.name,
-          registry:
-            process.env.npm_config_registry ?? "https://registry.npmjs.org",
-          requestedSpec: parsed.spec,
-          specKind: parsed.specKind,
-        };
-        exactResolution = {
-          kind: "npm",
-          version: parsed.specKind === "exact" ? parsed.spec : row.version,
-          integrity: null,
-        };
       } else {
         const ref =
           parsed.selector.kind === "range" ? parsed.spec : parsed.selector.ref;
@@ -778,7 +701,6 @@ export function createPluginRegistration(context: PluginRegistrationContext) {
     installBuiltinSource,
     installPathSource,
     installedUpdateVersion,
-    npmIntentForRow,
     provenanceForRow,
     reconcileBundled,
     registerInstalled,

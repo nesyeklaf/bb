@@ -68,7 +68,9 @@ function manifestWith(entry: Record<string, unknown>): Record<string, unknown> {
         description: "An Acme plugin.",
         icon: "ZoomIn",
         author: { name: "Acme" },
-        source: { npm: { package: "bb-plugin-acme" } },
+        source: {
+          git: { url: "https://example.com/acme/plugin.git", ref: "v1.2.3" },
+        },
         ...entry,
       },
     ],
@@ -84,7 +86,7 @@ function rangeFixture(label: string, range: string, valid: boolean): Fixture {
     label,
     valid,
     manifest: manifestWith({
-      source: { npm: { package: "bb-plugin-acme", range } },
+      source: { git: { url: "https://example.com/acme/plugin.git", range } },
     }),
   };
 }
@@ -94,7 +96,7 @@ function enginesFixture(label: string, engines: unknown): Fixture {
 }
 
 const fixtures: readonly Fixture[] = [
-  { label: "minimal npm entry", valid: true, manifest: manifestWith({}) },
+  { label: "minimal entry", valid: true, manifest: manifestWith({}) },
   {
     label: "git entry",
     valid: true,
@@ -138,15 +140,6 @@ const fixtures: readonly Fixture[] = [
     label: "unknown entry field",
     valid: false,
     manifest: manifestWith({ surprise: true }),
-  },
-  {
-    label: "npm range and tag together",
-    valid: false,
-    manifest: manifestWith({
-      source: {
-        npm: { package: "bb-plugin-acme", range: "^1.0.0", tag: "beta" },
-      },
-    }),
   },
 
   iconFixture("absolute https icon", "https://cdn.example.com/a.svg", true),
@@ -291,14 +284,18 @@ const v2Fixtures: readonly Fixture[] = [
     label: "partial prerelease range",
     valid: true,
     manifest: manifestV2With({
-      source: { npm: { package: "bb-plugin-acme", range: "1.x-alpha" } },
+      source: {
+        git: { url: "https://example.com/acme/plugin.git", range: "1.x-alpha" },
+      },
     }),
   },
   {
     label: "partial range with build metadata",
     valid: true,
     manifest: manifestV2With({
-      source: { npm: { package: "bb-plugin-acme", range: "1.2+build" } },
+      source: {
+        git: { url: "https://example.com/acme/plugin.git", range: "1.2+build" },
+      },
     }),
   },
   {
@@ -306,7 +303,10 @@ const v2Fixtures: readonly Fixture[] = [
     valid: true,
     manifest: manifestV2With({
       source: {
-        npm: { package: "bb-plugin-acme", range: ">=1.2.3-alpha" },
+        git: {
+          url: "https://example.com/acme/plugin.git",
+          range: ">=1.2.3-alpha",
+        },
       },
     }),
   },
@@ -314,7 +314,9 @@ const v2Fixtures: readonly Fixture[] = [
     label: "double equals partial range",
     valid: true,
     manifest: manifestV2With({
-      source: { npm: { package: "bb-plugin-acme", range: "==1.2" } },
+      source: {
+        git: { url: "https://example.com/acme/plugin.git", range: "==1.2" },
+      },
     }),
   },
   {
@@ -322,8 +324,8 @@ const v2Fixtures: readonly Fixture[] = [
     valid: true,
     manifest: manifestV2With({
       source: {
-        npm: {
-          package: "bb-plugin-acme",
+        git: {
+          url: "https://example.com/acme/plugin.git",
           range: ">=1.0.0 ".repeat(33).trim(),
         },
       },
@@ -335,10 +337,7 @@ const v2Fixtures: readonly Fixture[] = [
     manifest: manifestV2With({
       author: { name: "Acme", url: "HTTPS://example.com/acme" },
       source: {
-        npm: {
-          package: "bb-plugin-acme",
-          registry: "HTTPS://registry.example.com/",
-        },
+        git: { url: "HTTPS://example.com/acme/plugin.git", ref: "v1.2.3" },
       },
     }),
   },
@@ -347,15 +346,6 @@ const v2Fixtures: readonly Fixture[] = [
     valid: true,
     manifest: manifestV2With({
       author: { name: "Acme", url: "https://" },
-    }),
-  },
-  {
-    label: "malformed npm registry URL",
-    valid: true,
-    manifest: manifestV2With({
-      source: {
-        npm: { package: "bb-plugin-acme", registry: "https://" },
-      },
     }),
   },
   {
@@ -456,11 +446,6 @@ describe("published marketplace schema parity", () => {
     const manifests = [
       manifestV2With({
         source: {
-          npm: { package: "bb-plugin-acme", regsitry: "https://npm.test/" },
-        },
-      }),
-      manifestV2With({
-        source: {
           git: {
             url: "https://example.com/acme.git",
             ref: "v1.0.0",
@@ -506,7 +491,9 @@ describe("published marketplace schema parity", () => {
           description: "An Acme plugin.",
           icon: "ZoomIn",
           author: { name: "Acme" },
-          source: { npm: { package: `bb-plugin-acme-${index}` } },
+          source: {
+            git: { url: "https://example.com/acme/plugin.git", ref: "v1.2.3" },
+          },
         })),
       };
 

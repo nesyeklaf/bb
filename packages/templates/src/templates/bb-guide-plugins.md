@@ -13,7 +13,7 @@ optional entry that runs on enrolled hosts, UI, agent skills and tools, and
 
 Builtin plugins (`builtin:<name>`) ship with bb and install automatically.
 Official store plugins ship with the app and install on request; third-party
-plugins come from marketplaces, Git, npm, or a local path. Plugin state lives
+plugins come from marketplaces, Git, or a local path. Plugin state lives
 under `<bb-data-dir>/plugins/<id>/` (SQLite database, secrets, logs).
 
   bb plugin search <query>       Search the store: the bundled official
@@ -25,8 +25,7 @@ under `<bb-data-dir>/plugins/<id>/` (SQLite database, secrets, logs).
                                  memory, tasks, github, ...),
                                  <entry-id>@<marketplace>, a Git repository
                                  URL, a local path, builtin:<name>,
-                                 git:<url>[@<ref|semver-range>], or
-                                 npm:<package>[@<version|tag|range>].
+                                 git:<url>[@<ref|semver-range>].
                                  Installs ask for confirmation; --yes skips it.
                                  --subdirectory <path> or --plugin <name>
                                  selects one plugin of a multi-plugin
@@ -86,7 +85,7 @@ under `<bb-data-dir>/plugins/<id>/` (SQLite database, secrets, logs).
                                  secrets, and schedules (local path sources
                                  stay on disk; builtin removals are
                                  remembered)
-  bb plugin prune [--dry-run]    Delete cached git:/npm: plugin versions no
+  bb plugin prune [--dry-run]    Delete cached git: plugin versions no
                                  installed plugin uses (left by earlier bb
                                  releases, rolled-back updates, or
                                  interrupted operations) and leftover cache
@@ -270,19 +269,18 @@ demand and `bb plugin update` applies compatible candidates. Reinstalling an
 installed managed plugin is refused; use `bb plugin update`. A failed
 activation restores the previous version and leaves the failure visible.
 
-Exact npm versions, Git tags and commits, path sources, and bundled official
-plugins are pinned. npm ranges, dist-tags, and omitted specs, omitted Git refs
-(the default branch), Git branches, and Git semver ranges track compatible
-updates. Change a pinned git:/npm: source with `bb plugin remove` (which
+Git tags and commits, path sources, and bundled official plugins are pinned.
+Omitted Git refs (the default branch), Git branches, and Git semver ranges track compatible
+updates. Change a pinned git: source with `bb plugin remove` (which
 deletes settings, secrets, and schedules) and a fresh install. Edit a local
 path plugin in place and `bb plugin reload <id>`, or move it with
 `bb plugin install path:<new dir>`; both keep its configuration.
 
-Managed git:/npm: installs refuse engines.bb and engines.bbPluginSdk
+Managed git: installs refuse engines.bb and engines.bbPluginSdk
 mismatches, manifest and artifact identity mismatches, and ids reserved by
 bundled plugins. Git and path installs build the plugin on install (git
 sources need `git`; bb ships its own npm), and a build failure fails the
-install. npm packages must ship their prebuilt app and host bundles.
+install.
 
 Git semver ranges
 

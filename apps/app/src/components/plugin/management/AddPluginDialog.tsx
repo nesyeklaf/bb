@@ -86,17 +86,6 @@ function buildRequest(
 function resolvedSourceRows(
   source: PluginCatalogResolvedSource,
 ): { label: string; value: string; href?: string }[] {
-  if (source.kind === "npm") {
-    return [
-      {
-        label: "npm package",
-        value: `${source.package}@${source.range ?? source.tag ?? "latest"}`,
-      },
-      ...(source.registry === undefined
-        ? []
-        : [{ label: "registry", value: source.registry }]),
-    ];
-  }
   return [
     { label: "repository", value: source.url, href: source.url },
     ...(source.subdir === undefined
@@ -291,7 +280,7 @@ function AddPluginDialogContent({
         </DialogTitle>
         <DialogDescription>
           {initial === null
-            ? "Install from npm, a Git repository, or a local path."
+            ? "Install from a Git repository or a local path."
             : thirdParty
               ? "Install this plugin from the source its marketplace lists."
               : "Install this plugin, bundled with BB."}
@@ -324,7 +313,7 @@ function AddPluginDialogContent({
               onChange={(event) => setSourceText(event.target.value)}
             />
             <p className="mt-1.5 text-2xs text-subtle-foreground">
-              GitHub repository URL · npm:package[@version] · ./local/path
+              GitHub repository URL · ./local/path
             </p>
           </div>
         )}

@@ -506,7 +506,7 @@ function formatAbsoluteDate(value: number): string {
 function dualInterpretationError(source: string): string {
   return (
     `Could not resolve "${source}" as either a catalog plugin or a path on disk. ` +
-    "Use a Git repository URL, path:<path>, npm:<package>, git:<url>[@<ref>], or " +
+    "Use a Git repository URL, path:<path>, git:<url>[@<ref>], or " +
     "git:<url>@<semver-range> to choose an interpretation explicitly."
   );
 }
@@ -566,9 +566,7 @@ async function resolveInstallIntent(
   input: string,
 ): Promise<InstallIntent> {
   if (
-    ["path:", "npm:", "git:", "builtin:"].some((prefix) =>
-      input.startsWith(prefix),
-    )
+    ["path:", "git:", "builtin:"].some((prefix) => input.startsWith(prefix))
   ) {
     if (input.startsWith("path:")) {
       const path = resolve(input.slice(5));
@@ -626,15 +624,6 @@ async function resolveInstallIntent(
 }
 
 function resolvedSourceLines(source: PluginCatalogResolvedSource): string[] {
-  if (source.kind === "npm") {
-    const spec = source.range ?? source.tag ?? "latest";
-    return [
-      `  npm package: ${source.package}@${spec}`,
-      ...(source.registry === undefined
-        ? []
-        : [`  registry: ${source.registry}`]),
-    ];
-  }
   const lines = [`  git repository: ${source.url}`];
   if (source.subdir !== undefined) {
     lines.push(`  subdirectory: ${source.subdir}`);
@@ -1013,8 +1002,6 @@ export function registerPluginCommands(
         if (source.resolvedTag !== undefined) {
           console.log(`  tag: ${source.resolvedTag}`);
         }
-        if (source.registry) console.log(`  registry: ${source.registry}`);
-        if (source.integrity) console.log(`  integrity: ${source.integrity}`);
         if (source.engines.bb) {
           console.log(`  engines.bb: ${source.engines.bb}`);
         }
@@ -1040,7 +1027,7 @@ export function registerPluginCommands(
   plugin
     .command("install <source>")
     .description(
-      "Install a catalog entry by name or <entry>@<marketplace>, a Git repository URL, a local path, builtin:<name>, git:<url>[@<ref|semver-range>], or npm:<name>@<version>. A catalog entry from a third-party marketplace is not reviewed by BB, so its confirmation names the marketplace, the author, and the exact resolved source (managed sources validate engines ranges and build artifacts; bundled plugin ids are reserved)",
+      "Install a catalog entry by name or <entry>@<marketplace>, a Git repository URL, a local path, builtin:<name>, or git:<url>[@<ref|semver-range>]. A catalog entry from a third-party marketplace is not reviewed by BB, so its confirmation names the marketplace, the author, and the exact resolved source (managed sources validate engines ranges and build artifacts; bundled plugin ids are reserved)",
     )
     .option(
       "--subdirectory <path>",
@@ -1386,7 +1373,7 @@ export function registerPluginCommands(
             if (!shouldAttempt) {
               if (result.outcome === "pinned") {
                 console.log(
-                  `${result.id}: skipped — pinned${detail ? ` (${detail})` : ""}; remove and reinstall with a tracking npm range, git branch, or git semver range to receive updates (remove deletes the plugin's settings, secrets, and schedules). A local path plugin updates with \`bb plugin reload\`; move it with \`bb plugin install path:<new directory>\`.`,
+                  `${result.id}: skipped — pinned${detail ? ` (${detail})` : ""}; remove and reinstall with a tracking git branch, or git semver range to receive updates (remove deletes the plugin's settings, secrets, and schedules). A local path plugin updates with \`bb plugin reload\`; move it with \`bb plugin install path:<new directory>\`.`,
                 );
               } else if (result.outcome === "incompatible") {
                 console.log(
@@ -2060,7 +2047,7 @@ export function registerPluginCommands(
     .command("remove <id>")
     .alias("uninstall")
     .description(
-      "Remove an installed plugin and delete its settings, secrets, and schedules (git:/npm: managed files are deleted; local path sources stay on disk). To move a local plugin to another directory, install the new path instead",
+      "Remove an installed plugin and delete its settings, secrets, and schedules (git: managed files are deleted; local path sources stay on disk). To move a local plugin to another directory, install the new path instead",
     )
     .option("--json", "Output JSON")
     .addOption(new Option("--yes").hideHelp())

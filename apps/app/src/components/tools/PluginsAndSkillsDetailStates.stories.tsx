@@ -65,10 +65,8 @@ function PluginStoryQueryBoundary({ children }: { children: ReactNode }) {
       "enterprise-issue-tracker-synchronization",
     ]) {
       client.setQueryData(pluginSourceQueryKey(pluginId), {
-        requested: `npm:@bb-plugins/${pluginId}`,
+        requested: `git:https://example.invalid/bb-plugins/${pluginId}.git`,
         resolved: "1.4.0",
-        integrity: null,
-        registry: "npm",
         engines: { bb: null, bbPluginSdk: null },
         installedAt: new Date(2026, 6, 8).getTime(),
         history: [],
@@ -345,13 +343,13 @@ export function SkillDetailStates() {
 
 const PLUGIN: PluginListItem = makePluginListItem({
   id: "github",
-  source: "npm:@bb-plugins/github",
+  source: "git:github.com/bb-plugins/github@main",
   rootDir: "/Users/you/.bb/plugins/github",
   version: "1.4.0",
   description: "Browse GitHub issues and pull requests without leaving bb.",
   name: "GitHub",
   icon: "Github",
-  sourceDisplay: "npm · @bb-plugins/github",
+  sourceDisplay: "git · github.com/bb-plugins/github",
 });
 
 const NEXT_RUN_AT = new Date(2027, 0, 15, 9).getTime();

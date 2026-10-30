@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://getbb.app/schemas/marketplace.schema.json",
   "title": "BB plugin marketplace manifest",
-  "description": "A catalog of plugin listings with store branding. Entries point at npm packages or git repositories; BB's install pipeline stays authoritative for identity and compatibility.",
+  "description": "A catalog of plugin listings with store branding. Entries point at git repositories; BB's install pipeline stays authoritative for identity and compatibility.",
   "type": "object",
   "additionalProperties": false,
   "required": ["schemaVersion", "name", "displayName", "plugins"],
@@ -115,43 +115,9 @@
         },
         "source": {
           "oneOf": [
-            { "$ref": "#/$defs/npmSource" },
             { "$ref": "#/$defs/gitRefSource" },
             { "$ref": "#/$defs/gitRangeSource" }
           ]
-        }
-      }
-    },
-    "npmSource": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": ["npm"],
-      "properties": {
-        "npm": {
-          "type": "object",
-          "additionalProperties": false,
-          "required": ["package"],
-          "$comment": "range and tag are mutually exclusive.",
-          "not": {
-            "required": ["range", "tag"]
-          },
-          "properties": {
-            "package": {
-              "type": "string",
-              "pattern": "^(?:@[a-z0-9][a-z0-9._~-]*/)?[a-z0-9][a-z0-9._~-]*$"
-            },
-            "range": {
-              "$ref": "#/$defs/semverRange"
-            },
-            "tag": {
-              "type": "string",
-              "pattern": "^[A-Za-z][A-Za-z0-9._-]*$"
-            },
-            "registry": {
-              "type": "string",
-              "pattern": "^https://"
-            }
-          }
         }
       }
     },

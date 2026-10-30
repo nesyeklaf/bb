@@ -220,9 +220,10 @@ describe("marketplace manifest schema", () => {
           manifestV2([
             entry({
               source: {
-                npm: {
-                  package: "bb-plugin-widgets",
-                  regsitry: "https://npm.test/",
+                git: {
+                  url: "https://github.com/acme/plugins.git",
+                  ref: "v1.0.0",
+                  futureField: true,
                 },
               },
             }),
@@ -239,7 +240,10 @@ describe("marketplace manifest schema", () => {
           entry({
             id: "invalid-range",
             source: {
-              npm: { package: "bb-plugin-invalid", range: "not-semver" },
+              git: {
+                url: "https://github.com/acme/plugins.git",
+                range: "not-semver",
+              },
             },
           }),
           entry(),
@@ -387,34 +391,6 @@ describe("marketplace manifest schema", () => {
   });
 
   describe("sources", () => {
-    it("rejects npm package names the install pipeline cannot parse", () => {
-      for (const packageName of ["../plugin", "name@version", "--registry"]) {
-        expect(() =>
-          parse([
-            entry({
-              source: { npm: { package: packageName, range: "^1.0.0" } },
-            }),
-          ]),
-        ).toThrow(/npm package|ambiguous/);
-      }
-    });
-
-    it("rejects an npm entry that sets both range and tag", () => {
-      expect(() =>
-        parse([
-          entry({
-            source: {
-              npm: {
-                package: "bb-plugin-widgets",
-                range: "^1.0.0",
-                tag: "beta",
-              },
-            },
-          }),
-        ]),
-      ).toThrow(/mutually exclusive/);
-    });
-
     it("rejects a git subdir that escapes the repository", () => {
       for (const subdir of ["../evil", "/abs/path", "plugins/../../evil"]) {
         expect(() =>
@@ -527,23 +503,6 @@ describe("marketplace manifest schema", () => {
       expect(entrySourceDisplay(git)).toBe(
         "git:https://github.com/acme/plugins.git@v1.0.0#plugins/widgets",
       );
-
-      const npm = firstEntry([
-        entry({
-          source: {
-            npm: {
-              package: "bb-plugin-widgets",
-              range: "^1.0.0",
-              registry: "https://npm.acme.test",
-            },
-          },
-        }),
-      ]);
-      expect(resolvedEntrySource(npm)).toEqual({
-        source: "npm:bb-plugin-widgets@^1.0.0",
-        selection: { kind: "root" },
-        npmRegistry: "https://npm.acme.test",
-      });
     });
   });
 
@@ -597,29 +556,6 @@ describe("marketplace manifest schema", () => {
       expect(entryRepositoryUrl(reserved)).toBe(
         "https://github.com/acme/plugins/tree/HEAD/plugins/c%23/what%3F",
       );
-    });
-
-    it("links the public npm page only for the default registry", () => {
-      const publicPackage = firstEntry([
-        entry({
-          source: { npm: { package: "@acme/widgets", range: "^1.0.0" } },
-        }),
-      ]);
-      expect(entryRepositoryUrl(publicPackage)).toBe(
-        "https://www.npmjs.com/package/@acme/widgets",
-      );
-      const privatePackage = firstEntry([
-        entry({
-          source: {
-            npm: {
-              package: "bb-plugin-widgets",
-              range: "^1.0.0",
-              registry: "https://npm.acme.test",
-            },
-          },
-        }),
-      ]);
-      expect(entryRepositoryUrl(privatePackage)).toBeNull();
     });
   });
 

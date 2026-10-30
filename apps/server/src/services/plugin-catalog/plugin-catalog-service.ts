@@ -156,7 +156,7 @@ export function createPluginCatalogService(deps: {
   dataDir: string;
   plugins: Pick<
     PluginService,
-    "installOfficialPlugin" | "installCatalogPlugin" | "resolveCatalogNpmSource"
+    "installOfficialPlugin" | "installCatalogPlugin"
   >;
   bundledPlugins?: readonly BundledPluginRegistration[];
   notifyCatalogChanged?: () => void;
@@ -724,37 +724,6 @@ export function createPluginCatalogService(deps: {
     }
   }
 
-  async function resolveNpmEntrySource(
-    npm: Extract<MarketplaceEntry["source"], { npm: unknown }>["npm"],
-  ): Promise<PluginCatalogResolvedSource> {
-    const base = npmSourceView(npm);
-    try {
-      const resolved = await deps.plugins.resolveCatalogNpmSource({
-        packageName: npm.package,
-        ...(npm.registry === undefined ? {} : { registry: npm.registry }),
-        requestedSpec: npm.range ?? npm.tag ?? "",
-        specKind:
-          npm.range !== undefined
-            ? "range"
-            : npm.tag !== undefined
-              ? "tag"
-              : "default",
-      });
-      if (resolved.outcome === "unavailable") {
-        return { ...base, unresolvedReason: resolved.detail };
-      }
-      return {
-        ...base,
-        resolvedVersion: resolved.version,
-        ...(resolved.integrity.length === 0
-          ? {}
-          : { resolvedIntegrity: resolved.integrity }),
-      };
-    } catch (error) {
-      return { ...base, unresolvedReason: marketplaceErrorMessage(error) };
-    }
-  }
-
   async function resolvedEntrySourceView(
     entry: MarketplaceEntry,
     official: boolean,
@@ -762,19 +731,15 @@ export function createPluginCatalogService(deps: {
     if ("bundled" in entry.source) {
       throw new Error("a bundled marketplace entry has no remote source");
     }
-    if ("npm" in entry.source) {
-      const npm = entry.source.npm;
-      if (official) return npmSourceView(npm);
-      return resolveNpmEntrySource(npm);
-    }
     const git = entry.source.git;
     if (official) return gitSourceView(git);
     return resolveGitEntrySource(git);
   }
 
-  type ConfirmedEntryBinding =
-    | { kind: "git"; commit: string }
-    | { kind: "npm"; version: string; integrity: string | undefined };
+  interface ConfirmedEntryBinding {
+    kind: "git";
+    commit: string;
+  }
 
   async function installMarketplaceEntry(
     row: PluginMarketplaceRow,
@@ -791,18 +756,7 @@ export function createPluginCatalogService(deps: {
       pluginId: entry.id,
       source: resolved.source,
       selection: resolved.selection,
-      ...(resolved.npmRegistry === undefined
-        ? {}
-        : { npmRegistry: resolved.npmRegistry }),
-      ...(binding?.kind === "git" ? { expectedGitCommit: binding.commit } : {}),
-      ...(binding?.kind === "npm"
-        ? {
-            expectedNpmVersion: binding.version,
-            ...(binding.integrity === undefined
-              ? {}
-              : { expectedNpmIntegrity: binding.integrity }),
-          }
-        : {}),
+      ...(binding === undefined ? {} : { expectedGitCommit: binding.commit }),
     });
   }
 
@@ -820,18 +774,6 @@ export function createPluginCatalogService(deps: {
       throw new Error(
         "install refused: the marketplace source changed after confirmation; review it again",
       );
-    }
-    if (current.kind === "npm") {
-      if (current.resolvedVersion === undefined) {
-        throw new Error(
-          `install refused: the npm source could not be resolved (${current.unresolvedReason ?? "no version"})`,
-        );
-      }
-      return {
-        kind: "npm",
-        version: current.resolvedVersion,
-        integrity: current.resolvedIntegrity,
-      };
     }
     if (current.resolvedCommit === undefined) {
       throw new Error(
@@ -1170,18 +1112,6 @@ function gitSourceView(
   };
 }
 
-function npmSourceView(
-  npm: Extract<MarketplaceEntry["source"], { npm: unknown }>["npm"],
-): Extract<PluginCatalogResolvedSource, { kind: "npm" }> {
-  return {
-    kind: "npm",
-    package: npm.package,
-    ...(npm.range === undefined ? {} : { range: npm.range }),
-    ...(npm.tag === undefined ? {} : { tag: npm.tag }),
-    ...(npm.registry === undefined ? {} : { registry: npm.registry }),
-  };
-}
-
 function installedPluginMayComeFromEntry(
   plugin: InstalledPluginRow,
   entry: MarketplaceEntry,
@@ -1195,9 +1125,6 @@ function installedPluginMayComeFromEntry(
     case "catalog":
       return false;
     case "direct":
-      if ("npm" in entry.source) {
-        return plugin.sourceNpmPackage === entry.source.npm.package;
-      }
       if ("git" in entry.source) {
         return (
           plugin.sourceGitUrl !== null &&

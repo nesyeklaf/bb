@@ -21,7 +21,6 @@ import {
 import { createMigratedConnection } from "@bb/db/testing";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { createPluginCatalogService } from "../../../src/services/plugin-catalog/plugin-catalog-service.js";
-import type { PluginService } from "../../../src/services/plugins/plugin-service.js";
 
 const run = promisify(execFile);
 
@@ -64,6 +63,12 @@ function manifest(
   };
 }
 
+const SHA = "1234567890abcdef1234567890abcdef12345678";
+
+function notesSource(ref: string) {
+  return { git: { url: "https://github.com/acme/notes.git", ref } };
+}
+
 describe("third-party marketplaces", () => {
   let db: DbConnection;
   let dataDir: string;
@@ -92,7 +97,7 @@ describe("third-party marketplaces", () => {
     documents?: Record<string, unknown>;
     icons?: Record<string, Record<string, Buffer>>;
     warn?: (message: string) => void;
-    resolveNpm?: PluginService["resolveCatalogNpmSource"];
+    beforeInstall?: () => Promise<void>;
   }) {
     const catalog = createPluginCatalogService({
       db,
@@ -105,15 +110,9 @@ describe("third-party marketplaces", () => {
         },
         installCatalogPlugin: async (args: unknown) => {
           installedCatalogEntries.push(args);
+          await options?.beforeInstall?.();
           throw new Error("catalog installation stopped by test");
         },
-        resolveCatalogNpmSource:
-          options?.resolveNpm ??
-          (async () => ({
-            outcome: "resolved" as const,
-            version: "1.4.2",
-            integrity: "sha512-listed",
-          })),
       },
       ...(options?.warn === undefined ? {} : { warn: options.warn }),
     });
@@ -620,11 +619,11 @@ describe("third-party marketplaces", () => {
           entry({
             id: "notes",
             displayName: "Beta Notes",
-            source: { npm: { package: "bb-plugin-notes" } },
+            source: notesSource(SHA),
           }),
         ]),
         [ACME_URL]: manifest("acme-plugins", [
-          entry({ source: { npm: { package: "bb-plugin-notes" } } }),
+          entry({ source: notesSource(SHA) }),
         ]),
       },
     });
@@ -641,10 +640,10 @@ describe("third-party marketplaces", () => {
         entryId: "notes",
         marketplace: "acme-plugins",
         confirmedSource: {
-          kind: "npm",
-          package: "bb-plugin-notes",
-          resolvedVersion: "1.4.2",
-          resolvedIntegrity: "sha512-listed",
+          kind: "git",
+          url: "https://github.com/acme/notes.git",
+          ref: SHA,
+          resolvedCommit: SHA,
         },
       }),
     ).rejects.toThrow("catalog installation stopped by test");
@@ -653,10 +652,9 @@ describe("third-party marketplaces", () => {
         marketplace: "acme-plugins",
         entryId: "notes",
         pluginId: "notes",
-        source: "npm:bb-plugin-notes",
+        source: `git:https://github.com/acme/notes.git@${SHA}`,
         selection: { kind: "root" },
-        expectedNpmVersion: "1.4.2",
-        expectedNpmIntegrity: "sha512-listed",
+        expectedGitCommit: SHA,
       },
     ]);
   });
@@ -674,10 +672,6 @@ describe("third-party marketplaces", () => {
         installCatalogPlugin: async () => {
           throw new Error("unexpected catalog install");
         },
-        resolveCatalogNpmSource: async () => ({
-          outcome: "unavailable" as const,
-          detail: "no registry in this test",
-        }),
       },
     });
 
@@ -693,7 +687,7 @@ describe("third-party marketplaces", () => {
     const catalog = service({
       documents: {
         [ACME_URL]: manifest("acme-plugins", [
-          entry({ source: { npm: { package: "bb-plugin-notes" } } }),
+          entry({ source: notesSource(SHA) }),
         ]),
       },
     });
@@ -703,10 +697,10 @@ describe("third-party marketplaces", () => {
       catalog.install({
         entryId: "notes",
         confirmedSource: {
-          kind: "npm",
-          package: "bb-plugin-notes",
-          resolvedVersion: "1.4.2",
-          resolvedIntegrity: "sha512-listed",
+          kind: "git",
+          url: "https://github.com/acme/notes.git",
+          ref: SHA,
+          resolvedCommit: SHA,
         },
       }),
     ).rejects.toThrow("catalog installation stopped by test");
@@ -719,7 +713,7 @@ describe("third-party marketplaces", () => {
   it("refuses a third-party source that changed after confirmation", async () => {
     const documents: Record<string, unknown> = {
       [ACME_URL]: manifest("acme-plugins", [
-        entry({ source: { npm: { package: "bb-plugin-notes" } } }),
+        entry({ source: notesSource(SHA) }),
       ]),
     };
     const catalog = service({ documents });
@@ -731,7 +725,9 @@ describe("third-party marketplaces", () => {
     if (plan.kind !== "marketplace") throw new Error("expected a listing");
 
     documents[ACME_URL] = manifest("acme-plugins", [
-      entry({ source: { npm: { package: "bb-plugin-notes-impostor" } } }),
+      entry({
+        source: notesSource("abcdef1234567890abcdef1234567890abcdef12"),
+      }),
     ]);
     await catalog.refreshMarketplaces({ name: "acme-plugins" });
 
@@ -1014,40 +1010,6 @@ describe("third-party marketplaces", () => {
           : undefined,
       ).toBeDefined();
     });
-
-    it("describes an npm listing by package, range, and registry", async () => {
-      const catalog = service({
-        documents: {
-          [ACME_URL]: manifest("acme-plugins", [
-            entry({
-              source: {
-                npm: {
-                  package: "bb-plugin-notes",
-                  tag: "beta",
-                  registry: "https://npm.acme.test",
-                },
-              },
-            }),
-          ]),
-        },
-      });
-      await catalog.addMarketplace({ source: ACME_URL, subdirectory: null });
-
-      const plan = await catalog.installPlan({
-        entryId: "notes",
-        marketplace: "acme-plugins",
-      });
-      expect(plan).toMatchObject({
-        kind: "marketplace",
-        source: "npm:bb-plugin-notes@beta",
-        resolvedSource: {
-          kind: "npm",
-          package: "bb-plugin-notes",
-          tag: "beta",
-          registry: "https://npm.acme.test",
-        },
-      });
-    });
   });
 
   it("adds a local manifest larger than 1 MiB", async () => {
@@ -1072,95 +1034,19 @@ describe("third-party marketplaces", () => {
     ]);
   });
 
-  it("binds an npm install to the exact version it confirmed", async () => {
-    const npmEntry = entry({
-      source: { npm: { package: "bb-plugin-notes", range: "^1.0.0" } },
-    });
-    let resolvedVersion = "1.4.2";
-    const catalog = service({
-      documents: {
-        [ACME_URL]: manifest("acme-plugins", [npmEntry]),
-      },
-      resolveNpm: async () => ({
-        outcome: "resolved" as const,
-        version: resolvedVersion,
-        integrity: `sha512-${resolvedVersion}`,
-      }),
-    });
-    await catalog.addMarketplace({ source: ACME_URL, subdirectory: null });
-
-    const plan = await catalog.installPlan({
-      entryId: "notes",
-      marketplace: "acme-plugins",
-    });
-    expect(plan).toMatchObject({
-      kind: "marketplace",
-      resolvedSource: {
-        kind: "npm",
-        package: "bb-plugin-notes",
-        range: "^1.0.0",
-        resolvedVersion: "1.4.2",
-        resolvedIntegrity: "sha512-1.4.2",
-      },
-    });
-    if (plan.kind !== "marketplace") throw new Error("expected a marketplace");
-
-    resolvedVersion = "1.5.0";
-    await expect(
-      catalog.install({
-        entryId: "notes",
-        marketplace: "acme-plugins",
-        confirmedSource: plan.resolvedSource,
-      }),
-    ).rejects.toThrow(/source changed after confirmation/u);
-    expect(installedCatalogEntries).toEqual([]);
-
-    const current = await catalog.installPlan({
-      entryId: "notes",
-      marketplace: "acme-plugins",
-    });
-    if (current.kind !== "marketplace") {
-      throw new Error("expected a marketplace");
-    }
-    await expect(
-      catalog.install({
-        entryId: "notes",
-        marketplace: "acme-plugins",
-        confirmedSource: current.resolvedSource,
-      }),
-    ).rejects.toThrow("catalog installation stopped by test");
-    expect(installedCatalogEntries).toEqual([
-      expect.objectContaining({
-        expectedNpmVersion: "1.5.0",
-        expectedNpmIntegrity: "sha512-1.5.0",
-      }),
-    ]);
-  });
-
   it("holds the marketplace lock across an install", async () => {
     const order: string[] = [];
     let release = (): void => {};
     const gate = new Promise<void>((resolve) => {
       release = resolve;
     });
-    let resolveCalls = 0;
     const catalog = service({
       documents: {
         [ACME_URL]: manifest("acme-plugins", [
-          entry({
-            source: { npm: { package: "bb-plugin-notes", range: "^1.0.0" } },
-          }),
+          entry({ source: notesSource(SHA) }),
         ]),
       },
-      resolveNpm: async () => {
-        resolveCalls += 1;
-        if (resolveCalls > 1) await gate;
-        return {
-          outcome: "resolved" as const,
-          version: "1.4.2",
-          integrity: "sha512-listed",
-        };
-      },
+      beforeInstall: () => gate,
     });
     await catalog.addMarketplace({ source: ACME_URL, subdirectory: null });
     const plan = await catalog.installPlan({

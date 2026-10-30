@@ -409,7 +409,6 @@ describe("builtin plugin reconciliation", () => {
     const legacyRows = [
       ["legacy-path", `path:${fixtureRoot}`, 1, 101],
       ["legacy-builtin", "builtin:fixture", 0, 102],
-      ["legacy-npm", "npm:bb-plugin-legacy@1.2.3", 1, 103],
       ["legacy-git", `git:github.com/acme/bb-plugin-legacy@${sha}`, 0, 104],
     ] as const;
     const insert = db.$client.prepare(
@@ -438,14 +437,6 @@ describe("builtin plugin reconciliation", () => {
       provenance: "builtin",
       sourceKind: "builtin",
       sourceBuiltinName: "fixture",
-    });
-    expect(getInstalledPluginRegistration(db, "legacy-npm")).toMatchObject({
-      enabled: true,
-      removedAt: 103,
-      sourceKind: "npm",
-      sourceNpmPackage: "bb-plugin-legacy",
-      sourceNpmRequestedSpec: "1.2.3",
-      npmResolvedVersion: "1.2.3",
     });
     expect(getInstalledPluginRegistration(db, "legacy-git")).toMatchObject({
       enabled: false,

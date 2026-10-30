@@ -192,7 +192,7 @@ const STORY_PLUGINS = buildUpdateInventoryPlugins([
     id: "github-pr-status",
     name: "GitHub PR Status",
     icon: "GitPullRequest",
-    source: "npm:@acme/github-pr-status@^1.2.0",
+    source: "git:github.com/acme/github-pr-status@^1.2.0",
     version: "1.2.0",
     updateState: {
       outcome: "update-available",
@@ -222,7 +222,7 @@ const STORY_PLUGINS = buildUpdateInventoryPlugins([
     id: "notes",
     name: "Notes",
     icon: "File",
-    source: "npm:@acme/notes@^2.0.0",
+    source: "git:github.com/acme/notes@^2.0.0",
     version: "2.3.0",
     updateState: {
       outcome: "incompatible",
@@ -234,7 +234,7 @@ const STORY_PLUGINS = buildUpdateInventoryPlugins([
   makePluginListItem({
     id: "pinned",
     name: "Pinned",
-    source: "npm:@acme/pinned@1.0.0",
+    source: "git:github.com/acme/pinned@v1.0.0",
     updateState: { outcome: "pinned" },
   }),
 ]);

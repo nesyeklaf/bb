@@ -940,7 +940,12 @@ describe("plugin service", () => {
             icon: "Zap",
             category: "acme-tools",
             author: { name: "Acme" },
-            source: { npm: { package: "bb-plugin-installed-tool" } },
+            source: {
+              git: {
+                url: "https://github.com/acme/bb-plugin-installed-tool.git",
+                ref: "v1.0.0",
+              },
+            },
           },
         ],
       }),

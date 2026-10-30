@@ -117,10 +117,6 @@ describe("plugin catalog service", () => {
           installedCatalogEntries.push(args);
           throw new Error("catalog installation stopped by test");
         },
-        resolveCatalogNpmSource: async () => ({
-          outcome: "unavailable" as const,
-          detail: "no registry in this test",
-        }),
       },
       ...(options?.bundledPlugins === undefined
         ? {}
