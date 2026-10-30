@@ -24,7 +24,7 @@ const pluginList = (id: string, source: string) => ({
       provenance: "direct",
       publisherLabel: null,
       isOrphanedBuiltin: false,
-      sourceDisplay: `npm · ${id} · tracks compatible`,
+      sourceDisplay: `git · ${id} · tracks compatible`,
       updateState: {},
       enabled: true,
       description: null,
@@ -121,10 +121,8 @@ describe("bb plugin update commands", () => {
   it("source renders resolved source and activation history", async () => {
     vi.mocked(fetch).mockResolvedValueOnce(
       Response.json({
-        requested: "npm:notes@^1",
+        requested: "git:github.com/acme/notes@^1",
         resolved: "1.2.0",
-        integrity: "sha512-test",
-        registry: "https://registry.npmjs.org",
         engines: { bb: ">=0.9", bbPluginSdk: "^0.2.0" },
         installedAt: 1_752_300_000_000,
         history: [
@@ -137,7 +135,7 @@ describe("bb plugin update commands", () => {
     await runCommand(["plugin", "source", "notes"], register);
 
     const output = collectLogPayloads(vi.mocked(console.log)).join("\n");
-    expect(output).toContain("requested: npm:notes@^1");
+    expect(output).toContain("requested: git:github.com/acme/notes@^1");
     expect(output).toContain("resolved: 1.2.0");
     expect(output).toContain("engines.bbPluginSdk: ^0.2.0");
     expect(output).toContain("1.1.0");
@@ -238,7 +236,7 @@ describe("bb plugin update commands", () => {
     await runCommand(["plugin", "update", "notes"], register);
 
     expect(collectLogPayloads(vi.mocked(console.log)).join("\n")).toContain(
-      "remove and reinstall with a tracking npm range, git branch, or git semver range",
+      "remove and reinstall with a tracking git branch or git semver range",
     );
     expect(fetch).toHaveBeenCalledTimes(1);
   });
@@ -264,7 +262,9 @@ describe("bb plugin update commands", () => {
           ],
         }),
       )
-      .mockResolvedValueOnce(Response.json(pluginList("notes", "npm:notes@^1")))
+      .mockResolvedValueOnce(
+        Response.json(pluginList("notes", "git:github.com/acme/notes@^1")),
+      )
       .mockResolvedValueOnce(Response.json({ job }, { status: 202 }));
     await runCommand(
       ["plugin", "update", "notes", "--yes", "--no-wait"],
@@ -308,7 +308,9 @@ describe("bb plugin update commands", () => {
           ],
         }),
       )
-      .mockResolvedValueOnce(Response.json(pluginList("good", "npm:good@^1")))
+      .mockResolvedValueOnce(
+        Response.json(pluginList("good", "git:github.com/acme/good@^1")),
+      )
       .mockResolvedValueOnce(
         Response.json({
           applied: true,
@@ -341,7 +343,9 @@ describe("bb plugin update commands", () => {
           ],
         }),
       )
-      .mockResolvedValueOnce(Response.json(pluginList("notes", "npm:notes@^1")))
+      .mockResolvedValueOnce(
+        Response.json(pluginList("notes", "git:github.com/acme/notes@^1")),
+      )
       .mockResolvedValueOnce(
         Response.json({
           applied: false,
@@ -372,7 +376,9 @@ describe("bb plugin update commands", () => {
     };
     vi.mocked(fetch)
       .mockResolvedValueOnce(Response.json(update))
-      .mockResolvedValueOnce(Response.json(pluginList("notes", "npm:notes@^1")))
+      .mockResolvedValueOnce(
+        Response.json(pluginList("notes", "git:github.com/acme/notes@^1")),
+      )
       .mockResolvedValueOnce(
         Response.json(
           { error: "signature verification failed" },
@@ -394,7 +400,7 @@ describe("bb plugin update commands", () => {
     vi.mocked(fetch)
       .mockResolvedValueOnce(Response.json(update))
       .mockResolvedValueOnce(
-        Response.json(pluginList("notes", "npm:notes@^1")),
+        Response.json(pluginList("notes", "git:github.com/acme/notes@^1")),
       );
     await expect(
       runCommand(["plugin", "update", "notes"], register),
