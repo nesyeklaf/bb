@@ -12,6 +12,7 @@ export const BUILTIN_ALLOWED_HOSTS = [
   "auth.openai.com",
   "chatgpt.com",
   "ab.chatgpt.com",
+  "registry.npmjs.org",
   "github.com",
   "api.github.com",
   "codeload.github.com",
