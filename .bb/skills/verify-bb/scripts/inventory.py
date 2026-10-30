@@ -117,8 +117,7 @@ def collect(repo):
         slug = manifest.parent.name
         add(f'plugin:{slug}', under(f'plugins/{slug}/'), [f'plugin-{slug}'], True)
     for app, owner in [
-        ('desktop', 'desktop'), ('mobile', 'mobile'), ('web', 'hosted-web'),
-        ('connect', 'cloud-gateway'), ('demo-server', 'developer-fixtures'),
+        ('desktop', 'desktop'), ('mobile', 'mobile'),
     ]:
         add(f'app:{app}', under(f'apps/{app}/'), [owner], True)
     add('server-and-daemon', under('apps/server/src/', 'apps/host-daemon/src/'), CORE_PAGES)

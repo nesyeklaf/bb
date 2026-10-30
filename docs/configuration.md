@@ -202,8 +202,7 @@ Tailscale IPs), or the hostname in `BB_APP_URL`. For a custom DNS name or
 reverse proxy, set `BB_APP_URL` (for example `https://bb.example.com`) before
 connecting, including from the CLI or SDK; a matching `Host`/`Origin` or
 `X-Forwarded-Host` cannot authorize an unconfigured name. A proxy can preserve
-the configured host or forward to localhost. bb connect needs no additional
-configuration.
+the configured host or forward to localhost.
 
 ## General settings
 
@@ -626,7 +625,8 @@ Grok and Claude-compatible plugin skills.
 ## Multi-machine
 
 Multi-machine execution lets this server dispatch work to host daemons on
-other machines; it is independent of browser access (Tailscale, bb connect).
+other machines; it is independent of browser access (Tailscale Serve or
+`BB_SERVER_BIND_HOST`).
 Add, rename, and remove machines in Settings → Machines; see
 `bb guide machines` for the CLI.
 
@@ -640,7 +640,8 @@ the SDK and CLI, and machine credentials cannot change it. Read it with
 **Machine server access.** `machineServerUrl` (Settings → Machines → Server URL
 reachable by machines; HTTP or HTTPS without embedded credentials) falls back
 to `BB_EXTERNAL_URL` when unset. `defaultMachineAccess` selects the access
-provider; unset selects bb connect, and `direct` (Manual) uses your own URL.
+provider; unset selects the first registered access provider, or `direct`
+(Manual, your own URL) when none is registered.
 An explicit provider must be installed and available. Set them with
 `bb settings general machineServerUrl <url-or-null>` and
 `bb settings general defaultMachineAccess <provider-id-or-null>`.
@@ -675,8 +676,8 @@ changing them:
 - `serverHeaders`: private request headers from the access provider, passed to
   the daemon and its bundled `bb` CLI through `BB_SERVER_HEADERS` (a JSON
   string map) for enrollment, HTTP, WebSocket, and proxy requests.
-- `machineCredential` and `connectMachineId`: the legacy bb connect form;
-  `machineCredential` is sent as the `x-bb-connect-machine` header.
+- `machineCredential` and `connectMachineId` from older installs are ignored
+  and dropped when bb rewrites the file.
 
 These secret fields are omitted from `bb-app config list`.
 
@@ -887,8 +888,7 @@ off. An experiment you set yourself keeps your value either way.
 - `websocketCompression` (on for early adopters) lets the realtime client
   WebSocket (`/ws`) negotiate `permessage-deflate`, so messages of 1 KB or more,
   such as timeline pushes, are compressed (about 4x for timeline JSON). It
-  helps clients that reach the server over a network, including bb connect
-  next; the bb connect relay re-frames messages and does not carry it.
+  helps clients that reach the server over a network.
   Terminal, host daemon, and plugin WebSockets are never compressed. The server
   reads the experiment when a client connects, so a toggle applies when the
   app reconnects.
@@ -1184,50 +1184,6 @@ or a plugin's `<pluginId>/<actionId>`. Bare legacy ids and `core/<id>` keys
 migrate to current keys. A key whose action is hidden for a row, or whose
 plugin is not installed, is skipped on that row.
 
-### Connect and bb account
-
-Remote access makes this server reachable at `https://<handle>.getbb.app` once
-it is signed in to a getbb.app account. The builtin bb account plugin holds the
-server credential in its plugin KV (in `bb.db`); the builtin connect plugin
-holds the tunnel while the server runs. See the `bb-account` skill for signing
-in and the `share-server-links` skill for `bb connect` and port shares.
-
-| Connect setting          | Default | Effect                                                                                                                 |
-| ------------------------ | ------- | ---------------------------------------------------------------------------------------------------------------------- |
-| `remoteAccess`           | `true`  | The Remote access switch; `false` closes the tunnel and machine shares without signing out. Also `bb connect off\|on`. |
-| `sendRemoteInstructions` | `true`  | "Tell agents about remote access"; `false` suppresses Connect's remote-use agent message without disabling sharing.    |
-
-`bb plugin disable connect` cuts off all remote access. `--server` and
-`--base-url` on `bb connect` and `bb account login` accept only
-`https://getbb.app` and `https://vibecodethis.site` (plus
-`http://bb.localhost:<port>` in a development build).
-
-Settings → Mobile pairs the bb mobile app (`bb connect machine-code`, see `bb guide machines`). Mobile
-builds, and publishing
-are documented in [`apps/mobile/README.md`](../apps/mobile/README.md).
-
-### Connect next (beta)
-
-The builtin connect-next plugin is disabled by default. Enabled
-(`bb plugin enable bb--connect-next`) and switched on, it also makes this server
-reachable at `https://<label>.next.getbb.app` through the Fly gate, next to
-its connect address. The domain follows the bb account: `next.<host of the
-account's base URL>` (`next.vibecodethis.site` on staging). While it is on,
-every enrolled machine's daemon also serves the ports shared from it with
-`bb connect expose <port> --host <machine>` at
-`https://<machine-label>--<port>.next.getbb.app`, downloading `frpc` into
-`<daemon data dir>/connect-next/frp/`. See the `connect-next` skill and
-[`connect-next.md`](connect-next.md).
-
-| Connect next setting | Default | Effect                                                                      |
-| -------------------- | ------- | --------------------------------------------------------------------------- |
-| `enabled`            | `true`  | "Reach this bb at its next address (beta)". Also `bb connect-next on\|off`. |
-
-| Variable                 | Effect                                                                                                                            |
-| ------------------------ | --------------------------------------------------------------------------------------------------------------------------------- |
-| `BB_CONNECT_FRPC`        | Path of an `frpc` binary to run instead of the frp 0.71.0 release the plugin (or a host daemon) downloads and verifies.           |
-| `BB_CONNECT_NEXT_SERVER` | `ws://host:port` or `wss://host:port` of the frp server to dial instead of `wss://tunnel.<next domain>` derived from the account. |
-
 ### Browser Automation
 
 The Browser Automation plugin installs its pinned `dev-browser` release on
@@ -1241,11 +1197,11 @@ isolated development smoke tests only, `DEV_BROWSER_SMOKE_BINARY` and
 
 The bundled MCP server plugin is disabled by default; enable it with
 `bb plugin enable bb--mcp`. It serves a Model Context Protocol endpoint at
-`/mcp` on the bb connect address and at `/api/v1/plugins/bb--mcp/http/mcp` on
-loopback (`bb mcp status` prints both). Remote apps sign in through the bb
-account, and an approved app can run any `bb` command; `bb mcp clients` lists
-them and `bb mcp revoke <grant-id>` disconnects one. The loopback address needs
-no sign-in and has the same trust as the local `bb` CLI. See the `mcp` skill.
+`/api/v1/plugins/bb--mcp/http/mcp` (`bb mcp status` prints the loopback
+address). The endpoint needs no sign-in and has the same trust as the `bb`
+CLI: a client can run any `bb` command. Devices on your tailnet or WireGuard
+network reach the same path on an address listed in `BB_SERVER_BIND_HOST`.
+Requests from web pages are refused. See the `mcp` skill.
 
 ## Desktop browser cookie discovery
 

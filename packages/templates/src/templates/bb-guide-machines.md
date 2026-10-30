@@ -22,9 +22,9 @@ off, nothing can reach bb and running threads may stop. The server machine
 cannot be removed.
 
 The server listens on loopback by default. Remote execution machines need
-a server access provider: paired bb Connect, or a configured direct URL reachable
-from the target, such as a private Tailscale Serve URL. A configured URL alone
-does not prove reachability.
+a server access provider or a configured direct URL reachable from the target,
+such as a private Tailscale Serve URL or a `BB_SERVER_BIND_HOST` address. A
+configured URL alone does not prove reachability.
 
   bb machine list                         List persistent machines with role, ID, type,
                                           connection status, and relative last-seen time
@@ -165,24 +165,12 @@ instead of `--path` to clone the project's Git remote there; `--remote-url` and
 Set Machines → Server URL reachable by machines, or run `bb settings general
 machineServerUrl https://bb.example.com`. An unset value uses BB_EXTERNAL_URL.
 Set Default machine access with
-`bb settings general defaultMachineAccess direct` or `connect`; `null` uses
-the first registered access provider, or direct when none is registered. An
-unpaired provider reports setup required. `bb settings show --json` includes
-fresh provider availability and the effective selection; failed or timed-out
-checks report unavailable. Machines use this access for ongoing runtime
-requests, including account-pool endpoints. A machine on bb connect access holds
-a getbb.app machine credential that `bb machine remove` revokes; if that
-revocation fails, revoke the machine in the getbb.app dashboard.
-
-Remote access through getbb.app comes from the bundled bb account and Connect
-plugins: `bb account login|status|logout` signs this server in (bb-account
-skill), and `bb connect status|on|off|expose|unexpose|unexpose-all|shares`
-serves it at `<handle>.getbb.app` and shares HTTP ports from any enrolled host
-(share-server-links skill). `bb connect servers` lists every bb on the account.
-`bb connect machine-code` mints a one-time, 10-minute code that pairs the bb
-mobile app (also shown under Settings → Mobile → Add mobile device); `--json`
-prints `{code, serverUrl, apex, expiresAt}`. Without an installed bb, pair a
-dashboard code with `npx -p bb-app@latest bb connect --code <code>`.
+`bb settings general defaultMachineAccess direct` or a plugin provider id;
+`null` uses the first registered access provider, or direct when none is
+registered. An unpaired provider reports setup required. `bb settings show
+--json` includes fresh provider availability and the effective selection;
+failed or timed-out checks report unavailable. Machines use this access for
+ongoing runtime requests, including account-pool endpoints.
 
 ## Move the server
 

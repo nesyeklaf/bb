@@ -6,11 +6,11 @@ function problem(headers: Record<string, string>) {
 }
 
 describe("mcpAccessProblem", () => {
-  it("lets a local caller with no gate headers through", () => {
+  it("lets a caller without an origin through", () => {
     expect(problem({})).toBeNull();
   });
 
-  it("refuses a local request that comes from a web page", () => {
+  it("refuses a request that comes from a web page", () => {
     expect(problem({ origin: "https://evil.example" })).toMatchObject({
       status: 403,
     });
@@ -19,32 +19,13 @@ describe("mcpAccessProblem", () => {
     });
   });
 
-  it.each(["session", "machine", "", "OAuth"])(
-    "refuses a gate request authenticated as %j",
-    (kind) => {
-      expect(
-        problem({ "x-bb-gate-auth": kind, "x-bb-gate-oauth-scope": "bb" }),
-      ).toMatchObject({ status: 403 });
-    },
-  );
-
-  it("lets a gate request with an OAuth token for bb through", () => {
-    expect(
-      problem({ "x-bb-gate-auth": "oauth", "x-bb-gate-oauth-scope": "bb" }),
-    ).toBeNull();
+  it("gives the old gate OAuth headers no access of their own", () => {
     expect(
       problem({
+        origin: "https://evil.example",
         "x-bb-gate-auth": "oauth",
-        "x-bb-gate-oauth-scope": "openid bb",
+        "x-bb-gate-oauth-scope": "bb",
       }),
-    ).toBeNull();
-  });
-
-  it("refuses an OAuth request without the bb scope", () => {
-    for (const scope of ["", "openid", "bbx", "bb:all"]) {
-      expect(
-        problem({ "x-bb-gate-auth": "oauth", "x-bb-gate-oauth-scope": scope }),
-      ).toMatchObject({ status: 403 });
-    }
+    ).toMatchObject({ status: 403 });
   });
 });

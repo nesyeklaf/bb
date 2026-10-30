@@ -164,8 +164,8 @@ Each bundled plugin documents its commands and behavior in its own skill.
   fenced `inline-vis` code block or a `::inline-vis{file="demo.html"}`
   workspace or thread-storage file; see the `inline-vis` skill.
 - MCP server (builtin, disabled by default): `bb plugin enable bb--mcp` lets
-  ChatGPT, Claude, or another MCP client control this bb; an approved app can
-  run any `bb` command. `bb mcp status|clients|revoke`; see the `mcp` skill.
+  an MCP client on this machine or your tailnet control this bb; a client can
+  run any `bb` command. `bb mcp status`; see the `mcp` skill.
 - Storage & retention (builtin, disabled by default): enable with
   `bb plugin enable bb--storage-retention`. Owns thread retention policies
   and machine storage cleanup through its sidebar panel and `bb storage`
