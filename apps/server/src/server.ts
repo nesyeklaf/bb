@@ -23,11 +23,6 @@ import {
   declineWebSocketCompression,
   WEB_SOCKET_COMPRESSION,
 } from "./ws/compression.js";
-import { createGateKeyStore } from "./services/connect-next/gate-keys.js";
-import {
-  createTunnelIngressManager,
-  type TunnelIngressManager,
-} from "./services/connect-next/tunnel-ingress.js";
 import { createRequestPeerRecorder } from "./services/request-peers.js";
 import { createHash, randomUUID } from "node:crypto";
 import { readFile, stat } from "node:fs/promises";
@@ -114,7 +109,6 @@ import {
   createPluginCatalogService,
   type PluginCatalogService,
 } from "./services/plugin-catalog/plugin-catalog-service.js";
-import { callHostRetryableOnlineRpcForWork } from "./services/hosts/online-rpc.js";
 import { requestMatchesEntityTag } from "./services/files/entity-tag.js";
 import {
   allowedAppOrigins,
@@ -165,7 +159,6 @@ interface ServerApp {
   pluginService: PluginService;
   pluginCatalogService: PluginCatalogService;
   serverMove: ServerMoveCoordinator;
-  tunnelIngress: TunnelIngressManager;
 }
 
 interface CloseWebSocketServerArgs {
@@ -206,7 +199,6 @@ interface CreateAppOptions {
   slowApiRequestLogThresholdMs?: number;
   performanceDiagnosticsEnabled?: () => boolean;
   staticDir?: string;
-  tunnelIngressNow?: () => number;
 }
 
 interface StaticResponseHeadersArgs {
@@ -480,18 +472,6 @@ export function createApp(
   });
   wss.options.perMessageDeflate = WEB_SOCKET_COMPRESSION;
   const requestPeers = createRequestPeerRecorder();
-  const tunnelIngressNow = options?.tunnelIngressNow ?? Date.now;
-  const tunnelIngress = createTunnelIngressManager({
-    app,
-    injectWebSocket,
-    keys: createGateKeyStore({
-      url: () => deps.config.connectGateKeysUrl,
-      logger: deps.logger,
-      now: tunnelIngressNow,
-    }),
-    loopbackOrigin: () => `http://127.0.0.1:${deps.config.serverPort}`,
-    logger: deps.logger,
-  });
   const slowApiRequestLogThresholdMs =
     options?.slowApiRequestLogThresholdMs ?? SLOW_API_REQUEST_LOG_THRESHOLD_MS;
   const bbAppArtifactService =
@@ -792,20 +772,10 @@ export function createApp(
     dataDir: deps.config.dataDir,
     appVersion: deps.config.appVersion,
     getAppUrl: () => deps.config.appUrl ?? null,
-    sharedPorts: deps.sharedPorts,
     providerRegistry: deps.providerRegistry,
     pluginHostArtifacts: deps.pluginHostArtifacts,
     aiServices: deps.aiServices,
-    ensureSharedPortTunnel: (hostId) =>
-      deps.sharedPorts.ensureTunnelIdentity(hostId, () =>
-        callHostRetryableOnlineRpcForWork(deps, {
-          command: { type: "connect-tunnel.ensure-identity" },
-          hostId,
-          timeoutMs: 30_000,
-        }),
-      ),
     callPluginHost: (args) => callPluginHostRpc(deps, args),
-    openTunnelIngress: (audience) => tunnelIngress.open(audience),
     requestPeers: (after) => requestPeers.snapshot(after),
     disposePluginHost: (args) => disposePluginHostWorkers(deps, args),
     onSettingsChanged: (pluginId) => {
@@ -917,7 +887,7 @@ export function createApp(
   registerPromptHistoryRoutes(publicApi, deps);
   registerThreadSectionRoutes(publicApi, deps);
   registerFileRoutes(publicApi, deps);
-  registerHostRoutes(publicApi, deps, pluginService);
+  registerHostRoutes(publicApi, deps);
   registerDesktopBrowserRoutes(publicApi, deps);
   registerTerminalRoutes(publicApi, deps);
   registerEnvironmentRoutes(publicApi, deps, pluginService);
@@ -1099,6 +1069,5 @@ export function createApp(
     pluginService,
     pluginCatalogService,
     serverMove,
-    tunnelIngress,
   };
 }

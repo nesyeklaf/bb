@@ -338,7 +338,6 @@ describe("server move routes", () => {
           hostId: WORKER,
           instanceId: "instance-worker",
           hostName: "Worker",
-          hasMachineCredential: false,
           platform: "linux",
           dataDir: "/home/me/.bb-machines/laptop",
           localApiPort: 38_888,
@@ -358,47 +357,6 @@ describe("server move routes", () => {
         },
       });
       expect(events).toContain(`server.moved:${WORKER}`);
-    }));
-
-  it("refuses machine credentials on every server move route", () =>
-    withTestHarness(async (harness) => {
-      seedTopology(harness);
-      const machine = { "x-bb-gate-auth": "machine" };
-      const responses = await Promise.all([
-        postJson(
-          harness,
-          `${API}/server/move/check`,
-          { targetHostId: NEW, serverUrl: DIRECT_URL },
-          machine,
-        ),
-        postJson(
-          harness,
-          `${API}/server/move`,
-          {
-            targetHostId: NEW,
-            serverUrl: DIRECT_URL,
-            stopRunningWork: true,
-            archiveExistingTargetServerData: false,
-          },
-          machine,
-        ),
-        harness.app.request(`${API}/server/move`, { headers: machine }),
-        harness.app.request(`${API}/server/move/cancel`, {
-          method: "POST",
-          headers: machine,
-        }),
-        postExport(harness, machine),
-        harness.app.request(`${API}/hosts/${OLD}/old-server-copy`, {
-          method: "DELETE",
-          headers: machine,
-        }),
-      ]);
-      for (const response of responses) {
-        expect(response.status).toBe(403);
-        expect(await readJson(response)).toMatchObject({
-          code: "machine_host_management_forbidden",
-        });
-      }
     }));
 
   it("reports the last move and records old copy deletion even when the machine already removed it", () =>

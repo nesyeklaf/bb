@@ -302,8 +302,6 @@ describe("public host management", () => {
           headers: {
             authorization: `Bearer ${issued.joinCode}`,
             "content-type": "application/json",
-            "x-bb-gate-auth": "machine",
-            "x-bb-gate-machine-id": "machine-cloud-1",
           },
           body: JSON.stringify({
             hostId: issued.hostId,
@@ -315,7 +313,6 @@ describe("public host management", () => {
       expect(enrollResponse.status).toBe(201);
       const enrolled = (await readJson(enrollResponse)) as { hostKey: string };
       expect(getHost(harness.db, issued.hostId)).toMatchObject({
-        connectMachineId: "machine-cloud-1",
         name: "Build Machine",
       });
 
@@ -340,13 +337,10 @@ describe("public host management", () => {
           headers: {
             authorization: `Bearer ${enrolled.hostKey}`,
             "content-type": "application/json",
-            "x-bb-gate-auth": "machine",
-            "x-bb-gate-machine-id": "machine-cloud-2",
           },
           body: JSON.stringify({
             activeThreads: [],
             dataDir: "/tmp/remote-bb",
-            hasMachineCredential: true,
             hostId: issued.hostId,
             hostName: "Build Machine",
             instanceId: "instance-cloud-2",
@@ -362,7 +356,6 @@ describe("public host management", () => {
         await readJson(sessionResponse),
       );
       expect(getHost(harness.db, issued.hostId)).toMatchObject({
-        connectMachineId: "machine-cloud-2",
         name: "My Build Box",
       });
       expect(
@@ -376,102 +369,6 @@ describe("public host management", () => {
       expect(await readJson(publicHostResponse)).toMatchObject({
         id: issued.hostId,
         name: "My Build Box",
-      });
-    });
-  });
-
-  it("rejects a forged connect machine id at enrollment", async () => {
-    await withTestHarness(async (harness) => {
-      const issued = await createJoinCode(harness.app);
-      const response = await harness.app.request("/internal/hosts/enroll", {
-        method: "POST",
-        headers: {
-          authorization: `Bearer ${issued.joinCode}`,
-          "content-type": "application/json",
-          "x-bb-gate-auth": "machine",
-          "x-bb-gate-machine-id": "machine-authenticated",
-        },
-        body: JSON.stringify({
-          connectMachineId: "machine-forged",
-          hostId: issued.hostId,
-          hostName: "Forged Machine",
-        }),
-      });
-      expect(response.status).toBe(400);
-      expect(await readJson(response)).toMatchObject({
-        code: "invalid_request",
-      });
-      expect(getHost(harness.db, issued.hostId)).toBeNull();
-    });
-  });
-
-  it("rejects machine-gated host-management mutations", async () => {
-    await withTestHarness(async (harness) => {
-      const host = seedHost(harness.deps, { id: "host_machine_forbidden" });
-      const requests = [
-        harness.app.request(`${API}/hosts/join-codes`, {
-          method: "POST",
-          headers: {
-            "content-type": "application/json",
-            "x-bb-gate-auth": "machine",
-          },
-          body: JSON.stringify({}),
-        }),
-        harness.app.request(`${API}/hosts/${host.id}`, {
-          method: "PATCH",
-          headers: {
-            "content-type": "application/json",
-            "x-bb-gate-auth": "machine",
-          },
-          body: JSON.stringify({ name: "forbidden" }),
-        }),
-        harness.app.request(`${API}/hosts/${host.id}`, {
-          method: "DELETE",
-          headers: { "x-bb-gate-auth": "machine" },
-        }),
-        harness.app.request(`${API}/hosts/${host.id}/retry-update`, {
-          method: "POST",
-          headers: { "x-bb-gate-auth": "machine" },
-        }),
-        harness.app.request(`${API}/hosts/${host.id}/reconnect-commands`, {
-          method: "POST",
-          headers: { "x-bb-gate-auth": "machine" },
-        }),
-        harness.app.request(`${API}/hosts/${host.id}/suspend`, {
-          method: "POST",
-          headers: { "x-bb-gate-auth": "machine" },
-        }),
-        harness.app.request(`${API}/hosts/${host.id}/resume`, {
-          method: "POST",
-          headers: { "x-bb-gate-auth": "machine" },
-        }),
-        harness.app.request(`${API}/hosts/${host.id}/retry-cleanup`, {
-          method: "POST",
-          headers: { "x-bb-gate-auth": "machine" },
-        }),
-        harness.app.request(`${API}/hosts/${host.id}?force=true`, {
-          method: "DELETE",
-          headers: { "x-bb-gate-auth": "machine" },
-        }),
-        harness.app.request(`${API}/hosts/${host.id}/permission-ceiling`, {
-          method: "PATCH",
-          headers: {
-            "content-type": "application/json",
-            "x-bb-gate-auth": "machine",
-          },
-          body: JSON.stringify({ maxPermissionMode: "full" }),
-        }),
-      ];
-      for (const response of await Promise.all(requests)) {
-        expect(response.status).toBe(403);
-        expect(await readJson(response)).toMatchObject({
-          code: "machine_host_management_forbidden",
-        });
-      }
-      expect(getHost(harness.db, host.id)).toMatchObject({
-        destroyedAt: null,
-        maxPermissionMode: "full",
-        name: host.name,
       });
     });
   });
@@ -500,7 +397,7 @@ describe("public host management", () => {
     });
   });
 
-  it("stores a permission ceiling for a session-gated request", async () => {
+  it("stores a permission ceiling", async () => {
     await withTestHarness(async (harness) => {
       const host = seedHost(harness.deps, { id: "host_ceiling" });
       expect(getHost(harness.db, host.id)?.maxPermissionMode).toBe("full");
@@ -509,10 +406,7 @@ describe("public host management", () => {
         `${API}/hosts/${host.id}/permission-ceiling`,
         {
           method: "PATCH",
-          headers: {
-            "content-type": "application/json",
-            "x-bb-gate-auth": "session",
-          },
+          headers: { "content-type": "application/json" },
           body: JSON.stringify({ maxPermissionMode: "accept-edits" }),
         },
       );
@@ -838,62 +732,4 @@ describe("public host management", () => {
       expect(getHost(harness.db, primary.id)?.destroyedAt).toBeNull();
     });
   });
-
-  it("asks the connect plugin to revoke the removed host's cloud machine", async () => {
-    await withTestHarness(async (harness) => {
-      const primary = seedHost(harness.deps, { id: "host_primary" });
-      seedPrimaryHost(harness.deps, primary.id);
-      const host = seedHost(harness.deps, {
-        connectMachineId: "machine-cloud-remove",
-        id: "host_cloud_remove",
-      });
-      const connectPlugin = await harness.pluginService.install(
-        "builtin:connect",
-        { kind: "root" },
-      );
-      expect(connectPlugin).toMatchObject({
-        source: "builtin:connect",
-        status: "running",
-      });
-      const revokeHandler = vi.fn(async () => ({ ok: true }));
-      const revokeRecord = {
-        publication: null,
-        declarations: {},
-        inputSchema: z.object({ machineId: z.string() }),
-        outputSchema: z.object({ ok: z.literal(true) }),
-        handler: revokeHandler,
-      };
-      const live = harness.pluginService.getRpcHandler(
-        connectPlugin.id,
-        "revokeMachine",
-      );
-      if (live.outcome !== "found") {
-        throw new Error("connect plugin registers no revokeMachine handler");
-      }
-      vi.spyOn(harness.pluginService, "getRpcHandler").mockReturnValue({
-        outcome: "found",
-        value: revokeRecord,
-        owner: live.owner,
-      });
-      const invoke = vi
-        .spyOn(harness.pluginService, "invokeRpcHandler")
-        .mockResolvedValue({
-          ok: true,
-          result: { ok: true },
-        });
-
-      const response = await harness.app.request(`${API}/hosts/${host.id}`, {
-        method: "DELETE",
-      });
-      expect(response.status).toBe(200);
-      expect(invoke).toHaveBeenCalledWith(
-        live.owner,
-        "revokeMachine",
-        revokeRecord,
-        { machineId: "machine-cloud-remove" },
-        { kind: "client" },
-        null,
-      );
-    });
-  }, 30_000);
 });

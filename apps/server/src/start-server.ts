@@ -41,7 +41,6 @@ import type { ServerLogger, ServerRuntimeConfig } from "./types.js";
 import { NotificationHub } from "./ws/hub.js";
 import { startDaemonLivenessChecks } from "./ws/daemon-protocol.js";
 import { WatchInterestCoordinator } from "./ws/watch-interests.js";
-import { HostSharedPortCoordinator } from "./ws/host-shared-ports.js";
 import { disconnectImportedDaemonSessions } from "./internal/session-owner-side-effects.js";
 import {
   applyServerImportAtBoot,
@@ -145,7 +144,6 @@ export async function runServer(serverConfig: ServerConfig): Promise<void> {
       : null;
   const hub = new NotificationHub();
   const watchInterests = new WatchInterestCoordinator({ db, hub });
-  const sharedPorts = new HostSharedPortCoordinator({ db, hub });
   const lifecycleDedupers = createLifecycleDedupers();
   const appUrl = toOptionalString(serverConfig.BB_APP_URL);
 
@@ -158,7 +156,6 @@ export async function runServer(serverConfig: ServerConfig): Promise<void> {
   const runtimeConfig: ServerRuntimeConfig = {
     appVersion: serverConfig.BB_APP_VERSION,
     builtinSkillsRootPath: resolveBuiltinSkillsRootPath(),
-    connectGateKeysUrl: serverConfig.BB_CONNECT_GATE_KEYS_URL,
     customModels: [],
     dataDir: serverConfig.BB_DATA_DIR,
     featureFlags: serverConfig.featureFlags,
@@ -246,7 +243,6 @@ export async function runServer(serverConfig: ServerConfig): Promise<void> {
     pluginCatalogService,
     pluginService,
     serverMove,
-    tunnelIngress,
   } = createApp(
     {
       bbAppManagedConfig,
@@ -266,7 +262,6 @@ export async function runServer(serverConfig: ServerConfig): Promise<void> {
       skillTreeRegistry,
       terminalSessions,
       watchInterests,
-      sharedPorts,
     },
     {
       serverMove: {
@@ -321,7 +316,6 @@ export async function runServer(serverConfig: ServerConfig): Promise<void> {
     providerRegistry,
     pluginHostArtifacts,
     aiServices,
-    sharedPorts,
     skillTreeRegistry,
     terminalSessions,
   });
@@ -439,7 +433,6 @@ export async function runServer(serverConfig: ServerConfig): Promise<void> {
           resolve();
         });
       });
-      await tunnelIngress.closeAll();
       await closeWebSockets();
       await closeServer;
     })();

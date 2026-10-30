@@ -1850,48 +1850,6 @@ export function createPluginRuntime(context: PluginRuntimeContext) {
           owner: plugin,
         });
       },
-      ensureSharedPortTunnel: (hostId) => {
-        if (!deps.ensureSharedPortTunnel) {
-          throw new Error("host shared-port control plane is unavailable");
-        }
-        return deps.ensureSharedPortTunnel(hostId);
-      },
-      validateSharedPortDeclaration: (hostId, ports) => {
-        if (!deps.sharedPorts) {
-          throw new Error("host shared-port control plane is unavailable");
-        }
-        return deps.sharedPorts.validateSharedPortDeclaration(hostId, ports);
-      },
-      declareSharedPorts: (hostId, ports) => {
-        if (!deps.sharedPorts) {
-          throw new Error("host shared-port control plane is unavailable");
-        }
-        deps.sharedPorts.declareSharedPorts({
-          ownerId: row.id,
-          hostId,
-          ports,
-        });
-      },
-      setNextTunnels: (config) => {
-        if (!deps.sharedPorts) {
-          throw new Error("host shared-port control plane is unavailable");
-        }
-        deps.sharedPorts.setNextTunnelConfig(row.id, config);
-      },
-      nextTunnelStatuses: () =>
-        (deps.sharedPorts?.listNextTunnelStatuses() ?? []).map((entry) => ({
-          hostId: entry.hostId,
-          hostName: entry.hostName,
-          ...entry.status,
-        })),
-      onNextTunnelStatusChange: (listener) =>
-        deps.sharedPorts?.onNextTunnelStatusChange(listener) ?? (() => {}),
-      replaceDeclaredSharedPorts: (declarations) => {
-        if (declarations.length > 0 && !deps.sharedPorts) {
-          throw new Error("host shared-port control plane is unavailable");
-        }
-        deps.sharedPorts?.replaceDeclarationsForOwner(row.id, declarations);
-      },
       callPluginHost: (args) => {
         if (hostArtifactCandidate === null) {
           throw new Error(
@@ -1906,12 +1864,6 @@ export function createPluginRuntime(context: PluginRuntimeContext) {
           ...args,
           artifact: hostArtifactCandidate,
         });
-      },
-      openTunnelIngress: (audience) => {
-        if (!deps.openTunnelIngress) {
-          throw new Error("tunnel ingress is unavailable in this plugin host");
-        }
-        return deps.openTunnelIngress(audience);
       },
       requestPeers: (after) => {
         if (!deps.requestPeers) {
@@ -2070,7 +2022,6 @@ export function createPluginRuntime(context: PluginRuntimeContext) {
       if (hungAfterDispose !== undefined && hungAfterDispose.size > 0) {
         for (const rollback of rollbackGenerations.reverse()) rollback();
         loaded.delete(row.id);
-        deps.sharedPorts?.clearDeclarationsForOwner(row.id);
         discardCandidate(plugin);
         return hungServicesDetail(hungAfterDispose);
       }
@@ -2190,7 +2141,6 @@ export function createPluginRuntime(context: PluginRuntimeContext) {
     await disposePluginInstance(plugin);
     releaseMutableRoots(plugin.moduleRootUrls);
     hostArtifacts.delete(id);
-    deps.sharedPorts?.clearDeclarationsForOwner(id);
   }
 
   async function disposeAll(): Promise<void> {

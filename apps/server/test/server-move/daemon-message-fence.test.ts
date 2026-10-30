@@ -11,8 +11,6 @@ const SNAPSHOT_FENCE_CLASSIFICATION: Record<
   DaemonMessageType,
   "fenced" | "unfenced"
 > = {
-  "connect-next.status": "unfenced",
-  "connect-tunnel.identity": "unfenced",
   "desktop-browser.changed": "fenced",
   "environment-change": "unfenced",
   "environment-metadata-change": "fenced",

@@ -99,7 +99,7 @@ export const SERVER_MOVE_FENCED_DAEMON_MESSAGE_TYPES: ReadonlySet<
 
 export function onDaemonSocketOpen(
   deps: LoggedPendingInteractionWorkSessionDeps &
-    Pick<AppDeps, "hub" | "logger" | "sharedPorts" | "terminalSessions">,
+    Pick<AppDeps, "hub" | "logger" | "terminalSessions">,
   args: { hostId: string; sessionId: string; socket: DaemonSocket },
 ): void {
   deps.logger.info(
@@ -108,8 +108,6 @@ export function onDaemonSocketOpen(
   );
   deps.hub.registerDaemon(args.sessionId, args.hostId, args.socket);
   handleDaemonSocketOpened(deps, { hostId: args.hostId });
-  deps.sharedPorts.pushCurrentSharedPortsForHost(args.hostId);
-  deps.sharedPorts.pushCurrentNextTunnelForHost(args.hostId);
   if (!isServerMoveSnapshotFenced(deps.db)) {
     deps.terminalSessions.reconcileDisconnectedHostTerminals({
       daemonSessionId: args.sessionId,
@@ -142,7 +140,7 @@ export function onDaemonSocketOpen(
 }
 
 export function onDaemonSocketMessage(
-  deps: WorkSessionDeps & Pick<AppDeps, "sharedPorts" | "terminalSessions">,
+  deps: WorkSessionDeps & Pick<AppDeps, "terminalSessions">,
   args: DaemonSocketMessageArgs,
   plugins?: Pick<PluginService, "handleHostSignal" | "handleHostWorkerExit">,
   serverMove?: Pick<ServerMoveCoordinator, "handleProgress">,
@@ -237,18 +235,6 @@ export function onDaemonSocketMessage(
             "Ignoring stale host RPC response",
           );
         }
-        return;
-      }
-      if (message.type === "connect-tunnel.identity") {
-        deps.sharedPorts.recordTunnelIdentity(args.hostId, message.identity);
-        return;
-      }
-      if (message.type === "connect-next.status") {
-        deps.sharedPorts.recordNextTunnelStatus({
-          hostId: args.hostId,
-          sessionId: args.sessionId,
-          status: message.status,
-        });
         return;
       }
       if (message.type === "desktop-browser.changed") {
@@ -356,7 +342,7 @@ const DAEMON_LIVENESS_MAX_QUIET_CHECKS = Math.ceil(
 );
 
 export function startDaemonLivenessChecks(
-  deps: LoggedPendingInteractionWorkSessionDeps & Pick<AppDeps, "sharedPorts">,
+  deps: LoggedPendingInteractionWorkSessionDeps,
 ): () => void {
   const interval = setInterval(() => {
     for (const sessionId of deps.hub.takeSilentDaemonSessionIds(
@@ -370,7 +356,7 @@ export function startDaemonLivenessChecks(
 }
 
 export function onDaemonSocketClose(
-  deps: LoggedPendingInteractionWorkSessionDeps & Pick<AppDeps, "sharedPorts">,
+  deps: LoggedPendingInteractionWorkSessionDeps,
   sessionId: string,
 ): void {
   handleDaemonSocketClosed(deps, {

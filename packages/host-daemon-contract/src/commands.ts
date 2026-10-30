@@ -53,11 +53,9 @@ import {
 export {
   HOST_ARTIFACT_MAX_BYTES,
   HOST_DAEMON_COMPATIBLE_PROTOCOL_VERSIONS,
-  HOST_DAEMON_CONNECT_NEXT_PROTOCOL_VERSION,
   HOST_DAEMON_DESKTOP_BROKER_PROOF_PROTOCOL_VERSION,
   HOST_DAEMON_ENVIRONMENT_CLEANUP_INSPECTION_PROTOCOL_VERSION,
   HOST_DAEMON_PROTOCOL_VERSION,
-  hostDaemonSupportsConnectNext,
   hostDaemonSupportsDesktopBrokerProof,
   hostDaemonSupportsEnvironmentCleanupInspection,
   isCompatibleHostDaemonProtocolVersion,
@@ -75,37 +73,6 @@ export const workspaceContextSchema = z.object({
   workspacePath: z.string().min(1),
 });
 export type WorkspaceContext = z.infer<typeof workspaceContextSchema>;
-
-function isConnectBaseDomain(value: string): boolean {
-  try {
-    const parsed = new URL(`https://${value}`);
-    return (
-      parsed.host === value &&
-      parsed.username === "" &&
-      parsed.password === "" &&
-      parsed.pathname === "/" &&
-      parsed.search === "" &&
-      parsed.hash === ""
-    );
-  } catch {
-    return false;
-  }
-}
-
-export const hostDaemonConnectTunnelIdentitySchema = z
-  .object({
-    label: z
-      .string()
-      .min(1)
-      .max(63)
-      .regex(/^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$/)
-      .refine((label) => !label.includes("--")),
-    baseDomain: z.string().min(1).refine(isConnectBaseDomain),
-  })
-  .strict();
-export type HostDaemonConnectTunnelIdentity = z.infer<
-  typeof hostDaemonConnectTunnelIdentitySchema
->;
 
 const hostDaemonThreadTargetSchema = z
   .object({
@@ -666,12 +633,6 @@ const pluginHostDisposeCommandSchema = z
     type: z.literal("plugin.host.dispose"),
     pluginId: z.string().min(1),
     generation: z.string().min(1),
-  })
-  .strict();
-
-const connectTunnelEnsureIdentityCommandSchema = z
-  .object({
-    type: z.literal("connect-tunnel.ensure-identity"),
   })
   .strict();
 
@@ -1674,15 +1635,6 @@ export const hostDaemonCommandRegistry = {
     type: "plugin.host.dispose",
     schema: pluginHostDisposeCommandSchema,
     resultSchema: pluginHostDisposeResultSchema,
-    transport: "onlineRpc",
-    retryable: true,
-    flushEventsBeforeResult: false,
-    envLane: null,
-  }),
-  "connect-tunnel.ensure-identity": defineHostDaemonCommandDescriptor({
-    type: "connect-tunnel.ensure-identity",
-    schema: connectTunnelEnsureIdentityCommandSchema,
-    resultSchema: hostDaemonConnectTunnelIdentitySchema,
     transport: "onlineRpc",
     retryable: true,
     flushEventsBeforeResult: false,

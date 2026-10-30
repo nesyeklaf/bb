@@ -16,7 +16,6 @@ import {
   BB_APP_URL_ENV,
   BB_APP_SURFACE_ENV,
   BB_APP_VERSION_ENV,
-  BB_CONNECT_GATE_KEYS_URL_ENV,
   BB_EXTERNAL_URL_ENV,
   BB_INHERITED_SKILLS_ROOTS_ENV,
   BB_SERVER_BIND_HOST_ENV,
@@ -27,7 +26,6 @@ import {
   DEFAULT_BB_APP_URL,
   DEFAULT_BB_APP_SURFACE,
   DEFAULT_BB_APP_VERSION,
-  DEFAULT_BB_CONNECT_GATE_KEYS_URL,
   DEFAULT_BB_EXTERNAL_URL,
   DEFAULT_BB_SERVER_BIND_HOST,
   parseServerBindHost,
@@ -43,7 +41,6 @@ export interface ServerConfig
   BB_APP_URL: string;
   BB_APP_SURFACE: AppSurface;
   BB_APP_VERSION: string;
-  BB_CONNECT_GATE_KEYS_URL: string;
   BB_DEV_APP_PORT?: number;
   BB_EXTERNAL_URL: string;
   BB_HOST_DAEMON_PORT: number;
@@ -109,12 +106,6 @@ export function loadServerConfig(
       context: loader.context,
       defaultValue: DEFAULT_BB_APP_VERSION,
       definition: BB_APP_VERSION_ENV,
-      env: loader.env,
-    }),
-    BB_CONNECT_GATE_KEYS_URL: readEnvVarWithDefault({
-      context: loader.context,
-      defaultValue: DEFAULT_BB_CONNECT_GATE_KEYS_URL,
-      definition: BB_CONNECT_GATE_KEYS_URL_ENV,
       env: loader.env,
     }),
     BB_EXTERNAL_URL: readEnvVarWithDefault({

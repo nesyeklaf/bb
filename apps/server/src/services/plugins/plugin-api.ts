@@ -135,7 +135,6 @@ import {
 import type { ServerLogger } from "../../types.js";
 import type { PluginInteractionResult } from "../interactions/pending-interactions.js";
 import { appendPluginLogLine } from "./plugin-log.js";
-import type { TunnelIngressLease } from "../connect-next/tunnel-ingress.js";
 import type { RequestPeerSnapshot } from "../request-peers.js";
 import {
   readPluginSettingsValues,
@@ -498,7 +497,6 @@ export function createPluginApi(options: {
   getMachineEnrollments: () => MachineEnrollments;
   getAppUrl: () => string | null;
   getLoopbackBaseUrl: () => string | undefined;
-  openTunnelIngress: (audience: string) => Promise<TunnelIngressLease>;
   requestPeers: (after: number) => RequestPeerSnapshot;
   /**
    * This load's rpc caller token, attached to the plugin's
@@ -538,21 +536,6 @@ export function createPluginApi(options: {
       signal?: AbortSignal;
     },
   ) => Promise<PluginInteractionResult>;
-  ensureSharedPortTunnel: PluginHosts["ensureSharedPortTunnel"];
-  validateSharedPortDeclaration: (
-    hostId: string,
-    ports: readonly number[],
-  ) => readonly number[];
-  declareSharedPorts: PluginHosts["declareSharedPorts"];
-  setNextTunnels: PluginHosts["internal_DO_NOT_USE_setNextTunnels"];
-  nextTunnelStatuses: PluginHosts["internal_DO_NOT_USE_nextTunnelStatuses"];
-  onNextTunnelStatusChange: PluginHosts["internal_DO_NOT_USE_onNextTunnelStatusChange"];
-  replaceDeclaredSharedPorts: (
-    declarations: readonly {
-      hostId: string;
-      ports: readonly number[];
-    }[],
-  ) => void;
   callPluginHost: (args: {
     contract: PluginRpcContract;
     method: string;
@@ -578,7 +561,6 @@ export function createPluginApi(options: {
     getSdk,
     getAppUrl,
     getLoopbackBaseUrl,
-    openTunnelIngress,
     requestPeers,
     rpcCaller,
     publishSignal,
@@ -591,13 +573,6 @@ export function createPluginApi(options: {
     declaredIconNames,
     brandingIcon,
     requestInteraction,
-    ensureSharedPortTunnel,
-    validateSharedPortDeclaration,
-    declareSharedPorts,
-    setNextTunnels,
-    nextTunnelStatuses,
-    onNextTunnelStatusChange,
-    replaceDeclaredSharedPorts,
     callPluginHost,
     registerProvider,
     registerAiService,
@@ -609,9 +584,7 @@ export function createPluginApi(options: {
   let wrappedSdk: PluginBbSdk | undefined;
   let pendingNeedsConfiguration: string | null = null;
   const pendingAgentToolProblems: string[] = [];
-  const pendingSharedPorts = new Map<string, readonly number[]>();
   const disposeHooks: Array<() => void | Promise<void>> = [];
-  const openTunnelIngresses = new Set<() => Promise<void>>();
   const installHandlers: Array<() => void | Promise<void>> = [];
   const settingsRecord: PluginApiHandle["settings"] = {
     descriptors: {},
@@ -1077,32 +1050,6 @@ export function createPluginApi(options: {
       assertLive();
       return dataDir;
     },
-    async internal_DO_NOT_USE_openTunnelIngress(ingressOptions) {
-      assertLive();
-      const audience: unknown = ingressOptions?.audience;
-      if (typeof audience !== "string" || audience.length === 0) {
-        throw new Error(
-          "bb.server.internal_DO_NOT_USE_openTunnelIngress needs a non-empty audience",
-        );
-      }
-      const lease = await openTunnelIngress(audience);
-      let closed = false;
-      const close = async (): Promise<void> => {
-        if (closed) return;
-        closed = true;
-        openTunnelIngresses.delete(close);
-        const index = disposeHooks.indexOf(close);
-        if (index !== -1) disposeHooks.splice(index, 1);
-        await lease.close();
-      };
-      if (invalidated) {
-        await lease.close();
-        throw stale();
-      }
-      openTunnelIngresses.add(close);
-      disposeHooks.push(close);
-      return { baseUrl: lease.baseUrl, close };
-    },
     internal_DO_NOT_USE_requestPeers(peerOptions) {
       assertLive();
       const after: unknown = peerOptions?.after;
@@ -1202,37 +1149,6 @@ export function createPluginApi(options: {
           };
         },
       };
-    },
-    ensureSharedPortTunnel(hostId) {
-      assertLive();
-      return ensureSharedPortTunnel(hostId);
-    },
-    declareSharedPorts(hostId, ports) {
-      assertLive();
-      if (activated) declareSharedPorts(hostId, ports);
-      else {
-        pendingSharedPorts.set(
-          hostId,
-          validateSharedPortDeclaration(hostId, ports),
-        );
-      }
-    },
-    internal_DO_NOT_USE_setNextTunnels(config) {
-      assertLive();
-      setNextTunnels(config);
-    },
-    internal_DO_NOT_USE_nextTunnelStatuses() {
-      assertLive();
-      return nextTunnelStatuses();
-    },
-    internal_DO_NOT_USE_onNextTunnelStatusChange(listener) {
-      assertLive();
-      if (typeof listener !== "function") {
-        throw new Error("next tunnel status subscription requires a listener");
-      }
-      const unsubscribe = onNextTunnelStatusChange(listener);
-      disposeHooks.push(unsubscribe);
-      return unsubscribe;
     },
   };
   const events: PluginEvents = {
@@ -1522,9 +1438,6 @@ export function createPluginApi(options: {
     activate() {
       if (activated) return;
       assertLive();
-      replaceDeclaredSharedPorts(
-        [...pendingSharedPorts].map(([hostId, ports]) => ({ hostId, ports })),
-      );
       providerRegistrations.flush();
       aiServiceRegistrations.flush();
       activated = true;
@@ -1532,7 +1445,6 @@ export function createPluginApi(options: {
         ? pluginCliCollisionWarning(pluginId, cliRecord.registration.name)
         : null;
       if (cliWarning) emitLog("warn", cliWarning);
-      pendingSharedPorts.clear();
       for (const problem of pendingAgentToolProblems) {
         reportAgentToolProblem(problem);
       }
@@ -1560,7 +1472,6 @@ export function createPluginApi(options: {
     invalidate() {
       invalidated = true;
       rpcCaller.revoke();
-      for (const close of [...openTunnelIngresses]) void close();
     },
   };
 }

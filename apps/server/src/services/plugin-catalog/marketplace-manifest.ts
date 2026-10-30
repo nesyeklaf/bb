@@ -29,11 +29,6 @@ import {
 import { BUNDLED_MARKETPLACE_NAME } from "./bundled-marketplace-paths.js";
 export { BUNDLED_MARKETPLACE_NAME } from "./bundled-marketplace-paths.js";
 
-export const MARKETPLACE_V1_SCHEMA_URL =
-  "https://getbb.app/schemas/marketplace.schema.json";
-export const MARKETPLACE_V2_SCHEMA_URL =
-  "https://getbb.app/schemas/marketplace-v2.schema.json";
-
 export const BUILTIN_PUBLISHER_LABEL = "BB Official";
 
 const NAME_PATTERN = /^[a-z0-9][a-z0-9-]*$/u;
@@ -194,7 +189,7 @@ const marketplaceEntryV1Schema = z
 
 const marketplaceManifestV1Schema = z
   .object({
-    $schema: z.literal(MARKETPLACE_V1_SCHEMA_URL).optional(),
+    $schema: z.string().optional(),
     schemaVersion: z.literal(1),
     name: pluginMarketplaceNameSchema,
     displayName: z.string().min(1),
@@ -216,7 +211,7 @@ const marketplaceManifestV1Schema = z
   .strict();
 
 const marketplaceManifestV2Schema = z.object({
-  $schema: z.literal(MARKETPLACE_V2_SCHEMA_URL).optional(),
+  $schema: z.string().optional(),
   schemaVersion: z.literal(2),
   name: z.string().regex(NAME_PATTERN),
   displayName: z.string().min(1),

@@ -51,7 +51,6 @@ const hostCommandWakePolicy = {
   "plugin.host.call": "work",
   "plugin.host.cancel": "never",
   "plugin.host.dispose": "never",
-  "connect-tunnel.ensure-identity": "work",
   "host.list_commands": "work",
   "host.list_skills": "work",
   "host.read_workspace_agent_context": "work",

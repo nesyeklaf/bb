@@ -196,13 +196,6 @@ export const BB_EXTERNAL_URL_ENV = defineEnvVar<string>({
   parse: parseOptionalUrlEnvValue,
 });
 
-export const BB_CONNECT_GATE_KEYS_URL_ENV = defineEnvVar<string>({
-  description:
-    "URL of the bb connect next gate public key set the server's tunnel ingress verifies gate assertions with. Point it at a local file server to test the ingress.",
-  name: "BB_CONNECT_GATE_KEYS_URL",
-  parse: parseRequiredUrlEnvValue,
-});
-
 export const BB_PERF_DIAGNOSTICS_ENV = defineEnvVar<boolean>({
   description:
     "Permit server performance diagnostics when the performanceDiagnostics experiment is on. Requires restart.",
@@ -322,8 +315,6 @@ export const DEFAULT_BB_APP_URL = "";
 export const DEFAULT_BB_SERVER_BIND_HOST: ServerBindHost = BB_LOOPBACK_HOST;
 export const DEFAULT_BB_EXTERNAL_URL = "";
 export const DEFAULT_BB_DEV_APP_HOST = "";
-export const DEFAULT_BB_CONNECT_GATE_KEYS_URL =
-  "https://getbb.app/.well-known/bb-connect-gate-keys.json";
 export const DEFAULT_BB_FF_PLACEHOLDER = defaultFeatureFlags.placeholder;
 export const DEFAULT_BB_FF_TIMELINE_WINDOW_EVENT_BUDGET =
   defaultFeatureFlags.timelineWindowEventBudget;
