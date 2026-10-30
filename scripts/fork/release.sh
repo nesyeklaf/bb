@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Build a release of this fork: sync upstream, run the checks, build the artifacts.
-# Usage: scripts/fork/release.sh [sync|test|build|all]   (default: all)
+# Build a release of this fork from a clean checkout of main: run the checks, build the artifacts.
+# Usage: scripts/fork/release.sh [test|build|all]   (default: all)
 # Artifacts go to $BB_FORK_DIST/<short-sha>/ (default ~/bb-fork-dist).
 set -euo pipefail
 
@@ -12,16 +12,9 @@ root=$(git -C "$(dirname "$0")" rev-parse --show-toplevel)
 cd "$root"
 dist_root="${BB_FORK_DIST:-$HOME/bb-fork-dist}"
 
-sync() {
-  # Mirror upstream main into the fork's `upstream` branch, then replay the
-  # fork commits on top. Conflicts stop here; resolve, `git rebase --continue`,
-  # rerun. Publishing the rebased main is a separate, explicit step (FORK.md).
-  git diff --quiet && git diff --cached --quiet || { echo "Working tree not clean" >&2; exit 1; }
-  git fetch upstream main
-  git push origin upstream/main:refs/heads/upstream
-  git checkout main
-  git rebase upstream/main
-  git log --oneline upstream/main..main
+require_clean_main() {
+  [ -z "$(git status --porcelain)" ] || { echo "Working tree not clean" >&2; exit 1; }
+  [ "$(git symbolic-ref --short -q HEAD || true)" = main ] || { echo "HEAD is not the main branch" >&2; exit 1; }
 }
 
 test_fork() {
@@ -41,7 +34,8 @@ find_jdk17() {
 
 build() {
   local sha out
-  sha=$(git rev-parse --short HEAD)
+  require_clean_main
+  sha=$(git rev-parse --short main)
   out="$dist_root/$sha"
   mkdir -p "$out"
 
@@ -65,9 +59,8 @@ build() {
 }
 
 case "${1:-all}" in
-  sync) sync ;;
   test) test_fork ;;
   build) build ;;
-  all) sync; test_fork; build ;;
-  *) echo "Usage: $0 [sync|test|build|all]" >&2; exit 1 ;;
+  all) require_clean_main; test_fork; build ;;
+  *) echo "Usage: $0 [test|build|all]" >&2; exit 1 ;;
 esac

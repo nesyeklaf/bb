@@ -2,23 +2,16 @@
 
 `nesyeklaf/bb` is [get-bb/bb](https://github.com/get-bb/bb) with a small set of local fixes, built and run on a self-hosted server reached over Tailscale.
 
-- `upstream` mirrors get-bb `main`, unchanged.
-- `main` is `upstream` plus the fork commits: `git log --oneline origin/upstream..origin/main`.
-
-Keep the fork commits few and self-contained, so each rebase onto a new upstream stays a small conflict at most. A fix that upstream takes over gets dropped during the rebase.
+- `main` is the fork. Changes from get-bb come in only by cherry-picking or reimplementing a single upstream commit by hand. Every adopted commit must pass `scripts/fork/check-egress-hosts.sh`, `scripts/fork/check-package-manager-calls.sh` and the smoke run before deploy.
 
 ## Release
 
 ```sh
-scripts/fork/release.sh          # sync + test + build
-scripts/fork/release.sh build    # build the current main only
+scripts/fork/release.sh          # test + build
+scripts/fork/release.sh build    # build main only
 ```
 
-`sync` pushes upstream `main` to `origin/upstream` and rebases local `main` onto it. Publishing the rebased `main` rewrites the branch, so it is a deliberate step after the checks pass:
-
-```sh
-git push --force-with-lease origin main
-```
+The release builds a clean checkout of `main` and nothing else: a dirty tree, another branch or a detached `HEAD` fails before anything is built. It makes no git network call.
 
 `build` writes to `~/bb-fork-dist/<short-sha>/` (override with `BB_FORK_DIST`):
 
@@ -31,7 +24,7 @@ git push --force-with-lease origin main
 
 Build requirements: Node and pnpm from `package.json`, a JDK 17 with `javac` (found under `~/.gradle/jdks` or `/usr/lib/jvm`, or set `JAVA_HOME`), and the Android SDK at `$ANDROID_HOME` (default `~/Android/Sdk`). JDK 21 does not build the APK.
 
-The version number stays upstream's. Tell a fork build apart by its commit, not by its version.
+The version number stays get-bb's. Tell a fork build apart by its commit, not by its version.
 
 ## Deploy
 
@@ -77,5 +70,5 @@ Clients: the desktop app points at the tailnet URL through its custom server URL
 
 ## Fork changes
 
-- `BbNavigate.toThread(threadId, { experimental_messageSeq })` jumps to a message (`#msg=SEQ`) from plugins, with `split` too. Dropped when upstream ships an equivalent.
-- `app.slots.experimental_threadTocExtension({ id, title, useBands, tab?, onBandClick?, onBandHover? })` adds topic brackets and a popover tab to the thread TOC rail, with drag-marked ranges (`railSelection`). The tab can be the popover's default (`tab.experimental_default`) and gets `activeSeq`, `hoveredBand` and `setHoveredRange` to link its rows with the brackets. Ticks get their seq from the new `messageSeq` field of the conversation outline item (projection version 3). Dropped when upstream ships an equivalent.
+- `BbNavigate.toThread(threadId, { experimental_messageSeq })` jumps to a message (`#msg=SEQ`) from plugins, with `split` too. Dropped when get-bb ships an equivalent.
+- `app.slots.experimental_threadTocExtension({ id, title, useBands, tab?, onBandClick?, onBandHover? })` adds topic brackets and a popover tab to the thread TOC rail, with drag-marked ranges (`railSelection`). The tab can be the popover's default (`tab.experimental_default`) and gets `activeSeq`, `hoveredBand` and `setHoveredRange` to link its rows with the brackets. Ticks get their seq from the new `messageSeq` field of the conversation outline item (projection version 3). Dropped when get-bb ships an equivalent.
