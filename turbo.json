@@ -1148,25 +1148,6 @@
         "topo"
       ]
     },
-    "bb-plugin-environment-modal-sandbox#typecheck": {
-      "dependsOn": ["@get-bb/plugin-sdk#build:types", "topo"],
-      "inputs": [
-        "$TURBO_DEFAULT$",
-        "$TURBO_ROOT$/packages/plugin-registry/flavors/**"
-      ]
-    },
-    "bb-plugin-environment-modal-sandbox#test": {
-      "env": ["VITEST_MAX_WORKERS"],
-      "dependsOn": [
-        "//#ensure-native-modules",
-        "@get-bb/plugin-sdk#build",
-        "topo"
-      ],
-      "inputs": [
-        "$TURBO_DEFAULT$",
-        "$TURBO_ROOT$/packages/plugin-registry/flavors/**"
-      ]
-    },
     "bb-plugin-connect#typecheck": {
       "dependsOn": ["@get-bb/plugin-sdk#build:types", "topo"]
     },
@@ -1174,9 +1155,6 @@
       "dependsOn": ["@get-bb/plugin-sdk#build:types", "topo"]
     },
     "bb-plugin-bb-account#typecheck": {
-      "dependsOn": ["@get-bb/plugin-sdk#build:types", "topo"]
-    },
-    "bb-plugin-bb-ai#typecheck": {
       "dependsOn": ["@get-bb/plugin-sdk#build:types", "topo"]
     },
     "bb-plugin-bb-guide#typecheck": {

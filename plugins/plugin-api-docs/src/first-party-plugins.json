@@ -20,11 +20,6 @@
     "icon": "MessageSquare"
   },
   {
-    "id": "bb-ai",
-    "name": "bb cloud AI",
-    "icon": "AiBrain01"
-  },
-  {
     "id": "browser-automation",
     "name": "Browser Automation",
     "icon": "Globe"
@@ -88,11 +83,6 @@
     "id": "navigation",
     "name": "Navigation",
     "icon": "PanelLeft"
-  },
-  {
-    "id": "environment-modal-sandbox",
-    "name": "Modal Sandbox [Experimental]",
-    "icon": null
   },
   {
     "id": "environment-personal-workspace",

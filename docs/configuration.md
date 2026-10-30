@@ -1232,17 +1232,6 @@ every enrolled machine's daemon also serves the ports shared from it with
 | `BB_CONNECT_FRPC`        | Path of an `frpc` binary to run instead of the frp 0.71.0 release the plugin (or a host daemon) downloads and verifies.           |
 | `BB_CONNECT_NEXT_SERVER` | `ws://host:port` or `wss://host:port` of the frp server to dial instead of `wss://tunnel.<next domain>` derived from the account. |
 
-### Modal machines
-
-The Modal sandbox plugin creates machines on Modal. Its settings:
-`tokenId` and `tokenSecret` (secret; a Modal API token), `appName` (default
-`bb-sandboxes`), and `idleMinutes` (default 15; `0` disables idle suspension,
-maximum 1440). Sandboxes run for at most Modal's 24-hour sandbox lifetime.
-Without a size preset, a new machine reserves 1 CPU and 2 GiB. The plugin page
-also holds named image definitions (the bundled Standard Dockerfile, extra
-Dockerfiles, or Modal image IDs) and CPU/memory presets; a saved image applies
-to the next new machine. See the `modal-sandboxes` skill.
-
 ### Browser Automation
 
 The Browser Automation plugin installs its pinned `dev-browser` release on

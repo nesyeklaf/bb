@@ -188,10 +188,6 @@ Each bundled plugin documents its commands and behavior in its own skill.
 - Tasks (official, `bb plugin install tasks`): a task tracker with agent
   delegation. `bb tasks show|list|comment|update|attach`, and
   `bb tasks --help` for the rest; see the `tasks` skill.
-- Modal sandboxes (official, `bb plugin install environment-modal-sandbox`):
-  reusable Modal cloud machines. `bb modal account inspect`,
-  `bb machine create --provider modal-sandbox`, and `bb modal image|sandbox`;
-  see the `modal-sandboxes` skill.
 
 Multi-plugin repositories
 

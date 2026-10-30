@@ -134,12 +134,11 @@ Use `--environment-inputs <json>` for workspace configuration, separately from
 plugins; never put secrets there. Store credentials in plugin settings and pass
 only non-secret configuration or references.
 
-An environment provider that composes its own machine, such as
-`modal-sandbox`, chooses that machine:
-`bb thread spawn --project <id> --environment-provider modal-sandbox --prompt "..."`
+An environment provider that composes its own machine chooses that machine:
+`bb thread spawn --project <id> --environment-provider <provider-id> --prompt "..."`
 creates the machine, prepares the project checkout, and runs environment setup.
 Machine selectors are refused, and `--machine-inputs <json>` configures the
-machine (for example `{"preset":"Large","image":"Node 22"}`). Progress and
+machine. Progress and
 failures appear in the thread's provisioning details; if cloning fails, the
 machine remains available for retry or explicit removal.
 
