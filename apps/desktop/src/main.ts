@@ -1,15 +1,12 @@
-import { spawnHostProcess as spawn, hostToolchain } from "@bb/process-utils";
+import { hostToolchain } from "@bb/process-utils";
 import { openApplicationUrl } from "./application-url.js";
 import { createDesktopLogger } from "./desktop-logger.js";
-import { attachServerUpdateControl } from "./server-update-control.js";
 import { registerServerChoiceIpc } from "./server-choice-ipc.js";
 import { randomUUID } from "node:crypto";
-import { accessSync, constants as fsConstants } from "node:fs";
 import { arch, homedir, release, type as osType } from "node:os";
-import { dirname, join, resolve } from "node:path";
+import { join, resolve } from "node:path";
 import {
   app,
-  autoUpdater as nativeAutoUpdater,
   BrowserWindow,
   clipboard,
   dialog,
@@ -27,7 +24,6 @@ import {
   type MessageBoxOptions,
   type WebContents,
 } from "electron";
-import { autoUpdater } from "electron-updater";
 import {
   APP_SURFACE_DESKTOP,
   APP_SURFACE_ENV_NAME,
@@ -189,31 +185,18 @@ import {
   getDesktopVersion,
   resolveBbDesktopPlatform,
 } from "./desktop-platform.js";
-import { createDesktopUpdateService } from "./desktop-update-check.js";
 import {
-  createDesktopUpdateFeedUrl,
   DESKTOP_RELEASE_CHANNEL,
   DESKTOP_RELEASE_INFO,
-  resolveDesktopUpdateSupport,
-} from "./desktop-update-provider.js";
-import type { DesktopUpdateService } from "./desktop-update-scheduler.js";
+} from "./desktop-release.js";
 import {
-  createDesktopAutoUpdateService,
-  createElectronAutoUpdaterAdapter,
-  shouldEnableDesktopAutoUpdate,
-  type DesktopAutoUpdateService,
-} from "./desktop-auto-update.js";
-import { mergeDesktopUpdateInfo } from "./desktop-update-info.js";
-import {
-  BB_DESKTOP_CHECK_FOR_UPDATES_CHANNEL,
   BB_DESKTOP_GET_INFO_CHANNEL,
   BB_DESKTOP_INFO_CHANGED_CHANNEL,
-  BB_DESKTOP_INSTALL_UPDATE_CHANNEL,
   BB_DESKTOP_OPEN_EXTERNAL_URL_CHANNEL,
   BB_DESKTOP_OPEN_APPLICATION_URL_CHANNEL,
   BB_DESKTOP_SET_THEME_CHANNEL,
   BB_DESKTOP_ZOOM_COMMAND_CHANNEL,
-} from "./desktop-update-ipc.js";
+} from "./desktop-ipc-channels.js";
 import {
   BB_DESKTOP_SERVER_CHOICES_CHANGED_CHANNEL,
   BB_DESKTOP_APP_COMMAND_CHANNEL,
@@ -380,11 +363,6 @@ interface ResolveDesktopWindowUrlArgs {
   serverUrl: string;
 }
 
-interface ResolveDesktopUpdateFeedUrlArgs {
-  env: NodeJS.ProcessEnv;
-  platform: BbDesktopInfo["platform"];
-}
-
 interface SystemConfigRequestArgs {
   fetchImpl: typeof fetch;
   serverUrl: string;
@@ -409,8 +387,6 @@ let desktopBrowserBrokerClient: ReturnType<
 > | null = null;
 let currentAppKeybindings: AppKeybindings = [];
 let currentApplicationMenuAccelerators = DEFAULT_APPLICATION_MENU_ACCELERATORS;
-let desktopUpdateService: DesktopUpdateService | null = null;
-let desktopAutoUpdateService: DesktopAutoUpdateService | null = null;
 let currentRuntime: DesktopRuntime | null = null;
 let currentWindowUrl: string | null = null;
 let logViewerLineBuffer: LogLineBuffer | null = null;
@@ -431,7 +407,6 @@ let startupErrorPage: StartupErrorPage | null = null;
 let startupActionPending = false;
 let connectSignInWindow: BrowserWindow | null = null;
 let stoppingForQuit = false;
-let appImageRelaunchPath: string | null = null;
 let quitting = false;
 let serverTargetStore: ServerTargetStore | null = null;
 let connectServerSync: ConnectServerSync | null = null;
@@ -485,29 +460,6 @@ function resolveDesktopWindowUrl(args: ResolveDesktopWindowUrlArgs): string {
   return rawAppUrl;
 }
 
-function canReplaceAppImage(appImagePath: string): boolean {
-  try {
-    accessSync(
-      dirname(appImagePath),
-      // oxlint-disable-next-line no-bitwise
-      fsConstants.W_OK | fsConstants.X_OK,
-    );
-    return true;
-  } catch {
-    return false;
-  }
-}
-
-function resolveDesktopUpdateFeedUrl(
-  args: ResolveDesktopUpdateFeedUrlArgs,
-): string {
-  const rawFeedUrl = args.env.BB_DESKTOP_VERSION_FEED_URL?.trim();
-  if (rawFeedUrl === undefined || rawFeedUrl.length === 0) {
-    return createDesktopUpdateFeedUrl(args.platform);
-  }
-  return rawFeedUrl;
-}
-
 function readDesktopAboutFacts(applicationName: string): DesktopAboutFacts {
   return {
     applicationName,
@@ -547,16 +499,10 @@ async function showAboutDialog(): Promise<void> {
 }
 
 function getCurrentDesktopInfo(): BbDesktopInfo | null {
-  const info = mergeDesktopUpdateInfo({
-    autoInfo: desktopAutoUpdateService?.getInfo() ?? null,
-    feedInfo: desktopUpdateService?.getInfo() ?? null,
-  });
-  if (info === null) {
-    return null;
-  }
   return {
-    ...info,
+    platform: resolveBbDesktopPlatform(process.platform),
     serverDaemonLogsAvailable: true,
+    version: getDesktopVersion(process.env.BB_DESKTOP_VERSION),
   };
 }
 
@@ -2320,15 +2266,6 @@ function handleBeforeQuit(event: Event): void {
   event.preventDefault();
   stoppingForQuit = true;
   void finishQuit().finally(() => {
-    if (appImageRelaunchPath !== null) {
-      app.releaseSingleInstanceLock();
-      const replacement = spawn(appImageRelaunchPath, process.argv.slice(1), {
-        detached: true,
-        stdio: "ignore",
-      });
-      replacement.on("error", (error) => desktopLogger.error(error.message));
-      replacement.unref();
-    }
     app.quit();
   });
 }
@@ -2339,8 +2276,6 @@ async function finishQuit(): Promise<void> {
   desktopBrowserBroker?.dispose();
   stopSystemConfigSync();
   connectSessionRenewal?.stop();
-  desktopUpdateService?.stop();
-  desktopAutoUpdateService?.stop();
   desktopBrowserViewManager?.destroyAll();
   desktopFindViewManager?.destroyAll();
   await desktopWindowFactory
@@ -2356,31 +2291,7 @@ async function finishQuit(): Promise<void> {
   await stopOwnedRuntime();
 }
 
-async function checkDesktopUpdates(): Promise<void> {
-  await Promise.all([
-    desktopUpdateService?.checkForUpdates(),
-    desktopAutoUpdateService?.checkForUpdates(),
-  ]);
-}
-
-async function installDesktopUpdate(): Promise<void> {
-  if (
-    desktopAutoUpdateService === null ||
-    !desktopAutoUpdateService.getInfo().updateDownloaded
-  )
-    return;
-  const appImagePath = process.env.APPIMAGE?.trim() ?? "";
-  if (
-    process.platform === "linux" &&
-    (appImagePath.length === 0 || !canReplaceAppImage(appImagePath))
-  ) {
-    throw new Error("This AppImage cannot be replaced in place.");
-  }
-  await desktopWindowFactory?.persistOpenWindows();
-  await desktopAutoUpdateService.installUpdate();
-}
-
-function registerDesktopUpdateIpc(): void {
+function registerDesktopInfoIpc(): void {
   registerServerChoiceIpc({
     applicationWindowWebContentsIds,
     onListRequested: () => connectServerSync?.onListRequested(),
@@ -2413,11 +2324,6 @@ function registerDesktopUpdateIpc(): void {
   ipcMain.handle(BB_DESKTOP_OPEN_DATA_DIRECTORY_CHANNEL, async () => {
     await openDataDirectory();
   });
-  ipcMain.handle(BB_DESKTOP_CHECK_FOR_UPDATES_CHANNEL, async () => {
-    await checkDesktopUpdates();
-    return getCurrentDesktopInfo();
-  });
-  ipcMain.handle(BB_DESKTOP_INSTALL_UPDATE_CHANNEL, installDesktopUpdate);
   ipcMain.on(
     BB_DESKTOP_SET_SPLIT_NAVIGATION_ENABLED_CHANNEL,
     (event, enabled: unknown, directionalCommands: unknown) => {
@@ -2562,29 +2468,6 @@ async function spawnOwnedRuntime(
       processExecPath: process.execPath,
     }),
   });
-  const updater = desktopAutoUpdateService;
-  if (updater !== null) {
-    attachServerUpdateControl({
-      child: bbProcess.childProcess,
-      getInfo: () => ({
-        ...updater.getInfo(),
-        downloadState: updater.getInfo().downloadState ?? "idle",
-        supported:
-          shouldEnableDesktopAutoUpdate({
-            env: process.env,
-            isPackaged: app.isPackaged,
-          }) &&
-          resolveDesktopUpdateSupport({
-            canReplaceAppImage,
-            env: process.env,
-            platform: resolveBbDesktopPlatform(process.platform),
-          }).autoUpdate,
-      }),
-      check: checkDesktopUpdates,
-      install: installDesktopUpdate,
-      subscribe: (listener) => updater.subscribe(listener),
-    });
-  }
   const runtime: DesktopRuntime = {
     bbProcess,
     ownership: "spawned",
@@ -2888,8 +2771,6 @@ async function runDesktopApp(): Promise<void> {
     }
   });
   app.on("did-become-active", () => {
-    void desktopUpdateService?.checkAfterActive();
-    void desktopAutoUpdateService?.checkAfterActive();
     refreshRemoteSystemConfig?.();
     connectSessionRenewal?.renewIfDue();
   });
@@ -2967,12 +2848,6 @@ async function runDesktopApp(): Promise<void> {
   const serverUrl = resolveDesktopServerUrl({ env: process.env });
   builtinServerUrl = serverUrl;
   desktopBridgePath = bridgePath;
-  const desktopVersion = getDesktopVersion(process.env.BB_DESKTOP_VERSION);
-  const desktopPlatform = resolveBbDesktopPlatform(process.platform);
-  const desktopUpdateFeedUrl = resolveDesktopUpdateFeedUrl({
-    env: process.env,
-    platform: desktopPlatform,
-  });
   const userDataPath = app.getPath("userData");
   desktopUserDataPath = userDataPath;
 
@@ -3083,53 +2958,7 @@ async function runDesktopApp(): Promise<void> {
     },
   });
 
-  const desktopUpdateSupport = resolveDesktopUpdateSupport({
-    canReplaceAppImage,
-    env: process.env,
-    platform: desktopPlatform,
-  });
-  desktopUpdateService = createDesktopUpdateService({
-    channel: DESKTOP_RELEASE_CHANNEL,
-    currentVersion: desktopVersion,
-    enabled:
-      desktopUpdateSupport.versionCheck &&
-      (app.isPackaged || process.env.BB_DESKTOP_VERSION_CHECK === "1"),
-    feedUrl: desktopUpdateFeedUrl,
-    logger: desktopLogger,
-    platform: desktopPlatform,
-  });
-  desktopAutoUpdateService = createDesktopAutoUpdateService({
-    currentVersion: desktopVersion,
-    enabled:
-      desktopUpdateSupport.autoUpdate &&
-      shouldEnableDesktopAutoUpdate({
-        env: process.env,
-        isPackaged: app.isPackaged,
-      }),
-    forceDevUpdateConfig:
-      !app.isPackaged && process.env.BB_DESKTOP_AUTO_UPDATE === "1",
-    logger: desktopLogger,
-    platform: desktopPlatform,
-    updater: createElectronAutoUpdaterAdapter(
-      autoUpdater,
-      nativeAutoUpdater,
-      process.platform === "linux" && process.env.APPIMAGE
-        ? {
-            path: process.env.APPIMAGE,
-            relaunch: (execPath) => {
-              appImageRelaunchPath = execPath;
-            },
-          }
-        : null,
-    ),
-  });
-  desktopUpdateService.subscribe(() => {
-    sendDesktopInfoChanged();
-  });
-  desktopAutoUpdateService.subscribe(() => {
-    sendDesktopInfoChanged();
-  });
-  registerDesktopUpdateIpc();
+  registerDesktopInfoIpc();
   desktopFindViewManager = createDesktopFindViewManager({
     preloadPath: findBarPreloadPath,
   });
@@ -3298,16 +3127,6 @@ async function runDesktopApp(): Promise<void> {
       return currentRuntime?.serverUrl ?? builtinServerUrl;
     },
   });
-  if (desktopUpdateSupport.versionCheck) {
-    desktopUpdateService.start();
-  }
-  if (desktopUpdateSupport.autoUpdate) {
-    desktopAutoUpdateService.start();
-  } else {
-    desktopLogger.info(
-      "Desktop auto-install is disabled: only the Linux AppImage build can replace itself. Version checks still report new releases.",
-    );
-  }
 
   const browserWindowCreator: DesktopBrowserWindowCreator = {
     create(options) {

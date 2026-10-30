@@ -1,4 +1,3 @@
-import { createMobileAppReleaseService } from "../services/install/mobile-app-releases.js";
 import {
   setMachineEnvironmentVariable,
   deleteMachineEnvironmentVariable,
@@ -156,12 +155,6 @@ export function registerSystemRoutes(
   const routes = publicApiRoutes.system;
 
   const themeRoot = resolveThemeRootPath(deps.config.dataDir);
-
-  const mobileAppReleases = createMobileAppReleaseService();
-  get(routes.mobileAppReleases, async (context) => {
-    context.header("cache-control", "no-store");
-    return context.json(await mobileAppReleases());
-  });
 
   get(routes.attention, (context) =>
     context.json({ hasAttention: hasActiveThreadAttention(deps.db) }),
@@ -685,39 +678,6 @@ export function registerSystemRoutes(
     });
   });
 
-  get(routes.version, async (context, query) =>
-    context.json(
-      await deps.appVersion.getSystemVersion({
-        forceRefresh: query.force === "true",
-      }),
-    ),
-  );
-
-  get(routes.appUpdate, async (context, query) =>
-    context.json(
-      await deps.appUpdate.getStatus({
-        forceRefresh:
-          query.force === "true" && getGateAuthKind(context) !== "machine",
-      }),
-    ),
-  );
-
-  post(routes.applyAppUpdate, async (context, body) => {
-    assertAppUpdateAllowed(context);
-    return context.json(
-      await deps.appUpdate.apply({
-        confirmInterruptingThreads: body.confirmInterruptingThreads,
-      }),
-    );
-  });
-
-  post(routes.acknowledgeAppUpdate, async (context, body) => {
-    assertAppUpdateAllowed(context);
-    return context.json(
-      await deps.appUpdate.acknowledgeResult({ id: body.id }),
-    );
-  });
-
   get(routes.cliCommand, async (context) =>
     context.json(await deps.cliCommand.getStatus()),
   );
@@ -741,18 +701,6 @@ function assertCliCommandChangeAllowed(
       403,
       "forbidden",
       "Machine credentials cannot change the bb command on the bb server's computer",
-    );
-  }
-}
-
-function assertAppUpdateAllowed(
-  context: Parameters<typeof getGateAuthKind>[0],
-): void {
-  if (getGateAuthKind(context) === "machine") {
-    throw new ApiError(
-      403,
-      "forbidden",
-      "Machine credentials cannot update the bb server",
     );
   }
 }

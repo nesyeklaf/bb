@@ -147,8 +147,6 @@ export async function main(args = process.argv.slice(2)) {
   const {
     resolveWorktreeRuntimePolicy,
     runBbApp,
-    runSourceAppUpdateShim,
-    shouldRunSourceAppUpdateShim,
   } = await import("../packages/bb-app/src/launcher.ts");
   const worktreePolicy = parsedArgs.useWorktreeRuntimePolicy
     ? resolveWorktreeRuntimePolicy({
@@ -156,29 +154,10 @@ export async function main(args = process.argv.slice(2)) {
         homeDir: homedir(),
       })
     : null;
-  if (
-    dryRun ||
-    worktreePolicy !== null ||
-    !shouldRunSourceAppUpdateShim(parsedArgs.cliArgs)
-  ) {
-    await runBbApp(parsedArgs.cliArgs, {
-      dryRun,
-      beforeServerStart: () => runNativeModulePreflight({ checkOnly: true }),
-      worktreePolicy,
-    });
-    return;
-  }
-  process.exitCode = await runSourceAppUpdateShim({
-    cliArgs: parsedArgs.cliArgs,
-    launcherArgs: [
-      "--conditions=source",
-      "--import",
-      "tsx",
-      resolve(scriptDir, "start-bb-launcher.mjs"),
-      ...parsedArgs.cliArgs,
-    ],
-    prepareRuntime,
-    repoRoot,
+  await runBbApp(parsedArgs.cliArgs, {
+    dryRun,
+    beforeServerStart: () => runNativeModulePreflight({ checkOnly: true }),
+    worktreePolicy,
   });
 }
 

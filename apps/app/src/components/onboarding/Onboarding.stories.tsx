@@ -26,11 +26,6 @@ export default {
 const noop = () => {};
 const MACHINE_NAME = "Sawyer's MacBook Pro";
 const CONNECT_URL = "https://sawyer.getbb.app";
-const MOBILE_LINKS = {
-  ios: "https://testflight.apple.com/join/example",
-  android: "https://example.com/bb-android.apk",
-};
-
 type AgentId = "claude-code" | "codex" | "pi";
 type AgentStates = Record<AgentId, AgentSetupState>;
 
@@ -478,7 +473,6 @@ function DevicesFrame({
         }
         connectSetupOpen={connectSetupOpen}
         otherMachineCount={otherMachineCount}
-        mobileLinks={MOBILE_LINKS}
         onToggleConnectSetup={onToggleConnectSetup}
         onCopyConnectUrl={noop}
         onAddMachine={noop}

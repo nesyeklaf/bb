@@ -2,13 +2,13 @@ import { useEffect, useState } from "react";
 import type { BbDesktopApi, BbDesktopInfo } from "@bb/desktop-contract";
 import { getBbDesktopInfo } from "@/lib/bb-desktop";
 
-interface DesktopUpdateInfo {
+interface DesktopInfo {
   desktopApi: BbDesktopApi | null;
   desktopInfo: BbDesktopInfo | null;
   isDesktop: boolean;
 }
 
-export function useDesktopUpdateInfo(): DesktopUpdateInfo {
+export function useDesktopInfo(): DesktopInfo {
   const [desktopApi] = useState<BbDesktopApi | null>(() => getBbDesktopInfo());
   const [desktopInfo, setDesktopInfo] = useState<BbDesktopInfo | null>(null);
 

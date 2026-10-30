@@ -41,13 +41,7 @@ export function createDesktopReleaseConfig(channel) {
       // installed at once without one shadowing the other on PATH.
       linuxExecutableName: "bb-nightly",
       macIconPath: "assets/icon-nightly.icns",
-      releaseTag: "desktop-nightly",
       windowsInstallName: "bb-nightly",
-      updateMetadataFileNames: {
-        linux: "nightly-linux.yml",
-        macos: "nightly-mac.yml",
-        windows: "nightly.yml",
-      },
     };
   }
 
@@ -58,16 +52,6 @@ export function createDesktopReleaseConfig(channel) {
     iconFileName: "icon.png",
     linuxExecutableName: "bb",
     macIconPath: "assets/icon.icns",
-    releaseTag: "desktop-latest",
     windowsInstallName: "bb",
-    updateMetadataFileNames: {
-      linux: "latest-linux.yml",
-      macos: "latest-mac.yml",
-      windows: "latest.yml",
-    },
   };
-}
-
-export function createDesktopUpdateReleaseBaseUrl(releaseTag) {
-  return `https://github.com/get-bb/bb/releases/download/${releaseTag}/`;
 }

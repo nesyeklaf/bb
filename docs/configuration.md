@@ -181,58 +181,6 @@ SDK methods are `system.experimental_cliCommand()`,
 `BB_CLI_LAUNCHER` is an internal path the launcher passes to its server child;
 do not set it yourself.
 
-## In-App Updates
-
-In-app updates are on when you start bb with `npx bb-app start` (or a global
-`bb-app`) or with `pnpm start` from a source checkout. bb runs under a small
-update shim, so Settings → Updates and `bb updates app apply` can update bb
-without a terminal. Pass `--no-in-app-updates` to turn them off: bb then starts
-without the shim and Settings → Updates shows the npm upgrade command for
-release installs. `--in-app-updates`, which earlier releases needed, is still
-accepted and changes nothing. Source checkouts show their
-Git revision, or a labeled build version when unavailable, and are never compared
-with npm releases. Without the update shim, no freshness indicator is shown.
-Failed checks report “Latest unknown”; release checks can be retried in the UI,
-with `sdk.system.version({ force: true })`, or by rerunning `bb updates`.
-`GET /api/v1/system/version` and `sdk.system.version()` expose nullable
-`installKind` (`desktop`, `npm`, or `source`) and `currentCommit` fields.
-
-- **npm installs** download the release into
-  `<dataDir>/app-versions/<version>/` and restart into it. The shim runs
-  whichever is newer, that install or the launched `npx` copy; `--bundled`
-  always runs the launched copy. bb keeps the running and previous versions.
-  Stable installs follow the `latest` dist-tag and nightly builds `nightly`.
-- **Source checkouts** update only from a clean `main` that fast-forwards to
-  `origin/main`; bb fast-forwards, runs `pnpm install --frozen-lockfile`,
-  rebuilds, and restarts.
-
-bb does not roll back an update; a version that fails to start runs again on
-the next start, and an older release may not open a database the new version
-migrated. The outcome is recorded in `<dataDir>/bb-app-update.json` (do not
-edit it). Only one launcher manages updates for a data directory; a second
-`bb-app start` on it runs with in-app updates off. `pnpm dev`, `bb-server`, and a standalone
-`bb-host-daemon` do not offer in-app updates. `BB_APP_UPDATE_MODE`,
-`BB_APP_INSTALL_KIND`, `BB_APP_SOURCE_ORIGIN`, and `BB_APP_SOURCE_COMMIT` are
-internal markers the launcher passes to its server child; do not set them. See
-`bb guide machines` for the `bb updates` commands.
-
-Settings → Updates shows the **Server** row for both standalone servers and servers
-hosted by the desktop app. **Update** downloads the release and restarts the
-server, using the hosting desktop's native updater when applicable. It asks
-before interrupting running threads and checks again when the download finishes.
-A separate **Desktop** row appears when the viewing desktop needs attention and
-is not the desktop hosting the server. The same server update is available with
-`bb updates app apply` and `sdk.system.applyAppUpdate`.
-
-Desktop update capability is an additive `desktopUpdateSupported: true` field in
-`SystemAppUpdateStatus`. The legacy `support` value remains
-`{ kind: "unsupported", reason: "desktop" }`, so previously shipped clients can
-still parse the response and keep their existing desktop update path. New clients
-use the capability to offer the shared server controls. If an updater request
-fails, confirmed support is retained and installation is blocked until a retry
-succeeds. Desktop/server IPC stays within the bundled process tree and does not
-change the host-daemon protocol.
-
 ## Common Keys
 
 | Key                            | Set with                                           | When to set             | Used for                                                                                                                                                                                                                                                                   |
@@ -853,8 +801,6 @@ off. An experiment you set yourself keeps your value either way.
   `linear://` and `slack://` in rendered Markdown and the plugin
   `navigate.openUrl` path. The viewing device asks before opening unless the
   scheme was saved with Always allow. See [App links](#app-links).
-- `changelogPreview` shows the latest release notes as a dismissible card on
-  Settings → Updates.
 - `compactExpiredCache` (on for early adopters) reports `compactionOfferAt` on a thread's context
   usage (timeline `contextWindowUsage` and `bb thread context`) once the
   provider has reported a prompt-cache lifetime, the provider supports manual
@@ -1260,8 +1206,7 @@ in and the `share-server-links` skill for `bb connect` and port shares.
 `https://getbb.app` and `https://vibecodethis.site` (plus
 `http://bb.localhost:<port>` in a development build).
 
-Settings → Mobile links the iOS TestFlight and Android APK downloads and pairs
-the bb mobile app (`bb connect machine-code`, see `bb guide machines`). Mobile
+Settings → Mobile pairs the bb mobile app (`bb connect machine-code`, see `bb guide machines`). Mobile
 builds, the optional `GOOGLE_SERVICES_JSON` Firebase config, and publishing
 are documented in [`apps/mobile/README.md`](../apps/mobile/README.md).
 
@@ -1345,8 +1290,7 @@ The data directory holds all bb-managed state: the SQLite database, logs, host
 identity, thread storage, custom themes, and plugins. It defaults to `~/.bb/`
 for the packaged app. Use `--data-dir` for fully isolated instances.
 
-Other launcher flags: `--no-in-app-updates` ([In-App Updates](#in-app-updates))
-and `--perf-diagnostics` ([Experiments](#experiments)).
+Other launcher flag: `--perf-diagnostics` ([Experiments](#experiments)).
 
 ## Source Development
 

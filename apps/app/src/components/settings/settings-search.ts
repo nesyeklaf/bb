@@ -227,7 +227,7 @@ export const SETTINGS_SEARCH_INDEX: Record<
     settings: [],
   },
   updates: {
-    keywords: ["upgrade", "version", "release notes", "changelog"],
+    keywords: ["upgrade", "version"],
     settings: [
       { title: "Provider CLIs", keywords: ["agents", "upgrade"] },
       {
@@ -259,7 +259,6 @@ export const SETTINGS_SEARCH_INDEX: Record<
           "URL schemes",
         ],
       },
-      { title: "Changelog preview", keywords: ["release notes", "updates"] },
       {
         title: "Server performance diagnostics",
         keywords: ["cpu profile", "logs"],

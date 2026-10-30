@@ -114,12 +114,7 @@ describe("useThreadFileTabs recently closed tabs", () => {
     browser.getTarget = async () => desktopTarget;
     window.bbDesktop = createBbDesktopApi(
       {
-        lastCheckedAt: null,
-        latestVersion: null,
-        pendingVersion: null,
         platform: "macos",
-        updateAvailable: false,
-        updateDownloaded: false,
         version: "0.0.0-test",
       },
       browser,

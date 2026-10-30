@@ -34,7 +34,6 @@ const KNOWN_PATHS = new Set([
   "environment branches",
   "plugin outdated",
   "settings usage",
-  "updates app status",
   "browser watch",
   "server export",
 ]);
@@ -82,7 +81,6 @@ describe("evaluateCliAccess in read mode", () => {
     [["environment", "branches", "env_1"]],
     [["plugin", "outdated"]],
     [["settings", "usage"]],
-    [["updates", "app", "status"]],
     [["thread"]],
     [["docs", "list"]],
     [["unknown-plugin-command"]],
@@ -163,7 +161,6 @@ describe("READ_ONLY_COMMAND_PATHS", () => {
       "settings show",
       "settings ui get",
       "settings ui list",
-      "settings version",
       "skill cli-skills-status",
       "skill files",
       "skill list",
@@ -191,7 +188,6 @@ describe("READ_ONLY_COMMAND_PATHS", () => {
       "thread show",
       "thread tabs show",
       "thread wait",
-      "updates status",
     ]);
   });
 });

@@ -903,7 +903,6 @@ interface DevicesStepProps {
   connectSetup: ReactNode;
   connectSetupOpen: boolean;
   otherMachineCount: number;
-  mobileLinks: { ios: string; android: string };
   onToggleConnectSetup: () => void;
   onCopyConnectUrl: (url: string) => void;
   onAddMachine: () => void;
@@ -914,7 +913,6 @@ export function DevicesStep({
   connectSetup,
   connectSetupOpen,
   otherMachineCount,
-  mobileLinks,
   onToggleConnectSetup,
   onCopyConnectUrl,
   onAddMachine,
@@ -963,25 +961,6 @@ export function DevicesStep({
           <Button size="sm" variant="outline" onClick={onAddMachine}>
             Add machine
           </Button>
-        }
-      />
-      <DeviceRow
-        icon="Smartphone"
-        title="Get the mobile app"
-        description="Get a push when a thread needs you."
-        action={
-          <span className="flex items-center gap-2">
-            <Button size="sm" variant="outline" asChild>
-              <a href={mobileLinks.ios} target="_blank" rel="noreferrer">
-                iOS
-              </a>
-            </Button>
-            <Button size="sm" variant="outline" asChild>
-              <a href={mobileLinks.android} target="_blank" rel="noreferrer">
-                Android
-              </a>
-            </Button>
-          </span>
         }
       />
     </ul>

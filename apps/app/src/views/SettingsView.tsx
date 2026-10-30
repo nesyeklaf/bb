@@ -1108,11 +1108,6 @@ const EXPERIMENT_DEFINITIONS: Record<
     description:
       "Open links like linear:// or slack:// in their apps on this device. BB asks first unless you choose Always allow. Manage approvals in General → Links → App links.",
   },
-  changelogPreview: {
-    label: "Changelog preview",
-    description:
-      "Show the latest release notes as a compact preview on the Updates page.",
-  },
   compactExpiredCache: {
     label: "Compact before resuming expired sessions",
     description:
@@ -1399,9 +1394,7 @@ export function SettingsView() {
     content = <MachineEnvironmentSettings />;
   } else if (activeSection === "updates") {
     content = (
-      <UpdatesSettingsSection
-        showChangelogPreview={experiments.changelogPreview}
-      />
+      <UpdatesSettingsSection />
     );
   } else if (activeSection === "mobile") {
     content = <MobileAppSection />;

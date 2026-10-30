@@ -53,16 +53,14 @@ import {
   type BbDesktopZoomChangeHandler,
 } from "@bb/desktop-contract";
 import {
-  BB_DESKTOP_CHECK_FOR_UPDATES_CHANNEL,
   BB_DESKTOP_GET_INFO_CHANNEL,
   BB_DESKTOP_INFO_CHANGED_CHANNEL,
-  BB_DESKTOP_INSTALL_UPDATE_CHANNEL,
   BB_DESKTOP_OPEN_EXTERNAL_URL_CHANNEL,
   BB_DESKTOP_OPEN_APPLICATION_URL_CHANNEL,
   BB_DESKTOP_SET_THEME_CHANNEL,
   BB_DESKTOP_ZOOM_CHANGED_CHANNEL,
   BB_DESKTOP_ZOOM_COMMAND_CHANNEL,
-} from "./desktop-update-ipc.js";
+} from "./desktop-ipc-channels.js";
 import {
   BB_DESKTOP_BROWSER_ATTACH_CHANNEL,
   BB_DESKTOP_BROWSER_TARGET_CHANNEL,
@@ -123,13 +121,7 @@ import { STARTUP_ACTION_CHANNEL } from "./local-view.js";
 
 function createInitialDesktopInfo(): BbDesktopInfo {
   return {
-    downloadState: "idle",
-    lastCheckedAt: null,
-    latestVersion: null,
-    pendingVersion: null,
     platform: resolveBbDesktopPlatform(process.platform),
-    updateAvailable: false,
-    updateDownloaded: false,
     version: getDesktopVersion(process.env.BB_DESKTOP_VERSION),
   };
 }
@@ -200,14 +192,6 @@ async function invokeDesktopWindowState(): Promise<BbDesktopWindowState> {
     return applyDesktopWindowStatePayload(payload) ?? currentWindowState;
   } catch {
     return currentWindowState;
-  }
-}
-
-async function invokeInstallUpdate(): Promise<void> {
-  try {
-    await ipcRenderer.invoke(BB_DESKTOP_INSTALL_UPDATE_CHANNEL);
-  } catch {
-    return;
   }
 }
 
@@ -447,31 +431,13 @@ const bbDesktopApi: BbDesktopApi = {
   selectServer(id) {
     ipcRenderer.send(BB_DESKTOP_SELECT_SERVER_CHANNEL, id);
   },
-  get lastCheckedAt() {
-    return currentInfo.lastCheckedAt;
-  },
-  get latestVersion() {
-    return currentInfo.latestVersion;
-  },
-  get pendingVersion() {
-    return currentInfo.pendingVersion;
-  },
   macosTrafficLightInset: MACOS_TRAFFIC_LIGHT_INSET_PX,
   macosTrafficLightTopInset: MACOS_TRAFFIC_LIGHT_TOP_INSET_PX,
   platform: resolveBbDesktopPlatform(process.platform),
   get serverDaemonLogsAvailable() {
     return currentInfo.serverDaemonLogsAvailable;
   },
-  get updateAvailable() {
-    return currentInfo.updateAvailable;
-  },
-  get updateDownloaded() {
-    return currentInfo.updateDownloaded;
-  },
   version: currentInfo.version,
-  checkForUpdates() {
-    return invokeDesktopInfo(BB_DESKTOP_CHECK_FOR_UPDATES_CHANNEL);
-  },
   getInfo() {
     return invokeDesktopInfo(BB_DESKTOP_GET_INFO_CHANNEL);
   },
@@ -483,9 +449,6 @@ const bbDesktopApi: BbDesktopApi = {
   },
   getWindowState() {
     return invokeDesktopWindowState();
-  },
-  installUpdate() {
-    return invokeInstallUpdate();
   },
   onChange(listener: BbDesktopInfoChangeHandler): BbDesktopInfoUnsubscribe {
     return addListener(listeners, listener);

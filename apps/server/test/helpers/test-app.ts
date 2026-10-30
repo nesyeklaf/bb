@@ -11,7 +11,6 @@ import {
   ensurePersonalProject,
   getAppSettings,
   getDisabledProviderIds,
-  listRunningThreads,
   setAppSettings,
   type DbConnection,
 } from "@bb/db";
@@ -31,17 +30,9 @@ import { createProviderNativeRootsCache } from "../../src/services/providers/nat
 import { createProviderLiveCommandsCache } from "../../src/services/providers/provider-live-commands.js";
 import { createAiServiceRegistry } from "../../src/services/ai/ai-service-registry.js";
 import {
-  createAppUpdateService,
-  type AppUpdateService,
-} from "../../src/services/system/app-update.js";
-import {
   createCliCommandService,
   type CliCommandService,
 } from "../../src/services/system/cli-command.js";
-import {
-  createAppVersionService,
-  type AppVersionService,
-} from "../../src/services/system/app-version.js";
 import { createBbAppManagedConfigReloader } from "../../src/services/system/bb-app-managed-config.js";
 import { TerminalSessionLifecycle } from "../../src/services/terminals/terminal-session-lifecycle.js";
 import { createLifecycleDedupers } from "../../src/lifecycle-dedupers.js";
@@ -93,8 +84,6 @@ export async function installTestBuiltinPlugin(
 }
 
 export type TestAppHarnessConfigOverrides = Partial<ServerRuntimeConfig> & {
-  appUpdateService?: AppUpdateService;
-  appVersionService?: AppVersionService;
   cliCommandService?: CliCommandService;
   terminalAttachTimeoutMs?: number;
   terminalCloseTimeoutMs?: number;
@@ -160,8 +149,6 @@ export async function createTestAppHarness(
   overrides: TestAppHarnessConfigOverrides = {},
 ): Promise<TestAppHarness> {
   const {
-    appUpdateService,
-    appVersionService,
     cliCommandService,
     terminalAttachTimeoutMs = TEST_TERMINAL_RPC_TIMEOUT_MS,
     terminalCloseTimeoutMs,
@@ -284,30 +271,7 @@ export async function createTestAppHarness(
   });
   pendingInteractions.start();
   setPluginToolCallRegistry(new PluginToolCallRegistry({ logger }));
-  const appVersion =
-    appVersionService ??
-    createAppVersionService({
-      sourceCommit: null,
-      installKind: null,
-      config,
-      logger,
-    });
-  const appUpdate =
-    appUpdateService ??
-    createAppUpdateService({
-      currentCommit: null,
-      appSurface: "web",
-      appVersion,
-      config,
-      countRunningThreads: () => listRunningThreads(db).length,
-      launcher: null,
-      logger,
-      mode: null,
-      notifyChanged: () => hub.notifySystem(["app-update-changed"]),
-    });
   const deps: ServerAppDeps = {
-    appUpdate,
-    appVersion,
     bbAppManagedConfig,
     cliCommand:
       cliCommandService ??

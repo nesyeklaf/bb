@@ -6,12 +6,7 @@ import type { BbDesktopInfo, BbDesktopTheme } from "@bb/desktop-contract";
 import { createBbDesktopApi } from "@/test/bb-desktop-test-utils";
 
 const desktopInfo: BbDesktopInfo = {
-  lastCheckedAt: null,
-  latestVersion: null,
-  pendingVersion: null,
   platform: "macos",
-  updateAvailable: false,
-  updateDownloaded: false,
   version: "0.0.0-test",
 };
 

@@ -43,9 +43,6 @@ export function SidebarUpdatesBadge({ onNavigate }: SidebarUpdatesBadgeProps) {
     inventory.machines.map((machine) => machine.host),
     inventory.isLoading,
   );
-  const bbUpdateCount =
-    (inventory.appUpdateAvailable ? 1 : 0) +
-    (inventory.desktopUpdateReady ? 1 : 0);
 
   const staleProvidersByKey = new Map<ProviderCliKey, StaleProvider>();
   for (const machine of inventory.machines) {
@@ -74,7 +71,6 @@ export function SidebarUpdatesBadge({ onNavigate }: SidebarUpdatesBadgeProps) {
   );
 
   if (
-    bbUpdateCount === 0 &&
     staleProviders.length === 0 &&
     pluginUpdateCount === 0 &&
     machineAttention.label === null
@@ -83,8 +79,6 @@ export function SidebarUpdatesBadge({ onNavigate }: SidebarUpdatesBadgeProps) {
   }
 
   const updatesRoutePath = getSettingsRoutePath("updates");
-  const bbLabel =
-    bbUpdateCount === 1 ? "bb update available" : "bb updates available";
   const providerLabel = `${joinNames(
     staleProviders.map((stale) => stale.displayName),
   )} ${staleProviders.length === 1 ? "update" : "updates"} available`;
@@ -112,23 +106,6 @@ export function SidebarUpdatesBadge({ onNavigate }: SidebarUpdatesBadgeProps) {
             </Link>
           </TooltipTrigger>
           <TooltipContent side="top">{machineAttention.label}</TooltipContent>
-        </Tooltip>
-      ) : null}
-      {bbUpdateCount > 0 ? (
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <Link
-              to={updatesRoutePath}
-              onClick={onNavigate}
-              aria-label={bbLabel}
-              data-testid="sidebar-updates-badge-bb"
-              className={CHIP_CLASS}
-            >
-              <Icon name="Download" className="size-3 text-muted-foreground" />
-              bb
-            </Link>
-          </TooltipTrigger>
-          <TooltipContent side="top">{bbLabel}</TooltipContent>
         </Tooltip>
       ) : null}
       {staleProviders.length > 0 ? (

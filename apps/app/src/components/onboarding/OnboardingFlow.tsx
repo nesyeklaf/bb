@@ -4,7 +4,6 @@ import { useLocation } from "react-router-dom";
 import {
   findLocalPathProjectSourceForHost,
   isActiveTerminalSessionStatus,
-  mobileAppDownloads,
 } from "@bb/domain";
 import type { TerminalOutputChunk, TerminalSession } from "@bb/server-contract";
 import { useMediaQuery } from "@bb/shared-ui/hooks/use-media-query";
@@ -864,7 +863,6 @@ function DevicesStepContainer({
         connectSetup={<PluginSettingsSections pluginId={CONNECT_PLUGIN_ID} />}
         connectSetupOpen={connectSetupOpen}
         otherMachineCount={otherMachineCount}
-        mobileLinks={mobileAppDownloads}
         onToggleConnectSetup={() => setConnectSetupOpen((open) => !open)}
         onCopyConnectUrl={(url) => void copyToClipboardWithToast(url)}
         onAddMachine={() => setAddMachineOpen(true)}

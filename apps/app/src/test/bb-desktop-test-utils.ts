@@ -36,13 +36,9 @@ export function createBbDesktopApi(
   return {
     ...info,
     browser,
-    async checkForUpdates() {
-      return info;
-    },
     async getInfo() {
       return info;
     },
-    async installUpdate() {},
     onChange() {
       return () => {};
     },

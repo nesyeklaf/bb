@@ -4,7 +4,6 @@ import { PERSONAL_PROJECT_ID, type Host, type ProviderInfo } from "@bb/domain";
 import type {
   SidebarBootstrapResponse,
   SystemAiServicesResponse,
-  SystemVersionResponse,
 } from "@bb/server-contract";
 import type { ProviderCliStatusResponse } from "@bb/host-daemon-contract";
 import {
@@ -18,7 +17,6 @@ import {
   systemAiServicesQueryKey,
   systemConfigQueryKey,
   systemProvidersQueryKey,
-  systemVersionQueryKey,
 } from "../src/hooks/queries/query-keys";
 import {
   buildUpdateInventoryProviderIssues,
@@ -33,8 +31,6 @@ import {
 } from "./machine-story-fixtures";
 import { makeProviderInfo } from "@bb/test-helpers/domain-fixtures";
 import {
-  BbAppUpdateRows,
-  BbUpdatesCard,
   PluginUpdatesSection,
   ProviderCliUpdatesSection,
 } from "../src/components/settings/UpdatesSettingsSection";
@@ -231,17 +227,6 @@ const systemConfig = makeSystemConfig({
   dataDir: "/Users/michael/.bb",
 });
 
-const systemVersion = {
-  currentVersion: "0.39.0",
-  latestVersion: "0.39.0",
-  currentCommit: null,
-  installKind: "npm",
-  source: "npm",
-  updateAvailable: false,
-  isDevelopment: false,
-  upgradeCommand: "npx bb-app@latest",
-} satisfies SystemVersionResponse;
-
 const systemProviders = [
   makeProviderInfo({
     id: "codex",
@@ -278,15 +263,6 @@ const noop = () => {};
 export function SettingsUpdatesStory() {
   return (
     <div className="space-y-6">
-      <BbUpdatesCard>
-        <BbAppUpdateRows
-          systemVersion={systemVersion}
-          desktopInfo={null}
-          isDesktop={false}
-          onRelaunchDesktop={null}
-          onRetryDesktop={null}
-        />
-      </BbUpdatesCard>
       <ProviderCliUpdatesSection
         machines={[settingsUpdateMachine]}
         now={0}
@@ -327,7 +303,6 @@ function createSettingsStoryQueryClient(hosts: Host[] = SETTINGS_STORY_HOSTS) {
   queryClient.setQueryData(hostsQueryKey(true), hosts);
   queryClient.setQueryData(systemConfigQueryKey(), systemConfig);
   queryClient.setQueryData(systemProvidersQueryKey(), systemProviders);
-  queryClient.setQueryData(systemVersionQueryKey(), systemVersion);
   queryClient.setQueryData(sidebarNavigationQueryKey(), sidebarNavigation);
   queryClient.setQueryData(pluginMarketplacesQueryKey(), []);
   queryClient.setQueryData(systemAiServicesQueryKey(), STORY_AI_SERVICES);

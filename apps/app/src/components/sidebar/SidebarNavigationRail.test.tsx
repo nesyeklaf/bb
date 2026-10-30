@@ -125,8 +125,6 @@ vi.mock("@/components/tools/ResourceSidebar", () => ({
 
 vi.mock("@/hooks/useUpdateInventory", () => ({
   useUpdateInventory: () => ({
-    appUpdateAvailable: true,
-    desktopUpdateReady: false,
     machines: [],
     plugins: { trackedCount: 0, items: [] },
     isLoading: false,
@@ -577,8 +575,8 @@ describe("Rail", () => {
     fireEvent.click(screen.getByRole("button", { name: "Toggle Sidebar" }));
     act(() => vi.advanceTimersByTime(250));
 
-    fireEvent.click(screen.getByRole("link", { name: "bb update available" }));
-    expect(pathname()).toBe(`${SETTINGS_ROUTE_PATH}/updates`);
+    fireEvent.click(railButton("Settings"));
+    expect(pathname()).toBe(SETTINGS_ROUTE_PATH);
     act(() => vi.advanceTimersByTime(250));
 
     fireEvent.click(screen.getByRole("button", { name: "Toggle Sidebar" }));

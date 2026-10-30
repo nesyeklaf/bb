@@ -10,7 +10,6 @@ import {
   sidebarNavigationQueryKey,
   systemProvidersQueryKey,
   systemExecutionOptionsQueryKey,
-  systemVersionQueryKey,
   terminalsQueryKey,
   threadConversationOutlineQueryKey,
   threadDefaultExecutionOptionsQueryKey,
@@ -199,28 +198,6 @@ describe("system cache effects", () => {
     expect(queryClient.getQueryState(sidebarNavigationKey)?.isInvalidated).toBe(
       true,
     );
-  });
-
-  it("re-checks the app version after reconnect", () => {
-    const queryClient = createCacheEffectQueryClient();
-    const versionKey = systemVersionQueryKey();
-    queryClient.setQueryData(versionKey, {
-      currentVersion: "0.0.5",
-      latestVersion: "0.0.6",
-      currentCommit: null,
-      installKind: "npm",
-      source: "npm",
-      updateAvailable: true,
-      isDevelopment: false,
-      upgradeCommand: "npx bb-app@latest",
-    });
-
-    invalidateRealtimeQueriesAfterServerReconnect({
-      disconnectedAt: afterAllCachedData(),
-      queryClient,
-    });
-
-    expect(queryClient.getQueryState(versionKey)?.isInvalidated).toBe(true);
   });
 
   it("refetches active thread bundle queries together after reconnect", async () => {

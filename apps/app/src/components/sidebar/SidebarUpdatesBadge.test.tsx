@@ -150,10 +150,6 @@ const NO_PLUGIN_UPDATES: UpdateInventory["plugins"] = {
 function renderBadge(inventory: Partial<UpdateInventory>) {
   useUpdateInventoryMock.mockReturnValue({
     isLoading: false,
-    systemVersion: undefined,
-    desktopInfo: null,
-    appUpdateAvailable: false,
-    desktopUpdateReady: false,
     machines: [],
     plugins: NO_PLUGIN_UPDATES,
     actionableCount: 0,
@@ -180,13 +176,6 @@ describe("SidebarUpdatesBadge", () => {
     expect(result.container.innerHTML).toBe("");
   });
 
-  it("shows only the bb chip for a bb-only update", () => {
-    renderBadge({ appUpdateAvailable: true });
-
-    expect(screen.getByTestId("sidebar-updates-badge-bb")).toBeTruthy();
-    expect(screen.queryByTestId("sidebar-updates-badge-providers")).toBeNull();
-  });
-
   it("counts plugin updates but not blocked plugin candidates", () => {
     const plugin = (id: string) =>
       makePluginListItem({ id, source: `npm:@acme/${id}@^1.0.0` });
@@ -211,7 +200,6 @@ describe("SidebarUpdatesBadge", () => {
     });
     expect(chip.getAttribute("href")).toBe("/settings/updates");
     expect(chip.textContent).toBe("2");
-    expect(screen.queryByTestId("sidebar-updates-badge-bb")).toBeNull();
   });
 
   it("acknowledges offline machines across reloads without suppressing real updates", () => {
@@ -226,7 +214,6 @@ describe("SidebarUpdatesBadge", () => {
       canRetryDaemonUpdate: true,
     });
     renderBadge({ machines: [offline] });
-    expect(screen.queryByTestId("sidebar-updates-badge-bb")).toBeNull();
     const warning = screen.getByRole("link", {
       name: "Work laptop is offline",
     });
@@ -245,11 +232,9 @@ describe("SidebarUpdatesBadge", () => {
           host: { ...offline.host, lastRejectedProtocolVersion: 2 },
         },
       ],
-      appUpdateAvailable: true,
     });
     reloaded.rerender(<BadgeHarness />);
     expect(screen.queryByTestId("sidebar-machines-attention-badge")).toBeNull();
-    expect(screen.getByTestId("sidebar-updates-badge-bb")).toBeTruthy();
     cleanup();
 
     renderBadge({
@@ -307,14 +292,13 @@ describe("SidebarUpdatesBadge", () => {
     expect(screen.queryByTestId("sidebar-machines-attention-badge")).toBeNull();
   });
 
-  it("shows only the provider chip when bb itself is current", () => {
+  it("shows the provider chip for a stale provider CLI", () => {
     renderBadge({
       machines: [
         machine({ issues: [providerIssue("claude-code", "Claude Code")] }),
       ],
     });
 
-    expect(screen.queryByTestId("sidebar-updates-badge-bb")).toBeNull();
     expect(
       screen
         .getByTestId("sidebar-updates-badge-providers")
@@ -353,26 +337,10 @@ describe("SidebarUpdatesBadge", () => {
     });
 
     expect(screen.queryByTestId("sidebar-updates-badge-providers")).toBeNull();
-    expect(screen.queryByTestId("sidebar-updates-badge-bb")).toBeNull();
-  });
-
-  it("still shows the bb chip when the only provider issue is a missing CLI", () => {
-    renderBadge({
-      appUpdateAvailable: true,
-      machines: [
-        machine({
-          issues: [missingInstallIssue("codex", "Codex")],
-        }),
-      ],
-    });
-
-    expect(screen.getByTestId("sidebar-updates-badge-bb")).toBeTruthy();
-    expect(screen.queryByTestId("sidebar-updates-badge-providers")).toBeNull();
   });
 
   it("renders one mark per provider in a stable order when the same CLI is stale on several machines", async () => {
     renderBadge({
-      appUpdateAvailable: true,
       machines: [
         machine({
           host: host("host-1"),
@@ -409,6 +377,5 @@ describe("SidebarUpdatesBadge", () => {
         node.classList.contains("flex"),
       ),
     ).toBe(true);
-    expect(screen.getByTestId("sidebar-updates-badge-bb")).toBeTruthy();
   });
 });

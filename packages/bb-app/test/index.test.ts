@@ -40,7 +40,6 @@ import {
   resolveBundledCliLaunch,
   resolveWorktreeRuntimePolicy,
   runBbApp,
-  shouldRunSourceAppUpdateShim,
   runBundledCliCommand,
   superviseFullStackProcesses,
   terminateManagedFullStackProcesses,
@@ -726,32 +725,6 @@ describe("bb-app launcher", () => {
       },
       positionals: ["host-daemon", "join"],
     });
-  });
-
-  it("runs the source update shim for a start unless --no-in-app-updates is passed", () => {
-    expect(shouldRunSourceAppUpdateShim([])).toBe(true);
-    expect(shouldRunSourceAppUpdateShim(["start"])).toBe(true);
-    expect(shouldRunSourceAppUpdateShim(["--no-in-app-updates"])).toBe(false);
-    expect(shouldRunSourceAppUpdateShim(["start", "--no-in-app-updates"])).toBe(
-      false,
-    );
-    expect(shouldRunSourceAppUpdateShim(["stop"])).toBe(false);
-    expect(shouldRunSourceAppUpdateShim(["start", "--help"])).toBe(false);
-  });
-
-  it("keeps accepting --in-app-updates from launchers started by earlier update shims", () => {
-    expect(parseLauncherArgs(["start", "--in-app-updates"])).toEqual({
-      options: { help: false, json: false },
-      positionals: ["start"],
-    });
-    expect(shouldRunSourceAppUpdateShim(["start", "--in-app-updates"])).toBe(
-      true,
-    );
-    expect(() =>
-      parseLauncherArgs(["--in-app-updates", "--no-in-app-updates"]),
-    ).toThrow(
-      "--in-app-updates and --no-in-app-updates cannot be used together",
-    );
   });
 
   it("passes opt-in performance diagnostics through to the launched server", async () => {
@@ -2142,41 +2115,21 @@ describe("bb-app launcher", () => {
       cliLauncherPath: null,
       context,
       env: { BB_APP_SURFACE: "desktop" },
-      install: { kind: "desktop" },
     });
     const webServerEnv = createServerEnv({
       cliLauncherPath: null,
       context,
       env: {},
-      install: { kind: "npm" },
     });
     const invalidSurfaceServerEnv = createServerEnv({
       cliLauncherPath: null,
       context,
       env: { BB_APP_SURFACE: "bogus" },
-      install: { kind: "npm" },
     });
 
     expect(desktopServerEnv.BB_APP_SURFACE).toBe("desktop");
     expect(webServerEnv.BB_APP_SURFACE).toBe("web");
     expect(invalidSurfaceServerEnv.BB_APP_SURFACE).toBe("web");
-  });
-
-  it("replaces inherited install markers so a fork never reports a stale commit", () => {
-    const serverEnv = createServerEnv({
-      cliLauncherPath: null,
-      context: createTestStartContext(),
-      env: {
-        BB_APP_INSTALL_KIND: "source",
-        BB_APP_SOURCE_COMMIT: "a".repeat(40),
-        BB_APP_SOURCE_ORIGIN: "official",
-      },
-      install: { kind: "source", origin: "fork" },
-    });
-
-    expect(serverEnv.BB_APP_INSTALL_KIND).toBe("source");
-    expect(serverEnv.BB_APP_SOURCE_ORIGIN).toBe("fork");
-    expect(serverEnv).not.toHaveProperty("BB_APP_SOURCE_COMMIT");
   });
 
   it("tells the server about the bb command launcher only when this start wrote one", () => {
@@ -2187,7 +2140,6 @@ describe("bb-app launcher", () => {
         cliLauncherPath: "/home/me/.bb/bin/bb",
         context,
         env: { BB_CLI_LAUNCHER: "/stale/bin/bb" },
-        install: { kind: "npm" },
       }).BB_CLI_LAUNCHER,
     ).toBe("/home/me/.bb/bin/bb");
     expect(
@@ -2195,7 +2147,6 @@ describe("bb-app launcher", () => {
         cliLauncherPath: null,
         context,
         env: { BB_CLI_LAUNCHER: "/stale/bin/bb" },
-        install: { kind: "source", origin: "none" },
       }),
     ).not.toHaveProperty("BB_CLI_LAUNCHER");
   });
@@ -2271,7 +2222,6 @@ describe("managed process networking", () => {
           ? createServerEnv({
               context,
               env,
-              install: { kind: "npm" },
               cliLauncherPath: null,
             })
           : createDaemonEnv({

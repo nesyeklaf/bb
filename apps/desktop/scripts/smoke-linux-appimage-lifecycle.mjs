@@ -471,7 +471,6 @@ async function smokeLinuxAppImageLifecycle() {
     const childEnv = {
       ...process.env,
       BB_DATA_DIR: dataDir,
-      BB_DESKTOP_AUTO_UPDATE: "0",
       BB_DESKTOP_OPEN_DEVTOOLS: "0",
       BB_DESKTOP_VERSION_CHECK: "0",
       BB_HOST_DAEMON_PORT: String(daemonPort),

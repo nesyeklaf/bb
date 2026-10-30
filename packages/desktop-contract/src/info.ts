@@ -2,27 +2,14 @@ import type { BbDesktopServerChoice } from "./servers.js";
 import { z } from "zod";
 import type { BbDesktopBrowserApi } from "./browser.js";
 import type { BbDesktopWindowFindRequest } from "./find.js";
-import { bbDesktopVersionFeedPlatformSchema } from "./version-feed.js";
 import type { AppCommandId } from "@bb/domain";
 
-const isoUtcDateTimeSchema = z.iso.datetime();
-
-const bbDesktopDownloadStateSchema = z.enum([
-  "idle",
-  "downloading",
-  "downloaded",
-  "failed",
-]);
+export const bbDesktopPlatformSchema = z.enum(["macos", "linux", "windows"]);
+export type BbDesktopPlatform = z.infer<typeof bbDesktopPlatformSchema>;
 
 export const bbDesktopInfoSchema = z.object({
-  downloadState: bbDesktopDownloadStateSchema.optional(),
-  lastCheckedAt: isoUtcDateTimeSchema.nullable(),
-  latestVersion: z.string().min(1).nullable(),
-  pendingVersion: z.string().min(1).nullable(),
-  platform: bbDesktopVersionFeedPlatformSchema,
+  platform: bbDesktopPlatformSchema,
   serverDaemonLogsAvailable: z.boolean().optional(),
-  updateAvailable: z.boolean(),
-  updateDownloaded: z.boolean(),
   version: z.string().min(1),
 });
 export type BbDesktopInfo = z.infer<typeof bbDesktopInfoSchema>;
@@ -75,12 +62,10 @@ export interface BbDesktopApi extends BbDesktopInfo {
     listener: (choices: BbDesktopServerChoice[]) => void,
   ): () => void;
   selectServer?(id: string): void;
-  checkForUpdates(): Promise<BbDesktopInfo>;
   getInfo(): Promise<BbDesktopInfo>;
   focusWindow?(): void;
   setAttentionThreads?(threads: BbDesktopAttentionThreads): void;
   getWindowState?(): Promise<BbDesktopWindowState>;
-  installUpdate(): Promise<void>;
   macosTrafficLightInset?: number;
   macosTrafficLightTopInset?: number;
   onChange(listener: BbDesktopInfoChangeHandler): BbDesktopInfoUnsubscribe;

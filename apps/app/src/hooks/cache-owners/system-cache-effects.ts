@@ -43,9 +43,7 @@ import {
 import { allThreadDefaultExecutionOptionsQueryKeyPrefix } from "../queries/thread-default-execution-options-query";
 import type { QueryClientArg } from "../cache-effect-types";
 import { clearCachedModelCatalogs } from "@/lib/model-catalog-cache";
-import { invalidateAppUpdateStatus } from "./app-update-cache-owner";
 import { invalidatePluginList } from "./plugin-cache-owner";
-import { invalidateSystemVersion } from "./system-version-cache-owner";
 import {
   invalidateQueryKeys,
   refetchFailedActiveQueryKeys,
@@ -72,8 +70,6 @@ export function invalidateRealtimeQueriesAfterServerReconnect({
       { cancelRefetch: false },
     );
   }
-  invalidateSystemVersion({ queryClient });
-  invalidateAppUpdateStatus({ queryClient });
 }
 
 export function refetchErroredRealtimeQueriesOnInitialConnect({

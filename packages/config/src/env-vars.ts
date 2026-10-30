@@ -2,20 +2,6 @@ import { z } from "zod";
 import { delimiter } from "node:path";
 import { defaultFeatureFlags } from "@bb/domain";
 import { DEFAULTS } from "./defaults.js";
-import {
-  APP_UPDATE_MODE_ENV_NAME,
-  appUpdateModeSchema,
-  type AppUpdateMode,
-} from "./app-update.js";
-import {
-  APP_INSTALL_KIND_ENV_NAME,
-  APP_SOURCE_COMMIT_ENV_NAME,
-  APP_SOURCE_ORIGIN_ENV_NAME,
-  appInstallKindSchema,
-  appSourceOriginSchema,
-  type AppInstallKind,
-  type AppSourceOrigin,
-} from "./app-install.js";
 import { CLI_LAUNCHER_ENV_NAME } from "./cli-command.js";
 import { defineEnvVar, type EnvVarParseArgs } from "./env.js";
 import {
@@ -60,36 +46,6 @@ function parseAppSurfaceEnvValue(args: EnvVarParseArgs): AppSurface {
     return parsed;
   }
   throw new Error(`${args.name} must be one of ${formatAppSurfaceValues()}`);
-}
-
-function parseAppUpdateModeEnvValue(args: EnvVarParseArgs): AppUpdateMode {
-  const parsed = appUpdateModeSchema.safeParse(args.value);
-  if (parsed.success) {
-    return parsed.data;
-  }
-  throw new Error(
-    `${args.name} must be one of ${appUpdateModeSchema.options.join(", ")}`,
-  );
-}
-
-function parseAppInstallKindEnvValue(args: EnvVarParseArgs): AppInstallKind {
-  const parsed = appInstallKindSchema.safeParse(args.value);
-  if (parsed.success) {
-    return parsed.data;
-  }
-  throw new Error(
-    `${args.name} must be one of ${appInstallKindSchema.options.join(", ")}`,
-  );
-}
-
-function parseAppSourceOriginEnvValue(args: EnvVarParseArgs): AppSourceOrigin {
-  const parsed = appSourceOriginSchema.safeParse(args.value);
-  if (parsed.success) {
-    return parsed.data;
-  }
-  throw new Error(
-    `${args.name} must be one of ${appSourceOriginSchema.options.join(", ")}`,
-  );
 }
 
 function parseOptionalPortEnvValue(args: EnvVarParseArgs): number | undefined {
@@ -212,38 +168,10 @@ export const BB_SERVER_LAUNCH_ID_ENV = defineEnvVar<string>({
   parse: parseNonEmptyStringEnvValue,
 });
 
-export const BB_APP_UPDATE_MODE_ENV = defineEnvVar<AppUpdateMode>({
-  description:
-    "Internal marker the bb-app launcher hands its server child when it runs under the in-app update shim: npm for package installs, source for pnpm start checkouts. The server offers in-app updates only when it is set.",
-  name: APP_UPDATE_MODE_ENV_NAME,
-  parse: parseAppUpdateModeEnvValue,
-});
-
 export const BB_CLI_LAUNCHER_ENV = defineEnvVar<string>({
   description:
     "Internal path the bb-app launcher hands its server child: the bb command launcher it wrote in the data directory for this install. The server offers to put the bb command on PATH only when it is set.",
   name: CLI_LAUNCHER_ENV_NAME,
-  parse: parseNonEmptyStringEnvValue,
-});
-
-export const BB_APP_INSTALL_KIND_ENV = defineEnvVar<AppInstallKind>({
-  description:
-    "Internal marker the bb-app launcher hands its server child: desktop for the desktop app, npm for package installs, source for pnpm start checkouts. Absent when the server runs without the launcher.",
-  name: APP_INSTALL_KIND_ENV_NAME,
-  parse: parseAppInstallKindEnvValue,
-});
-
-export const BB_APP_SOURCE_ORIGIN_ENV = defineEnvVar<AppSourceOrigin>({
-  description:
-    "Internal marker the bb-app launcher hands its server child for source checkouts: official when the origin remote is github.com/get-bb/bb or github.com/ymichael/bb, fork for any other origin, none without one.",
-  name: APP_SOURCE_ORIGIN_ENV_NAME,
-  parse: parseAppSourceOriginEnvValue,
-});
-
-export const BB_APP_SOURCE_COMMIT_ENV = defineEnvVar<string>({
-  description:
-    "Internal marker the bb-app launcher hands its server child with the HEAD commit of an official source checkout. Never set for forks.",
-  name: APP_SOURCE_COMMIT_ENV_NAME,
   parse: parseNonEmptyStringEnvValue,
 });
 

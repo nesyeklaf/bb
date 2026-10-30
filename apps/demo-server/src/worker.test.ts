@@ -5,7 +5,6 @@ import { join } from "node:path";
 import {
   pluginListResponseSchema,
   sidebarBootstrapResponseSchema,
-  systemAppUpdateStatusSchema,
   threadTimelineResponseSchema,
 } from "@bb/server-contract";
 import { PROVIDERS } from "./fixtures/providers.js";
@@ -167,9 +166,6 @@ it("serves the sample conversation in current contract shape", async () => {
     },
   );
   expect(await rpc.json()).toEqual({ ok: true, result: { preferences: {} } });
-  systemAppUpdateStatusSchema.parse(
-    await (await fetch(`${origin}/api/v1/system/app-update`)).json(),
-  );
 }, 15_000);
 
 it("keeps unsupported API and mutation requests out of the SPA fallback", async () => {

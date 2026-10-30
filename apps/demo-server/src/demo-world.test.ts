@@ -9,7 +9,6 @@ import {
   sendQueuedMessageResponseSchema,
   sidebarBootstrapResponseSchema,
   systemConfigResponseSchema,
-  systemVersionResponseSchema,
   threadChildSummaryResponseSchema,
   threadListResponseSchema,
   threadPendingInteractionsResponseSchema,
@@ -93,7 +92,6 @@ describe("demo world routes", () => {
     );
     expect(config.serverUrl).toBe(ORIGIN);
     expect(await (await get("/health")).json()).toEqual({ ok: true });
-    await parsed(get("/api/v1/system/version"), systemVersionResponseSchema);
     await parsed(get("/api/v1/hosts"), z.array(hostSchema));
     const bootstrap = await parsed(
       get("/api/v1/sidebar-bootstrap"),

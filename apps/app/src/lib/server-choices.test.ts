@@ -32,12 +32,7 @@ const studio: BbDesktopServerChoice = {
 
 function createDesktopApi() {
   return createBbDesktopApi({
-    lastCheckedAt: null,
-    latestVersion: null,
-    pendingVersion: null,
     platform: "macos",
-    updateAvailable: false,
-    updateDownloaded: false,
     version: "test",
   });
 }

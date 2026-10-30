@@ -68,11 +68,6 @@ export const CORE_COMMAND_GROUPS: readonly CommandGroup[] = [
     (m) => (program, deps) => m.registerServerCommands(program, deps.getUrl),
   ),
   group(
-    "updates",
-    () => import("./commands/updates.js"),
-    (m) => (program, deps) => m.registerUpdatesCommands(program, deps.getUrl),
-  ),
-  group(
     "terminal",
     () => import("./commands/terminal.js"),
     (m) => (program, deps) => m.registerTerminalCommands(program, deps.getUrl),

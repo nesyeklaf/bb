@@ -15,10 +15,6 @@ import { tmpdir } from "node:os";
 import { dirname, resolve } from "node:path";
 import { z } from "zod";
 import { describe, expect, it } from "vitest";
-import {
-  createDesktopReleaseInfo,
-  DESKTOP_AUTO_UPDATE_FEED_CONFIG,
-} from "../src/desktop-update-provider.js";
 
 const desktopPackageRoot = process.cwd();
 const require = createRequire(resolve(desktopPackageRoot, "package.json"));
@@ -109,15 +105,6 @@ const electronBuilderConfigSchema = z
     appId: z.string().min(1),
     artifactName: z.string().min(1),
     productName: z.string().min(1),
-    publish: z.tuple([
-      z
-        .object({
-          channel: z.enum(["latest", "nightly"]),
-          provider: z.literal("generic"),
-          url: z.string().min(1),
-        })
-        .passthrough(),
-    ]),
     toolsets: z.object({
       appimage: z.literal("1.0.3"),
     }),
@@ -554,20 +541,17 @@ describe("electron-builder signing config", () => {
     }
   });
 
-  it("keeps the updater provider pointed at desktop-latest release assets", async () => {
+  it("publishes nothing and ships no update feed", async () => {
     const config = await readStaticConfig();
 
-    expect(config.publish[0]).toMatchObject(DESKTOP_AUTO_UPDATE_FEED_CONFIG);
-    expect(DESKTOP_AUTO_UPDATE_FEED_CONFIG.url).toBe(
-      "https://github.com/get-bb/bb/releases/download/desktop-latest/",
-    );
+    expect(config).not.toHaveProperty("publish");
+    expect(JSON.stringify(config)).not.toContain("github.com");
   });
 
   it("creates a separate nightly app identity and update feed", async () => {
     const { config } = await readResolvedConfig({
       BB_DESKTOP_RELEASE_CHANNEL: "nightly",
     });
-    const nightlyRelease = createDesktopReleaseInfo("nightly");
 
     expect(config.appId).toBe("dev.bb.desktop.nightly");
     expect(config.productName).toBe("bb Nightly");
@@ -581,11 +565,6 @@ describe("electron-builder signing config", () => {
     await expect(
       access(resolve(desktopPackageRoot, "assets/icon-nightly.png")),
     ).resolves.toBeUndefined();
-    expect(config.publish[0]).toEqual({
-      channel: "nightly",
-      provider: "generic",
-      url: nightlyRelease.updateReleaseBaseUrl,
-    });
   });
 
   it("rejects unknown desktop release channels", async () => {

@@ -1,7 +1,6 @@
 // @vitest-environment jsdom
 
 import {
-  act,
   cleanup,
   fireEvent,
   render,
@@ -14,9 +13,6 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { Host } from "@bb/domain";
 import { makeHost as makeHostFixture } from "@bb/test-helpers/domain-fixtures";
-import type { BbDesktopApi, BbDesktopInfo } from "@bb/desktop-contract";
-import { BbHttpError } from "@bb/sdk/browser";
-import type { SystemAppUpdateStatus } from "@bb/server-contract";
 import {
   HOST_DAEMON_PROTOCOL_VERSION,
   type ProviderCliKey,
@@ -27,7 +23,6 @@ import type {
   ProviderCliActionableIssue,
 } from "@/components/provider-cli/provider-cli-install";
 import { useProviderCliInstallRunner } from "@/components/provider-cli/provider-cli-install";
-import { resetAppUpdateCheckStoreForTests } from "@/components/settings/app-update-check-store";
 import {
   getProviderCliInstallSnapshot,
   resetProviderCliInstallStoreForTests,
@@ -35,8 +30,6 @@ import {
 import { appToast } from "@/components/ui/app-toast";
 import { makePluginListItem } from "@/test/fixtures/plugins";
 import { buildUpdateInventoryPlugins } from "@/hooks/useUpdateInventory";
-import { sdk } from "@/lib/sdk";
-import { useDesktopUpdateInfo } from "@/hooks/useDesktopUpdateInfo";
 import {
   useUpdateInventory,
   type UpdateInventory,
@@ -64,10 +57,6 @@ vi.mock("@/lib/sdk", async () => {
   return {
     sdk: {
       system: {
-        acknowledgeAppUpdate: vi.fn(),
-        appUpdate: vi.fn(),
-        applyAppUpdate: vi.fn(),
-        version: vi.fn(),
         config: vi.fn(async () =>
           makeSystemConfig({ primaryHostId: "host_primary" }),
         ),
@@ -90,10 +79,6 @@ vi.mock("@/lib/ws", () => ({
 vi.mock("@/hooks/useUpdateInventory", async (original) => ({
   ...(await original<typeof import("@/hooks/useUpdateInventory")>()),
   useUpdateInventory: vi.fn(),
-}));
-
-vi.mock("@/hooks/useDesktopUpdateInfo", () => ({
-  useDesktopUpdateInfo: vi.fn(),
 }));
 
 const hostDaemon = vi.hoisted(() => ({
@@ -274,19 +259,6 @@ function makeMachine(args: {
 function makeInventory(overrides: Partial<UpdateInventory>): UpdateInventory {
   return {
     isLoading: false,
-    systemVersion: {
-      currentVersion: "0.0.5",
-      latestVersion: "0.0.5",
-      currentCommit: null,
-      installKind: "npm",
-      source: "npm",
-      updateAvailable: false,
-      isDevelopment: false,
-      upgradeCommand: "npx bb-app@latest",
-    },
-    desktopInfo: null,
-    appUpdateAvailable: false,
-    desktopUpdateReady: false,
     machines: [
       makeMachine({
         host: makeHost({ id: "host_primary", name: "workstation" }),
@@ -302,9 +274,7 @@ function makeInventory(overrides: Partial<UpdateInventory>): UpdateInventory {
   };
 }
 
-function renderSection({
-  showChangelogPreview = false,
-}: { showChangelogPreview?: boolean } = {}): void {
+function renderSection(): void {
   render(
     <MemoryRouter>
       <TooltipProvider>
@@ -313,7 +283,7 @@ function renderSection({
             new QueryClient({ defaultOptions: { queries: { retry: false } } })
           }
         >
-          <UpdatesSettingsSection showChangelogPreview={showChangelogPreview} />
+          <UpdatesSettingsSection />
         </QueryClientProvider>
       </TooltipProvider>
     </MemoryRouter>,
@@ -321,62 +291,15 @@ function renderSection({
 }
 
 const useUpdateInventoryMock = vi.mocked(useUpdateInventory);
-const useDesktopUpdateInfoMock = vi.mocked(useDesktopUpdateInfo);
 const useProviderCliInstallRunnerMock = vi.mocked(useProviderCliInstallRunner);
 
-function makeAppUpdateStatus(
-  overrides: Partial<SystemAppUpdateStatus> = {},
-): SystemAppUpdateStatus {
-  return {
-    activity: { phase: "idle" },
-    available: {
-      channel: "latest",
-      commit: null,
-      commitCount: null,
-      subjects: [],
-      version: "0.0.6",
-    },
-    blocked: null,
-    current: { commit: null, version: "0.0.5" },
-    lastResult: null,
-    runningThreadCount: 0,
-    support: { kind: "supported", mode: "npm" },
-    ...overrides,
-  };
-}
-
 function useWebApp(): void {
-  useDesktopUpdateInfoMock.mockReturnValue({
-    desktopApi: null,
-    desktopInfo: null,
-    isDesktop: false,
-  });
   useUpdateInventoryMock.mockReturnValue(makeInventory({}));
-  vi.mocked(sdk.system.version).mockResolvedValue({
-    currentVersion: "0.0.5",
-    isDevelopment: false,
-    latestVersion: "0.0.6",
-    currentCommit: null,
-    installKind: "npm",
-    source: "npm",
-    updateAvailable: true,
-    upgradeCommand: "npx bb-app@latest",
-  });
 }
 
 beforeEach(() => {
   hostDaemon.localDaemonHostId = null;
   pluginUpdateJobs.current = [];
-  vi.mocked(sdk.system.appUpdate).mockResolvedValue(
-    makeAppUpdateStatus({
-      available: null,
-      support: { kind: "unsupported", reason: "unmanaged" },
-    }),
-  );
-  vi.stubGlobal(
-    "fetch",
-    vi.fn().mockRejectedValue(new Error("Changelog unavailable offline")),
-  );
   useProviderCliInstallRunnerMock.mockReturnValue({
     failuresByJobKey: new Map(),
     queuedJobKeys: new Set<string>(),
@@ -389,42 +312,13 @@ afterEach(() => {
   vi.useRealTimers();
   cleanup();
   window.localStorage.clear();
-  resetAppUpdateCheckStoreForTests();
   resetProviderCliInstallStoreForTests();
   vi.clearAllMocks();
   vi.unstubAllGlobals();
 });
 
 describe("UpdatesSettingsSection", () => {
-  it("checks for updates once when the view mounts", async () => {
-    useDesktopUpdateInfoMock.mockReturnValue({
-      desktopApi: null,
-      desktopInfo: null,
-      isDesktop: false,
-    });
-    const host = makeHost({ id: "host_1", name: "workstation" });
-    useUpdateInventoryMock.mockReturnValue(
-      makeInventory({ machines: [makeMachine({ host })] }),
-    );
-    vi.mocked(sdk.system.version).mockResolvedValue(
-      makeInventory({}).systemVersion!,
-    );
-
-    renderSection();
-
-    expect(screen.queryByRole("button", { name: /check/i })).toBeNull();
-    await waitFor(() => {
-      expect(sdk.system.version).toHaveBeenCalledWith({ force: true });
-    });
-    expect(sdk.system.version).toHaveBeenCalledTimes(1);
-  });
-
   it("places fleet-wide Update all beside the Provider CLIs heading", () => {
-    useDesktopUpdateInfoMock.mockReturnValue({
-      desktopApi: null,
-      desktopInfo: null,
-      isDesktop: false,
-    });
     useUpdateInventoryMock.mockReturnValue(
       makeInventory({
         machines: [
@@ -473,249 +367,7 @@ describe("UpdatesSettingsSection", () => {
     ).toBeNull();
   });
 
-  it("keeps the changelog preview behind its experiment", () => {
-    useDesktopUpdateInfoMock.mockReturnValue({
-      desktopApi: null,
-      desktopInfo: null,
-      isDesktop: false,
-    });
-    useUpdateInventoryMock.mockReturnValue(makeInventory({}));
-
-    renderSection();
-
-    expect(
-      document.querySelector('[data-updates-domain="changelog"]'),
-    ).toBeNull();
-    expect(fetch).not.toHaveBeenCalled();
-  });
-
-  it("keeps a recently checked healthy fleet quiet and accessible", async () => {
-    vi.stubGlobal(
-      "fetch",
-      vi.fn().mockImplementation(() =>
-        Promise.resolve(
-          new Response(`# Changelog
-
-## 9.9.9
-
-The canonical release summary.
-
-### New features
-
-- One current feature.
-
-### Fixes
-
-- One current fix.
-`),
-        ),
-      ),
-    );
-    useDesktopUpdateInfoMock.mockReturnValue({
-      desktopApi: null,
-      desktopInfo: null,
-      isDesktop: false,
-    });
-    useUpdateInventoryMock.mockReturnValue(
-      makeInventory({
-        lastCheckedAt: Date.now() - 2 * 60 * 1000,
-        machines: [
-          makeMachine({
-            host: makeHost({ id: "host_1", name: "workstation" }),
-            isPrimary: true,
-          }),
-          makeMachine({
-            host: makeHost({ id: "host_2", name: "studio-mac" }),
-          }),
-        ],
-      }),
-    );
-
-    renderSection({ showChangelogPreview: true });
-
-    await waitFor(() => {
-      expect(
-        screen
-          .getAllByText("Up to date")
-          .every((label) => label.className.includes("sr-only")),
-      ).toBe(true);
-    });
-    expect(screen.queryByText("2 up to date")).toBeNull();
-    expect(
-      screen.getByText("Nothing to update on all 2 machines."),
-    ).toBeDefined();
-    expect(document.querySelector("[data-updates-machine]")).toBeNull();
-    expect(screen.queryByText("workstation")).toBeNull();
-    expect(screen.queryByText("This machine")).toBeNull();
-    expect(screen.queryByText("Codex")).toBeNull();
-    expect(screen.queryByText(/Checked/)).toBeNull();
-    expect(screen.queryByText(/ago$/)).toBeNull();
-    expect(screen.queryByText(/^In sync$/)).toBeNull();
-    expect(screen.queryByText("workstation, studio-mac")).toBeNull();
-    expect(screen.queryByRole("button", { name: /check/i })).toBeNull();
-    expect(screen.queryByRole("heading", { name: "Updates" })).toBeNull();
-    expect(
-      screen.getByRole("button", { name: /^Open the full bb .* changelog$/ }),
-    ).toBeDefined();
-    const changelog = document.querySelector(
-      '[data-updates-domain="changelog"]',
-    );
-    await waitFor(() => {
-      expect(changelog?.textContent).toContain("9.9.9");
-    });
-    expect(
-      within(changelog as HTMLElement).getByRole("heading", {
-        level: 2,
-        name: "What's new",
-      }),
-    ).toBeDefined();
-    expect(
-      within(changelog as HTMLElement).getByRole("heading", {
-        level: 3,
-        name: "9.9.9",
-      }),
-    ).toBeDefined();
-    expect(changelog?.textContent).toContain("The canonical release summary.");
-    expect(
-      changelog?.querySelector('[data-changelog-version="9.9.9"]'),
-    ).toBeNull();
-    const changelogPreview = changelog?.querySelector(
-      "[data-changelog-preview]",
-    );
-    expect(changelogPreview?.className).not.toContain("grid");
-    expect(
-      changelog?.querySelector("[data-changelog-release-scroll]")?.className,
-    ).toContain("max-h-56");
-    expect(
-      changelog?.querySelector("[data-changelog-footer]")?.className,
-    ).toContain("bg-foreground");
-    expect(
-      changelog?.querySelector("[data-changelog-footer]")?.className,
-    ).toContain("text-background");
-    expect(changelog?.textContent).toContain("Full changelog");
-    for (const highlight of ["New features", "Fixes"]) {
-      expect(
-        within(changelog as HTMLElement).getByRole("heading", {
-          level: 4,
-          name: highlight,
-        }),
-      ).toBeDefined();
-    }
-    expect(changelog?.textContent).toContain("One current feature.");
-    expect(changelog?.textContent).toContain("One current fix.");
-    const dismissChangelog = screen.getByRole("button", {
-      name: "Dismiss bb 9.9.9 changelog preview",
-    });
-    const changelogHeader = changelog?.querySelector("[data-changelog-header]");
-    const changelogCard = changelogHeader?.closest("section");
-    expect(changelogPreview?.firstElementChild).toBe(changelogHeader);
-    expect(changelogHeader?.contains(dismissChangelog)).toBe(true);
-    expect(changelogCard?.contains(changelogPreview ?? null)).toBe(true);
-    expect(dismissChangelog.querySelector('[data-icon="X"]')).not.toBeNull();
-    fireEvent.click(
-      screen.getByRole("button", {
-        name: "Open the full bb 9.9.9 changelog",
-      }),
-    );
-    expect(openUrlInExternalBrowserMock).toHaveBeenCalledWith(
-      "https://getbb.app/changelog#9-9-9",
-    );
-    vi.useFakeTimers();
-    fireEvent.click(dismissChangelog);
-    expect(screen.getByRole("status").textContent).toContain(
-      "You're all caught up",
-    );
-    expect(
-      screen.queryByRole("button", {
-        name: "Open the full bb 9.9.9 changelog",
-      }),
-    ).toBeNull();
-    expect(changelog?.getAttribute("data-changelog-dismiss-phase")).toBe(
-      "confirming",
-    );
-    expect(
-      changelog?.querySelector("[data-changelog-release-panel]")?.className,
-    ).toContain("grid-rows-[0fr]");
-    const confirmation = changelog?.querySelector(
-      "[data-changelog-dismiss-confirmation]",
-    );
-    expect(confirmation?.className).toContain("grid-rows-[1fr]");
-    expect(confirmation?.className).not.toContain("absolute");
-    expect(changelog?.className).toContain("motion-reduce:transition-none");
-    expect(
-      window.localStorage.getItem(
-        "bb.settings.updates.dismissed-changelog-version",
-      ),
-    ).toBe("9.9.9");
-
-    act(() => vi.advanceTimersByTime(1_999));
-    expect(changelog?.getAttribute("data-changelog-dismiss-phase")).toBe(
-      "confirming",
-    );
-    act(() => vi.advanceTimersByTime(1));
-    expect(changelog?.getAttribute("data-changelog-dismiss-phase")).toBe(
-      "exiting",
-    );
-    expect(changelog?.className).toContain("grid-rows-[0fr]");
-    act(() => vi.advanceTimersByTime(180));
-    expect(
-      document.querySelector('[data-updates-domain="changelog"]'),
-    ).toBeNull();
-    vi.useRealTimers();
-
-    cleanup();
-    renderSection({ showChangelogPreview: true });
-    await waitFor(() => {
-      expect(fetch).toHaveBeenCalledTimes(2);
-    });
-    expect(
-      document.querySelector('[data-updates-domain="changelog"]'),
-    ).toBeNull();
-
-    cleanup();
-    window.localStorage.setItem(
-      "bb.settings.updates.dismissed-changelog-version",
-      "9.9.8",
-    );
-    renderSection({ showChangelogPreview: true });
-    await waitFor(() => {
-      expect(
-        screen.getByRole("button", {
-          name: "Dismiss bb 9.9.9 changelog preview",
-        }),
-      ).toBeDefined();
-    });
-
-    const settledRows = screen.getAllByText(/^Up to date/);
-    expect(
-      settledRows.every(
-        (settled) =>
-          settled.parentElement?.querySelector(".bg-success") === null,
-      ),
-    ).toBe(true);
-    expect(document.querySelector(".bg-success")).toBeNull();
-    expect(
-      document
-        .querySelector(
-          '[data-update-state="up-to-date"] [data-icon="CircleCheck"]',
-        )
-        ?.getAttribute("class"),
-    ).toContain("text-input");
-    expect(
-      document
-        .querySelector(
-          '[data-update-state="up-to-date"] [data-icon="CircleCheck"]',
-        )
-        ?.getAttribute("class"),
-    ).not.toContain("opacity-");
-  });
-
   it("does not claim up to date when the latest version is unknown", async () => {
-    useDesktopUpdateInfoMock.mockReturnValue({
-      desktopApi: null,
-      desktopInfo: null,
-      isDesktop: false,
-    });
     const machine = makeMachine({
       host: makeHost({ id: "host_1", name: "workstation" }),
       isPrimary: true,
@@ -726,7 +378,7 @@ The canonical release summary.
       makeInventory({ lastCheckedAt: Date.now(), machines: [machine] }),
     );
 
-    renderSection({});
+    renderSection();
 
     expect(screen.getByText("Nothing to update on workstation.")).toBeDefined();
     fireEvent.click(screen.getByRole("button", { name: "Show machines" }));
@@ -739,11 +391,6 @@ The canonical release summary.
   });
 
   it("does not call an offline fleet all in sync", async () => {
-    useDesktopUpdateInfoMock.mockReturnValue({
-      desktopApi: null,
-      desktopInfo: null,
-      isDesktop: false,
-    });
     useUpdateInventoryMock.mockReturnValue(
       makeInventory({
         machines: [
@@ -764,10 +411,6 @@ The canonical release summary.
     expect(screen.queryByText(/Nothing to update/)).toBeNull();
     expect(screen.queryByText(/all in sync/)).toBeNull();
     expect(document.querySelector("[data-updates-machine]")).toBeNull();
-    expect(
-      document.querySelector('[data-bb-update-role="app"]'),
-    ).not.toBeNull();
-    expect(screen.getByText("Server")).toBeDefined();
 
     fireEvent.click(screen.getByRole("button", { name: "Show machines" }));
     const row = document.querySelector<HTMLElement>(
@@ -778,17 +421,9 @@ The canonical release summary.
     expect(
       within(row as HTMLElement).queryByRole("button", { name: "homelab" }),
     ).toBeNull();
-    await waitFor(() => {
-      expect(screen.getByText(/^Up to date/)).toBeDefined();
-    });
   });
 
   it("lists only machines that need attention and folds the rest into the footer", () => {
-    useDesktopUpdateInfoMock.mockReturnValue({
-      desktopApi: null,
-      desktopInfo: null,
-      isDesktop: false,
-    });
     const stalledHost = makeHost({
       id: "host_3",
       name: "homelab",
@@ -845,11 +480,6 @@ The canonical release summary.
   });
 
   it("treats a recent daemon protocol mismatch as an automatic update", () => {
-    useDesktopUpdateInfoMock.mockReturnValue({
-      desktopApi: null,
-      desktopInfo: null,
-      isDesktop: false,
-    });
     const host = makeHost({
       id: "host_1",
       name: "homelab",
@@ -884,11 +514,6 @@ The canonical release summary.
   });
 
   it("explains and retries a daemon update that has stalled", () => {
-    useDesktopUpdateInfoMock.mockReturnValue({
-      desktopApi: null,
-      desktopInfo: null,
-      isDesktop: false,
-    });
     const host = makeHost({
       id: "host_1",
       name: "homelab",
@@ -944,11 +569,6 @@ The canonical release summary.
   });
 
   it("names a machine running a newer bb than the server", () => {
-    useDesktopUpdateInfoMock.mockReturnValue({
-      desktopApi: null,
-      desktopInfo: null,
-      isDesktop: false,
-    });
     useUpdateInventoryMock.mockReturnValue(
       makeInventory({
         machines: [
@@ -974,11 +594,6 @@ The canonical release summary.
   });
 
   it("sweeps every machine stalled on the same bb update", () => {
-    useDesktopUpdateInfoMock.mockReturnValue({
-      desktopApi: null,
-      desktopInfo: null,
-      isDesktop: false,
-    });
     const stalled = ["workstation", "studio-mac", "homelab"].map(
       (name, index) =>
         makeHost({
@@ -1017,11 +632,6 @@ The canonical release summary.
   });
 
   it("shows one line per machine and its installed CLIs when expanded", async () => {
-    useDesktopUpdateInfoMock.mockReturnValue({
-      desktopApi: null,
-      desktopInfo: null,
-      isDesktop: false,
-    });
     const host = makeHost({ id: "host_1", name: "workstation" });
     const codexIssue = makeUpdateIssue({ provider: "codex" });
     useUpdateInventoryMock.mockReturnValue(
@@ -1106,11 +716,6 @@ The canonical release summary.
   });
 
   it("names the updater from the command the machine reports", () => {
-    useDesktopUpdateInfoMock.mockReturnValue({
-      desktopApi: null,
-      desktopInfo: null,
-      isDesktop: false,
-    });
     const host = makeHost({ id: "host_1", name: "workstation" });
     const withCommand = (
       provider: "codex" | "claude-code",
@@ -1152,11 +757,6 @@ The canonical release summary.
   });
 
   it("badges the client-local daemon independently from the server machine", async () => {
-    useDesktopUpdateInfoMock.mockReturnValue({
-      desktopApi: null,
-      desktopInfo: null,
-      isDesktop: false,
-    });
     const primary = makeHost({ id: "host_primary", name: "workstation" });
     const local = makeHost({ id: "host_local", name: "studio-mac" });
     hostDaemon.localDaemonHostId = local.id;
@@ -1197,11 +797,6 @@ The canonical release summary.
   });
 
   it("badges a lone server machine without marking it as this machine", async () => {
-    useDesktopUpdateInfoMock.mockReturnValue({
-      desktopApi: null,
-      desktopInfo: null,
-      isDesktop: false,
-    });
     const primary = makeHost({ id: "host_primary", name: "workstation" });
     hostDaemon.localDaemonHostId = primary.id;
     useUpdateInventoryMock.mockReturnValue(
@@ -1232,11 +827,6 @@ The canonical release summary.
   });
 
   it("lists Cursor updates with the other provider CLIs", async () => {
-    useDesktopUpdateInfoMock.mockReturnValue({
-      desktopApi: null,
-      desktopInfo: null,
-      isDesktop: false,
-    });
     const host = makeHost({ id: "host_1", name: "workstation" });
     const cursorIssue = makeUpdateIssue({ provider: "acp-cursor" });
     useUpdateInventoryMock.mockReturnValue(
@@ -1262,11 +852,6 @@ The canonical release summary.
   });
 
   it("piles every outdated CLI onto its machine's single line", () => {
-    useDesktopUpdateInfoMock.mockReturnValue({
-      desktopApi: null,
-      desktopInfo: null,
-      isDesktop: false,
-    });
     const host = makeHost({ id: "host_1", name: "workstation" });
     useUpdateInventoryMock.mockReturnValue(
       makeInventory({
@@ -1303,11 +888,6 @@ The canonical release summary.
   });
 
   it("shows one quiet line while provider checks are still running", async () => {
-    useDesktopUpdateInfoMock.mockReturnValue({
-      desktopApi: null,
-      desktopInfo: null,
-      isDesktop: false,
-    });
     const host = makeHost({ id: "host_1", name: "workstation" });
     useUpdateInventoryMock.mockReturnValue(
       makeInventory({
@@ -1345,11 +925,6 @@ The canonical release summary.
   });
 
   it("keeps error red on the reason and off the recovery", () => {
-    useDesktopUpdateInfoMock.mockReturnValue({
-      desktopApi: null,
-      desktopInfo: null,
-      isDesktop: false,
-    });
     const host = makeHost({ id: "host_1", name: "workstation" });
     useUpdateInventoryMock.mockReturnValue(
       makeInventory({
@@ -1370,11 +945,6 @@ The canonical release summary.
   });
 
   it("leaves never-installed CLIs off an update page", () => {
-    useDesktopUpdateInfoMock.mockReturnValue({
-      desktopApi: null,
-      desktopInfo: null,
-      isDesktop: false,
-    });
     const host = makeHost({ id: "host_1", name: "workstation" });
     const missingCodex = makeUpdateIssue({ provider: "codex" });
     useUpdateInventoryMock.mockReturnValue(
@@ -1411,11 +981,6 @@ The canonical release summary.
   });
 
   it("swaps Update all for progress while every job is running or queued", () => {
-    useDesktopUpdateInfoMock.mockReturnValue({
-      desktopApi: null,
-      desktopInfo: null,
-      isDesktop: false,
-    });
     const host = makeHost({ id: "host_1", name: "workstation" });
     const codexIssue = makeUpdateIssue({ provider: "codex" });
     const claudeIssue = makeUpdateIssue({ provider: "claude-code" });
@@ -1460,11 +1025,6 @@ The canonical release summary.
   });
 
   it("counts progress through an Update all batch", () => {
-    useDesktopUpdateInfoMock.mockReturnValue({
-      desktopApi: null,
-      desktopInfo: null,
-      isDesktop: false,
-    });
     const host = makeHost({ id: "host_1", name: "workstation" });
     useUpdateInventoryMock.mockReturnValue(
       makeInventory({
@@ -1526,11 +1086,6 @@ The canonical release summary.
   });
 
   it("keeps a provider update failure and its command log on the machine", () => {
-    useDesktopUpdateInfoMock.mockReturnValue({
-      desktopApi: null,
-      desktopInfo: null,
-      isDesktop: false,
-    });
     const host = makeHost({ id: "host_1", name: "workstation" });
     const issue = makeUpdateIssue({ provider: "claude-code" });
     const logDialogState = {
@@ -1595,225 +1150,7 @@ The canonical release summary.
     );
   });
 
-  it("forces the web update check and shows the upgrade command inline", async () => {
-    useDesktopUpdateInfoMock.mockReturnValue({
-      desktopApi: null,
-      desktopInfo: null,
-      isDesktop: false,
-    });
-    const availableVersion = {
-      currentVersion: "0.0.5",
-      latestVersion: "0.0.6",
-      currentCommit: null,
-      installKind: "npm" as const,
-      source: "npm" as const,
-      updateAvailable: true,
-      isDevelopment: false,
-      upgradeCommand: "npx bb-app@latest",
-    };
-    useUpdateInventoryMock.mockReturnValue(
-      makeInventory({
-        systemVersion: availableVersion,
-        appUpdateAvailable: true,
-        actionableCount: 1,
-        hasAttention: true,
-      }),
-    );
-    vi.mocked(sdk.system.version).mockResolvedValue(availableVersion);
-
-    renderSection();
-    expect(screen.getByText("npx bb-app@latest")).toBeDefined();
-    expect(screen.getByText("0.0.6")).toBeDefined();
-    const copyButton = screen.getByRole("button", {
-      name: "Update available · Copy the upgrade command",
-    });
-    expect(copyButton.textContent).toBe("");
-    expect(copyButton.className).not.toContain("bg-secondary");
-    const updateSurface = document.querySelector('[data-updates-domain="bb"]');
-    expect(updateSurface?.querySelector(".bg-card")).not.toBeNull();
-    expect(updateSurface?.querySelector(".divide-y")).not.toBeNull();
-    expect(
-      within(updateSurface as HTMLElement).getByText("Server"),
-    ).toBeDefined();
-    expect(screen.queryByText(/^Update available/)).toBeNull();
-
-    await waitFor(() => {
-      expect(sdk.system.version).toHaveBeenCalledWith({ force: true });
-    });
-  });
-
-  it("checks for desktop updates through the desktop bridge", async () => {
-    const desktopInfo: BbDesktopInfo = {
-      downloadState: "downloaded",
-      lastCheckedAt: null,
-      latestVersion: "0.0.6",
-      pendingVersion: "0.0.6",
-      platform: "macos",
-      updateAvailable: true,
-      updateDownloaded: true,
-      version: "0.0.5",
-    };
-    const checkForUpdates = vi.fn().mockResolvedValue(desktopInfo);
-    const installUpdate = vi.fn().mockResolvedValue(undefined);
-    useDesktopUpdateInfoMock.mockReturnValue({
-      desktopApi: { checkForUpdates, installUpdate } as unknown as BbDesktopApi,
-      desktopInfo,
-      isDesktop: true,
-    });
-    useUpdateInventoryMock.mockReturnValue(
-      makeInventory({
-        desktopInfo,
-        desktopUpdateReady: true,
-        actionableCount: 1,
-        hasAttention: true,
-      }),
-    );
-
-    renderSection();
-    const relaunch = screen.getByRole("button", {
-      name: /Relaunch bb to finish updating/,
-    });
-    expect(relaunch.querySelector("img")?.className).toContain("size-3");
-    expect(relaunch.className).toContain("border");
-    fireEvent.click(relaunch);
-    expect(installUpdate).toHaveBeenCalledOnce();
-
-    await waitFor(() => {
-      expect(checkForUpdates).toHaveBeenCalledTimes(1);
-    });
-    expect(sdk.system.version).toHaveBeenCalledWith({ force: true });
-  });
-
-  it("explains an unknown desktop release and retries through the desktop bridge", async () => {
-    const desktopInfo: BbDesktopInfo = {
-      downloadState: "idle",
-      lastCheckedAt: "2026-07-19T00:00:00.000Z",
-      latestVersion: null,
-      pendingVersion: null,
-      platform: "macos",
-      updateAvailable: false,
-      updateDownloaded: false,
-      version: "0.0.5",
-    };
-    const checkForUpdates = vi.fn().mockResolvedValue(desktopInfo);
-    useDesktopUpdateInfoMock.mockReturnValue({
-      desktopApi: { checkForUpdates } as unknown as BbDesktopApi,
-      desktopInfo,
-      isDesktop: true,
-    });
-    useUpdateInventoryMock.mockReturnValue(makeInventory({ desktopInfo }));
-
-    renderSection();
-    await waitFor(() => {
-      expect(checkForUpdates).toHaveBeenCalledTimes(1);
-      expect(
-        (
-          screen.getByRole("button", {
-            name: /Retry the desktop release check/,
-          }) as HTMLButtonElement
-        ).disabled,
-      ).toBe(false);
-    });
-    expect(
-      screen.getByText("Couldn't determine the latest desktop release."),
-    ).toBeTruthy();
-
-    let finishCheck: (() => void) | undefined;
-    checkForUpdates.mockImplementationOnce(
-      () =>
-        new Promise<void>((resolve) => {
-          finishCheck = resolve;
-        }),
-    );
-    fireEvent.click(
-      screen.getByRole("button", { name: /Retry the desktop release check/ }),
-    );
-    await waitFor(() => {
-      expect(checkForUpdates).toHaveBeenCalledTimes(2);
-      expect(
-        (
-          screen.getByRole("button", {
-            name: /Retry the desktop release check/,
-          }) as HTMLButtonElement
-        ).disabled,
-      ).toBe(true);
-    });
-    expect(
-      screen.getByText("Checking for a newer desktop release…"),
-    ).toBeTruthy();
-    await act(async () => finishCheck?.());
-    await waitFor(() => {
-      expect(
-        (
-          screen.getByRole("button", {
-            name: /Retry the desktop release check/,
-          }) as HTMLButtonElement
-        ).disabled,
-      ).toBe(false);
-    });
-  });
-
-  it("does not claim a legacy desktop shell is downloading an available update", () => {
-    const desktopInfo: BbDesktopInfo = {
-      lastCheckedAt: null,
-      latestVersion: "0.0.6",
-      pendingVersion: null,
-      platform: "macos",
-      updateAvailable: true,
-      updateDownloaded: false,
-      version: "0.0.5",
-    };
-    useDesktopUpdateInfoMock.mockReturnValue({
-      desktopApi: {} as BbDesktopApi,
-      desktopInfo,
-      isDesktop: true,
-    });
-    useUpdateInventoryMock.mockReturnValue(makeInventory({ desktopInfo }));
-
-    renderSection();
-
-    expect(screen.getByText("Update available")).toBeDefined();
-    expect(screen.queryByText("Downloading in the background…")).toBeNull();
-  });
-
-  it("retries a failed desktop download through the desktop bridge", async () => {
-    const desktopInfo: BbDesktopInfo = {
-      downloadState: "failed",
-      lastCheckedAt: null,
-      latestVersion: "0.0.6",
-      pendingVersion: null,
-      platform: "macos",
-      updateAvailable: true,
-      updateDownloaded: false,
-      version: "0.0.5",
-    };
-    const checkForUpdates = vi.fn().mockResolvedValue(desktopInfo);
-    useDesktopUpdateInfoMock.mockReturnValue({
-      desktopApi: { checkForUpdates } as unknown as BbDesktopApi,
-      desktopInfo,
-      isDesktop: true,
-    });
-    useUpdateInventoryMock.mockReturnValue(makeInventory({ desktopInfo }));
-
-    renderSection();
-    await waitFor(() => {
-      expect(checkForUpdates).toHaveBeenCalledTimes(1);
-    });
-    fireEvent.click(
-      screen.getByRole("button", { name: "Failed · Retry the download" }),
-    );
-
-    await waitFor(() => {
-      expect(checkForUpdates).toHaveBeenCalledTimes(2);
-    });
-  });
-
   it("runs every actionable provider update across machines from Update all", async () => {
-    useDesktopUpdateInfoMock.mockReturnValue({
-      desktopApi: null,
-      desktopInfo: null,
-      isDesktop: false,
-    });
     const laptop = makeHost({ id: "host_1", name: "laptop" });
     const homelab = makeHost({ id: "host_2", name: "homelab" });
     const laptopIssue = makeUpdateIssue({ provider: "codex" });
@@ -2050,11 +1387,6 @@ The canonical release summary.
   });
 
   it("shows an external Claude installation as a manual update without an update button", () => {
-    useDesktopUpdateInfoMock.mockReturnValue({
-      desktopApi: null,
-      desktopInfo: null,
-      isDesktop: false,
-    });
     const host = makeHost({ id: "host_1", name: "workstation" });
     const issue = makeManualUpdateIssue({ provider: "claude-code" });
     useUpdateInventoryMock.mockReturnValue(
@@ -2086,11 +1418,6 @@ The canonical release summary.
   });
 
   it("omits an empty machine container", async () => {
-    useDesktopUpdateInfoMock.mockReturnValue({
-      desktopApi: null,
-      desktopInfo: null,
-      isDesktop: false,
-    });
     useUpdateInventoryMock.mockReturnValue(makeInventory({ machines: [] }));
 
     renderSection();
@@ -2099,603 +1426,4 @@ The canonical release summary.
     expect(screen.queryByText("No machines yet.")).toBeNull();
     expect(screen.getByText("No machines available.")).toBeDefined();
   });
-
-  it("updates bb from the app when the launcher supports it", async () => {
-    useWebApp();
-    vi.mocked(sdk.system.appUpdate).mockResolvedValue(makeAppUpdateStatus());
-    vi.mocked(sdk.system.applyAppUpdate).mockResolvedValue(
-      makeAppUpdateStatus({
-        activity: {
-          output: [],
-          phase: "preparing",
-          startedAt: "2026-09-23T00:00:00.000Z",
-          step: "Downloading bb-app 0.0.6",
-          targetVersion: "0.0.6",
-        },
-      }),
-    );
-
-    renderSection();
-    fireEvent.click(
-      await screen.findByRole("button", {
-        name: "Update available · Download the update and restart bb",
-      }),
-    );
-
-    await waitFor(() => {
-      expect(sdk.system.applyAppUpdate).toHaveBeenCalledWith({
-        confirmInterruptingThreads: false,
-      });
-    });
-    expect(await screen.findByText("Downloading bb-app 0.0.6")).toBeDefined();
-    expect(sdk.system.appUpdate).toHaveBeenCalledWith({ force: true });
-  });
-
-  it("asks before an update interrupts running threads", async () => {
-    useWebApp();
-    vi.mocked(sdk.system.appUpdate).mockResolvedValue(
-      makeAppUpdateStatus({ runningThreadCount: 2 }),
-    );
-    vi.mocked(sdk.system.applyAppUpdate).mockResolvedValue(
-      makeAppUpdateStatus(),
-    );
-
-    renderSection();
-    fireEvent.click(
-      await screen.findByRole("button", {
-        name: "Update available · Download the update and restart bb",
-      }),
-    );
-
-    const dialog = await screen.findByRole("dialog");
-    expect(within(dialog).getByText(/2 threads are running/)).toBeDefined();
-    expect(sdk.system.applyAppUpdate).not.toHaveBeenCalled();
-    fireEvent.click(
-      within(dialog).getByRole("button", { name: "Update and restart" }),
-    );
-
-    await waitFor(() => {
-      expect(sdk.system.applyAppUpdate).toHaveBeenCalledWith({
-        confirmInterruptingThreads: true,
-      });
-    });
-  });
-
-  it("asks for confirmation when threads started after the status was fetched", async () => {
-    useWebApp();
-    vi.mocked(sdk.system.appUpdate).mockResolvedValue(makeAppUpdateStatus());
-    vi.mocked(sdk.system.applyAppUpdate)
-      .mockRejectedValueOnce(
-        new BbHttpError({
-          body: {
-            code: "threads_running",
-            details: { runningThreadCount: 1 },
-            message: "1 thread is running.",
-          },
-          code: "threads_running",
-          message: "1 thread is running.",
-          status: 409,
-        }),
-      )
-      .mockResolvedValueOnce(makeAppUpdateStatus());
-
-    renderSection();
-    fireEvent.click(
-      await screen.findByRole("button", {
-        name: "Update available · Download the update and restart bb",
-      }),
-    );
-
-    const dialog = await screen.findByRole("dialog");
-    expect(within(dialog).getByText(/1 thread is running/)).toBeDefined();
-    expect(appToast.error).not.toHaveBeenCalled();
-    fireEvent.click(
-      within(dialog).getByRole("button", { name: "Update and restart" }),
-    );
-    await waitFor(() => {
-      expect(sdk.system.applyAppUpdate).toHaveBeenLastCalledWith({
-        confirmInterruptingThreads: true,
-      });
-    });
-  });
-
-  it("retries an unavailable release check from the app row", async () => {
-    useWebApp();
-    vi.mocked(sdk.system.appUpdate).mockResolvedValue(
-      makeAppUpdateStatus({
-        available: null,
-        blocked: {
-          reason: "fetch-failed",
-          message: "Couldn't check npm for a newer release.",
-        },
-      }),
-    );
-    useUpdateInventoryMock.mockReturnValue(
-      makeInventory({
-        systemVersion: {
-          currentVersion: "0.0.5",
-          currentCommit: null,
-          installKind: "npm",
-          source: "npm",
-          latestVersion: null,
-          updateAvailable: false,
-          isDevelopment: false,
-          upgradeCommand: "npx bb-app@latest",
-        },
-      }),
-    );
-    renderSection();
-    const retry = await screen.findByRole("button", {
-      name: "Latest unknown · Retry the release check",
-    });
-    expect(
-      screen.getByText("Couldn't check npm for a newer release."),
-    ).toBeDefined();
-    expect(retry.querySelector('[data-icon="CircleQuestion"]')).toBeNull();
-    await waitFor(() =>
-      expect(
-        screen
-          .getByRole("button", {
-            name: "Latest unknown · Retry the release check",
-          })
-          .hasAttribute("disabled"),
-      ).toBe(false),
-    );
-    vi.mocked(sdk.system.version).mockClear();
-    vi.mocked(sdk.system.appUpdate).mockResolvedValue(
-      makeAppUpdateStatus({ available: null, blocked: null }),
-    );
-    fireEvent.click(
-      screen.getByRole("button", {
-        name: "Latest unknown · Retry the release check",
-      }),
-    );
-    await waitFor(() =>
-      expect(sdk.system.version).toHaveBeenCalledWith({ force: true }),
-    );
-    await waitFor(() =>
-      expect(
-        screen.queryByRole("button", {
-          name: "Latest unknown · Retry the release check",
-        }),
-      ).toBeNull(),
-    );
-  });
-
-  it("shows why a source checkout could not check for updates", async () => {
-    useWebApp();
-    vi.mocked(sdk.system.appUpdate).mockResolvedValue(
-      makeAppUpdateStatus({
-        available: null,
-        blocked: {
-          message:
-            "Could not fetch origin/main: Permission denied (publickey).",
-          reason: "fetch-failed",
-        },
-        current: { commit: "a".repeat(40), version: "0.0.5" },
-        support: { kind: "supported", mode: "source" },
-      }),
-    );
-
-    renderSection();
-
-    expect(
-      await screen.findByText(
-        "Could not fetch origin/main: Permission denied (publickey).",
-      ),
-    ).toBeDefined();
-  });
-
-  it("keeps a failed update on the row with its details and a retry", async () => {
-    useWebApp();
-    vi.mocked(sdk.system.appUpdate).mockResolvedValue(
-      makeAppUpdateStatus({
-        lastResult: {
-          acknowledged: false,
-          finishedAt: "2026-09-23T00:00:00.000Z",
-          from: { commit: null, version: "0.0.5" },
-          id: "update-1",
-          logTail: ["npm error code E404"],
-          message: "npm install failed",
-          outcome: "failed",
-          phase: "install",
-          to: { commit: null, version: "0.0.6" },
-        },
-      }),
-    );
-
-    renderSection();
-
-    expect(await screen.findByText("Last update failed")).toBeDefined();
-    expect(
-      screen.getByRole("button", { name: "View the failed bb update" }),
-    ).toBeDefined();
-    expect(
-      screen.getByRole("button", {
-        name: "Failed · Download the update and restart bb",
-      }),
-    ).toBeDefined();
-  });
-
-  it("marks a failed update once when no retry is available", async () => {
-    useWebApp();
-    vi.mocked(sdk.system.appUpdate).mockResolvedValue(
-      makeAppUpdateStatus({
-        available: null,
-        lastResult: {
-          acknowledged: false,
-          finishedAt: "2026-09-23T00:00:00.000Z",
-          from: { commit: null, version: "0.0.5" },
-          id: "update-1",
-          logTail: ["npm error code E404"],
-          message: "npm install failed",
-          outcome: "failed",
-          phase: "install",
-          to: { commit: null, version: "0.0.6" },
-        },
-      }),
-    );
-
-    renderSection();
-
-    expect(
-      await screen.findByRole("button", { name: "View the failed bb update" }),
-    ).toBeDefined();
-    expect(document.querySelector('[data-update-state="failed"]')).toBeNull();
-  });
-
-  it.each([
-    {
-      installKind: "source" as const,
-      currentCommit: "a".repeat(40),
-      latestVersion: "9.9.9",
-      updateAvailable: true,
-    },
-    {
-      installKind: "source" as const,
-      currentCommit: null,
-      latestVersion: null,
-      updateAvailable: false,
-    },
-    {
-      installKind: "npm" as const,
-      currentCommit: null,
-      latestVersion: null,
-      updateAvailable: false,
-    },
-  ])(
-    "does not claim freshness without a relevant check: %j",
-    async (version) => {
-      useWebApp();
-      useUpdateInventoryMock.mockReturnValue(
-        makeInventory({
-          machines: [
-            {
-              ...makeMachine({
-                host: makeHost({ id: "host_primary", name: "workstation" }),
-                isPrimary: true,
-              }),
-              providerStatus: null,
-            },
-          ],
-          systemVersion: {
-            currentVersion: "0.0.5",
-            source: "npm",
-            isDevelopment: false,
-            upgradeCommand: "npx bb-app@latest",
-            ...version,
-          },
-        }),
-      );
-
-      renderSection();
-
-      await screen.findByText("Server");
-      expect(screen.queryByText("Latest unknown")).toBeNull();
-      expect(document.querySelector('[data-icon="CircleQuestion"]')).toBeNull();
-      expect(screen.queryByText("Up to date")).toBeNull();
-      expect(
-        screen.queryByRole("button", {
-          name: "Update available · Copy the upgrade command",
-        }),
-      ).toBeNull();
-      if (version.installKind === "npm") {
-        expect(
-          await screen.findByText("Couldn't check npm for a newer release."),
-        ).toBeDefined();
-      }
-      if (version.installKind === "source") {
-        expect(
-          screen.queryByText(
-            "Update this checkout with Git. Automatic update checks are off.",
-          ),
-        ).toBeNull();
-        expect(screen.getByText("Source checkout")).toBeDefined();
-        expect(
-          screen.getByText(
-            version.currentCommit === null ? "Build 0.0.5" : "aaaaaaa",
-          ),
-        ).toBeDefined();
-        expect(screen.queryByText(/9.9.9/)).toBeNull();
-      }
-    },
-  );
-
-  it.each([true, false])(
-    "explains why a source checkout cannot update without an action (incoming: %s)",
-    async (incoming) => {
-      useWebApp();
-      useUpdateInventoryMock.mockReturnValue(
-        makeInventory({
-          systemVersion: {
-            currentVersion: "0.0.5",
-            latestVersion: null,
-            source: "npm",
-            currentCommit: null,
-            installKind: "source",
-            updateAvailable: false,
-            isDevelopment: false,
-            upgradeCommand: "npx bb-app@latest",
-          },
-        }),
-      );
-      vi.mocked(sdk.system.appUpdate).mockResolvedValue(
-        makeAppUpdateStatus({
-          available: incoming
-            ? {
-                channel: "main",
-                commit: "b".repeat(40),
-                commitCount: 3,
-                subjects: ["Fix bug"],
-                version: "0.0.5",
-              }
-            : null,
-          blocked: {
-            message:
-              "The checkout is on feature. Only main can be updated from the app.",
-            reason: "not-on-main",
-          },
-          current: { commit: "a".repeat(40), version: "0.0.5" },
-          support: { kind: "supported", mode: "source" },
-        }),
-      );
-
-      renderSection();
-
-      expect(
-        await screen.findByText(
-          "The checkout is on feature. Only main can be updated from the app.",
-        ),
-      ).toBeDefined();
-      if (incoming)
-        expect(screen.getByText("bbbbbbb (+3 commits)")).toBeDefined();
-      else expect(screen.queryByText("bbbbbbb (+3 commits)")).toBeNull();
-      expect(document.querySelector('[data-icon="Terminal"]')).toBeNull();
-      expect(
-        document.querySelector('[data-update-state="update-available"]'),
-      ).toBeNull();
-      expect(screen.getByText("Source checkout")).toBeDefined();
-      expect(
-        screen.queryByRole("button", {
-          name: "Update available · Download the update and restart bb",
-        }),
-      ).toBeNull();
-    },
-  );
-
-  function useDesktopApp(): {
-    checkForUpdates: ReturnType<typeof vi.fn>;
-    installUpdate: ReturnType<typeof vi.fn>;
-  } {
-    const desktopInfo: BbDesktopInfo = {
-      downloadState: "idle",
-      lastCheckedAt: null,
-      latestVersion: "0.0.5",
-      pendingVersion: null,
-      platform: "macos",
-      updateAvailable: false,
-      updateDownloaded: false,
-      version: "0.0.5",
-    };
-    const checkForUpdates = vi.fn().mockResolvedValue(desktopInfo);
-    const installUpdate = vi.fn();
-    useDesktopUpdateInfoMock.mockReturnValue({
-      desktopApi: {
-        checkForUpdates,
-        installUpdate,
-      } as unknown as BbDesktopApi,
-      desktopInfo,
-      isDesktop: true,
-    });
-    return { checkForUpdates, installUpdate };
-  }
-
-  function desktopFleet(): UpdateInventory {
-    return makeInventory({
-      machines: [
-        makeMachine({
-          host: makeHost({ id: "host_primary", name: "bee" }),
-          isPrimary: true,
-        }),
-        makeMachine({ host: makeHost({ id: "host_laptop", name: "laptop" }) }),
-      ],
-    });
-  }
-
-  it("updates a server the desktop does not own from its own Server row", async () => {
-    const { checkForUpdates } = useDesktopApp();
-    hostDaemon.localDaemonHostId = "host_laptop";
-    useUpdateInventoryMock.mockReturnValue(desktopFleet());
-    vi.mocked(sdk.system.appUpdate).mockResolvedValue(makeAppUpdateStatus());
-    vi.mocked(sdk.system.applyAppUpdate).mockResolvedValue(
-      makeAppUpdateStatus(),
-    );
-
-    renderSection();
-
-    const bbCard = document.querySelector<HTMLElement>(
-      '[data-updates-domain="bb"]',
-    );
-    if (bbCard === null) throw new Error("expected the bb card");
-    fireEvent.click(
-      await within(bbCard).findByRole("button", {
-        name: "Update available · Download the update and restart bb",
-      }),
-    );
-    expect(within(bbCard).getByText("Server")).toBeDefined();
-    expect(within(bbCard).queryByText("Desktop")).toBeNull();
-    expect(bbCard.querySelectorAll('[data-bb-update-role="app"]')).toHaveLength(
-      1,
-    );
-    await waitFor(() => {
-      expect(sdk.system.applyAppUpdate).toHaveBeenCalledWith({
-        confirmInterruptingThreads: false,
-      });
-    });
-    await waitFor(() => {
-      expect(checkForUpdates).toHaveBeenCalledOnce();
-      expect(sdk.system.appUpdate).toHaveBeenCalledWith({ force: true });
-    });
-  });
-
-  it("adds a Desktop row under Server only while the desktop needs an update", async () => {
-    const desktopInfo: BbDesktopInfo = {
-      downloadState: "downloaded",
-      lastCheckedAt: null,
-      latestVersion: "0.0.6",
-      pendingVersion: "0.0.6",
-      platform: "macos",
-      updateAvailable: true,
-      updateDownloaded: true,
-      version: "0.0.5",
-    };
-    const installUpdate = vi.fn().mockResolvedValue(undefined);
-    useDesktopUpdateInfoMock.mockReturnValue({
-      desktopApi: {
-        checkForUpdates: vi.fn().mockResolvedValue(desktopInfo),
-        installUpdate,
-      } as unknown as BbDesktopApi,
-      desktopInfo,
-      isDesktop: true,
-    });
-    useUpdateInventoryMock.mockReturnValue(desktopFleet());
-    vi.mocked(sdk.system.appUpdate).mockResolvedValue(makeAppUpdateStatus());
-
-    renderSection();
-
-    const bbCard = document.querySelector<HTMLElement>(
-      '[data-updates-domain="bb"]',
-    );
-    if (bbCard === null) throw new Error("expected the bb card");
-    const desktopName = await within(bbCard).findByText("Desktop");
-    const serverName = within(bbCard).getByText("Server");
-    expect(
-      serverName.compareDocumentPosition(desktopName) &
-        Node.DOCUMENT_POSITION_FOLLOWING,
-    ).not.toBe(0);
-    expect(serverName.className).toBe(desktopName.className);
-    expect(serverName.className).toContain("w-16");
-    expect(document.querySelector("[data-updates-device]")).toBeNull();
-    fireEvent.click(
-      within(bbCard).getByRole("button", {
-        name: /Relaunch bb to finish updating/,
-      }),
-    );
-    expect(installUpdate).toHaveBeenCalledOnce();
-  });
-
-  it("uses the Server label when the desktop runs the server itself", async () => {
-    useDesktopApp();
-    hostDaemon.localDaemonHostId = "host_primary";
-    useUpdateInventoryMock.mockReturnValue(desktopFleet());
-    vi.mocked(sdk.system.appUpdate).mockResolvedValue(
-      makeAppUpdateStatus({
-        support: { kind: "unsupported", reason: "desktop" },
-      }),
-    );
-
-    renderSection();
-
-    await waitFor(() => expect(sdk.system.appUpdate).toHaveBeenCalled());
-    expect(screen.getByText("Server")).toBeDefined();
-    expect(screen.queryByText("Desktop")).toBeNull();
-    expect(
-      document.querySelectorAll('[data-bb-update-role="app"]'),
-    ).toHaveLength(1);
-    expect(
-      screen.queryByRole("button", {
-        name: "Update available · Download the update and restart bb",
-      }),
-    ).toBeNull();
-  });
-
-  it.each(["host_laptop", null])(
-    "shows a desktop-hosted server's own version when the viewing host is %s",
-    async (localHostId) => {
-      const { checkForUpdates } = useDesktopApp();
-      hostDaemon.localDaemonHostId = localHostId;
-      const inventory = desktopFleet();
-      const serverVersion = {
-        ...inventory.systemVersion!,
-        currentVersion: "0.0.4",
-        installKind: "desktop" as const,
-        updateAvailable: true,
-      };
-      useUpdateInventoryMock.mockReturnValue(
-        makeInventory({ ...inventory, systemVersion: serverVersion }),
-      );
-      vi.mocked(sdk.system.version).mockResolvedValue(serverVersion);
-      vi.mocked(sdk.system.appUpdate).mockResolvedValue(
-        makeAppUpdateStatus({
-          current: { commit: null, version: "0.0.4" },
-          support: { kind: "unsupported", reason: "desktop" },
-        }),
-      );
-
-      renderSection();
-
-      const bbCard = screen.getByRole("region", { name: "bb" });
-      await waitFor(() => expect(checkForUpdates).toHaveBeenCalledOnce());
-      expect(within(bbCard).getByText("Server")).toBeDefined();
-      expect(within(bbCard).getByText("0.0.4")).toBeDefined();
-      expect(within(bbCard).queryByText("Desktop")).toBeNull();
-      expect(
-        within(bbCard).queryByText(/Update bb in the desktop app on/),
-      ).toBeNull();
-      expect(
-        within(bbCard).queryByRole("button", {
-          name: /Copy the upgrade command|Relaunch bb|Download the update/,
-        }),
-      ).toBeNull();
-      expect(sdk.system.version).toHaveBeenCalledWith({ force: true });
-    },
-  );
-  it.each(["host_primary", "host_laptop", null])(
-    "uses the shared server update action for a desktop-hosted server viewed from %s",
-    async (localHostId) => {
-      const { installUpdate } = useDesktopApp();
-      hostDaemon.localDaemonHostId = localHostId;
-      useUpdateInventoryMock.mockReturnValue(desktopFleet());
-      const status = makeAppUpdateStatus({
-        support: { kind: "unsupported", reason: "desktop" },
-        desktopUpdateSupported: true,
-      });
-      vi.mocked(sdk.system.appUpdate).mockResolvedValue(status);
-      vi.mocked(sdk.system.applyAppUpdate).mockResolvedValue(status);
-      renderSection();
-      const update = await screen.findByRole("button", {
-        name: "Update available · Download the update and restart bb",
-      });
-      expect(screen.getByText("Server")).toBeDefined();
-      expect(screen.queryByText("Desktop")).toBeNull();
-      expect(screen.queryByText(/Update bb in the desktop app on/)).toBeNull();
-      fireEvent.click(update);
-      await waitFor(() =>
-        expect(sdk.system.applyAppUpdate).toHaveBeenCalledWith({
-          confirmInterruptingThreads: false,
-        }),
-      );
-      expect(installUpdate).not.toHaveBeenCalled();
-    },
-  );
 });

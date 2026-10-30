@@ -68,7 +68,6 @@ bb settings completed-turns [provider-id] [collapse|flat|default]
 bb settings experiment <key> <value>
 bb settings usage [--machine <id-or-name>] [--refresh]
 bb settings cli-command [install|remove]
-bb settings version [--force]
 bb settings reload Reload bb-managed configuration
 
 AI services: `bb settings ai-services` shows which AI service writes thread
@@ -182,8 +181,7 @@ approvals locally for the current BB site and device profile. They do not sync
 across devices or server addresses. The Plugin SDK can list and revoke the
 viewing client's approvals; there is no CLI command that reads or modifies a
 remote client's localStorage.
-`changelogPreview` shows the latest
-release notes as a dismissible card on Settings → Updates. Experiments that
+Experiments that
 gate a feature are documented with it: `serverMove` in `bb guide machines`,
 `performanceDiagnostics` under Server performance diagnostics below.
 `timelinePush` sends an open thread's timeline updates over the live
@@ -414,20 +412,6 @@ preferred device is used on the next recording. A missing preference alone
 shows no warning. Capture failures warn on the idle microphone; five seconds
 of near-silent audio warns in the preview or recording row without switching
 inputs or stopping capture. Preview audio is never saved or transcribed.
-
-Mobile app downloads
-
-Settings → Mobile links the iOS TestFlight
-(https://testflight.apple.com/join/T9MayTMb) and the Android APK from the
-public `get-bb/bb` GitHub `android-testing` release (`bb-android.apk`), and
-pairs either app through Add mobile device. `bb settings mobile-app --json` or
-SDK `system.mobileAppDownloads()` returns both links. Add `--details --json`
-or call `system.mobileAppReleases()` for the Android version, build, size, and
-upload date; `android` is `null` when that metadata is unavailable, and the
-links still work. Inside the Android app, this page compares the installed
-native build number with the published APK. Older apps without build reporting
-cannot determine update status. Installed version and build are device-local;
-CLI and SDK metadata report the published APK.
 
 Server performance diagnostics
 
