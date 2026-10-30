@@ -761,6 +761,32 @@ describe("ThreadTableOfContents", () => {
     expect(screen.getByText("Your messages")).not.toBeNull();
   });
 
+  it("closes on mouse leave after a mouse click left focus on a row", () => {
+    render(
+      <TocHost
+        timelineRows={[
+          userConversationRow(1),
+          userConversationRow(2),
+          userConversationRow(3),
+        ]}
+      />,
+    );
+    const toc = document.querySelector<HTMLElement>("[data-thread-toc]");
+    if (!toc) throw new Error("Expected the thread table of contents.");
+    const trigger = screen.getByRole("button", {
+      name: "Thread table of contents",
+    });
+    fireEvent.mouseEnter(toc);
+    const row = screen.getByRole("button", {
+      name: "Loaded after client-side navigation 1",
+    });
+    fireEvent.pointerDown(row);
+    act(() => row.focus());
+    fireEvent.click(row);
+    fireEvent.mouseLeave(toc);
+    expect(trigger.getAttribute("aria-expanded")).toBe("false");
+  });
+
   it("tracks overflow when an initially closed panel opens and reopens", () => {
     render(
       <TocHost

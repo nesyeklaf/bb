@@ -581,6 +581,7 @@ export function ThreadTableOfContents({
   const [chosenTab, setTab] = useState<PanelTab | null>(null);
   const [railHalf, setRailHalf] = useState<TocRailHalf | null>(null);
   const halfTimerRef = useRef<number | null>(null);
+  const pointerFocusRef = useRef(false);
   const clearHalfTimer = useCallback(() => {
     if (halfTimerRef.current === null) return;
     window.clearTimeout(halfTimerRef.current);
@@ -938,9 +939,20 @@ export function ThreadTableOfContents({
       ref={setRootElement}
       data-thread-toc=""
       className="group/toc relative w-8"
+      onPointerDownCapture={() => {
+        pointerFocusRef.current = true;
+      }}
+      onKeyDownCapture={() => {
+        pointerFocusRef.current = false;
+      }}
       onMouseEnter={() => setOpen(true)}
       onMouseLeave={(event) => {
-        if (event.currentTarget.contains(document.activeElement)) return;
+        if (
+          !pointerFocusRef.current &&
+          event.currentTarget.contains(document.activeElement)
+        ) {
+          return;
+        }
         setOpen(false);
       }}
       onFocusCapture={() => setOpen(true)}
