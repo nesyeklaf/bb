@@ -33,6 +33,7 @@ export const MIGRATIONS = [
   )`,
   "CREATE INDEX gaps_end ON gaps(end)",
   "CREATE TABLE meta (key TEXT PRIMARY KEY, value TEXT NOT NULL)",
+  "CREATE TABLE alert_claims (key TEXT PRIMARY KEY, claimed_at INTEGER NOT NULL)",
 ];
 
 export interface Attribution {
@@ -145,6 +146,19 @@ export function createStore(
   const insertGap = db.prepare(
     "INSERT INTO gaps (source_id, start, end, reason) VALUES (?, ?, ?, ?)",
   );
+  const unclaimedRed = db.prepare(
+    "SELECT key FROM destinations WHERE state = 'red' AND key NOT IN (SELECT key FROM alert_claims) ORDER BY first_seen, key",
+  );
+  const claim = db.prepare(
+    "INSERT OR IGNORE INTO alert_claims (key, claimed_at) VALUES (?, ?)",
+  );
+  const claimUnclaimedRed = db.transaction((now: number): string[] => {
+    const keys = (unclaimedRed.all() as { key: string }[]).map(
+      (row) => row.key,
+    );
+    for (const key of keys) claim.run(key, now);
+    return keys;
+  });
   let keyCount = (countKeys.get() as { n: number }).n;
 
   function capReached(): boolean {
@@ -260,6 +274,7 @@ export function createStore(
       })();
     },
     capReached,
+    claimUnclaimedRed: (now: number) => claimUnclaimedRed(now),
     loadCursor(sourceId: string): unknown {
       const row = metaGet.get("cursor:" + sourceId) as
         | { value: string }
