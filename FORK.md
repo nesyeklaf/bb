@@ -78,3 +78,4 @@ Clients: the desktop app points at the tailnet URL through its custom server URL
 ## Fork changes
 
 - `BbNavigate.toThread(threadId, { experimental_messageSeq })` jumps to a message (`#msg=SEQ`) from plugins, with `split` too. Dropped when upstream ships an equivalent.
+- `app.slots.experimental_threadTocExtension({ id, title, useBands, tab?, onBandClick? })` adds topic brackets and a popover tab to the thread TOC rail, with drag-marked ranges (`railSelection`). Ticks get their seq from the new `messageSeq` field of the conversation outline item (projection version 3). Dropped when upstream ships an equivalent.

@@ -106,6 +106,7 @@ export function Default() {
             <ThreadTableOfContents
               contextBoundarySeq={null}
               threadId="thr_toc_story"
+              projectId="prj_toc_story"
               timelineRows={timelineRows}
               hasOlderTimelineRows={false}
               loadOlderTimelineRows={() => {}}

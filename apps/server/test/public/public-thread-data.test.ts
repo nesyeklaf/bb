@@ -768,6 +768,15 @@ describe("public thread data routes", () => {
         windowedConversationIds.length,
       );
       expect(outline.maxSeq).toBe(12);
+      const outlineSeqs = outline.items.map((item) => item.messageSeq);
+      expect(outlineSeqs).toEqual([...outlineSeqs].sort((a, b) => a - b));
+      expect(new Set(outlineSeqs).size).toBe(outlineSeqs.length);
+      for (const row of timeline.rows) {
+        if (row.kind !== "conversation") continue;
+        expect(
+          outline.items.find((item) => item.id === row.id)?.messageSeq,
+        ).toBe(row.messageSeq);
+      }
       expect(outline.items.map((item) => item.preview)).toEqual([
         "First question",
         "First question — answered.",

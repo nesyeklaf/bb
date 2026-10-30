@@ -148,6 +148,10 @@ Read the installed SDK declarations for the exact current signatures.
 - `ExperimentalThreadContextSegmentInput`
 - `ExperimentalThreadContextSegmentProps`
 - `ExperimentalThreadContextSegmentReference`
+- `ExperimentalThreadTocInput`
+- `ExperimentalThreadTocBand`
+- `ExperimentalThreadTocSelection`
+- `ExperimentalThreadTocTabProps`
 - `ExperimentalThreadRowMetadataProps`
 - `ExperimentalThreadRowMetadataLineProps`
 - `ExperimentalInfoSectionProps`
@@ -220,6 +224,7 @@ Read the installed SDK declarations for the exact current signatures.
 - `PluginBoundThreadsArea`
 - `PluginBrowserBbSdk`
 - `ExperimentalThreadContextSegmentRegistration`
+- `ExperimentalThreadTocExtensionRegistration`
 - `ExperimentalThreadInfoRowRegistration`
 - `ExperimentalThreadRowMetadataRegistration`
 - `ExperimentalThreadInfoSectionRegistration`

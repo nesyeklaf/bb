@@ -1885,6 +1885,80 @@ export interface ExperimentalThreadContextSegmentRegistration {
   useVisible?(input: ExperimentalThreadContextSegmentInput): boolean;
 }
 
+/** What a thread TOC rail extension knows about its thread. */
+export interface ExperimentalThreadTocInput {
+  threadId: string;
+  projectId: string;
+}
+
+/**
+ * A bracket drawn beside the thread TOC rail. The rail has one tick per user
+ * message; the bracket spans the ticks whose message seq lies in
+ * `fromSeq..toSeq`. A range with no tick in it spans the next tick after
+ * `fromSeq`, or the last tick when none follows.
+ */
+export interface ExperimentalThreadTocBand {
+  /** First message seq of the range, inclusive. */
+  fromSeq: number;
+  /** Last message seq of the range, inclusive. */
+  toSeq: number;
+  /** Hue of the bracket in degrees, 0 to 360. */
+  hue: number;
+  /** Shown as the bracket's tooltip. */
+  label?: string;
+  /** Draws the bracket dashed, for a proposal. */
+  dashed?: boolean;
+  /** Draws the bracket thicker with a glow. */
+  active?: boolean;
+}
+
+/**
+ * A range of message seqs the user marked by dragging along the TOC rail.
+ * `fromSeq` is the seq of the first marked tick's message; `toSeq` is the seq
+ * just before the next user message, or the newest seq after the last tick,
+ * so the range includes the replies to the last marked message.
+ */
+export interface ExperimentalThreadTocSelection {
+  fromSeq: number;
+  toSeq: number;
+}
+
+/** Props of the tab an extension adds to the thread TOC rail's panel. */
+export interface ExperimentalThreadTocTabProps extends ExperimentalThreadTocInput {
+  /** Scrolls the thread to the message with this seq, loading older pages when needed. */
+  jumpToSeq(seq: number): void;
+  /** The range marked on the rail, or null. The panel stays open while it is set. */
+  railSelection: ExperimentalThreadTocSelection | null;
+  /** Drops `railSelection`; call it once the selection is used. */
+  clearRailSelection(): void;
+}
+
+/**
+ * Brackets and a tab for the thread TOC rail beside an existing thread's chat.
+ * The host mounts the tab in a crash boundary. A drag along the rail only
+ * marks a range while some extension registers a tab.
+ */
+export interface ExperimentalThreadTocExtensionRegistration {
+  /** Unique within the plugin; letters, digits, `-`, `_`. */
+  id: string;
+  /** Accessible name of the extension. */
+  title: string;
+  /** Runs in plugin scope for each thread; the returned brackets are drawn on the rail. */
+  useBands(
+    input: ExperimentalThreadTocInput,
+  ): readonly ExperimentalThreadTocBand[];
+  /** An extra tab in the rail's panel, beside the message tabs. */
+  tab?: {
+    label: string;
+    component: ComponentType<ExperimentalThreadTocTabProps>;
+  };
+  /** Runs when the user clicks one of this extension's brackets. */
+  onBandClick?(
+    band: ExperimentalThreadTocBand,
+    input: ExperimentalThreadTocInput,
+  ): void;
+}
+
 /**
  * A row in the thread Info tab's details block, beside bb's own rows. Render
  * one or more `experimental_DetailRow` elements, or null to show nothing for
@@ -3721,6 +3795,14 @@ export interface PluginAppSlots {
    */
   experimental_threadContextSegment(
     registration: ExperimentalThreadContextSegmentRegistration,
+  ): void;
+  /**
+   * Add brackets and a tab to the thread TOC rail (see
+   * {@link ExperimentalThreadTocExtensionRegistration}). Experimental: see
+   * docs/api_to_audit.md.
+   */
+  experimental_threadTocExtension(
+    registration: ExperimentalThreadTocExtensionRegistration,
   ): void;
   /**
    * Add a small item to the metadata line of every thread row in thread

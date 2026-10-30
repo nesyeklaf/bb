@@ -1335,6 +1335,7 @@ export const threadConversationOutlineItemSchema = z
   .object({
     id: z.string().min(1),
     role: z.enum(["user", "assistant"]),
+    messageSeq: z.number().int(),
     preview: z.string(),
     attachmentSummary:
       threadConversationOutlineAttachmentSummarySchema.nullable(),

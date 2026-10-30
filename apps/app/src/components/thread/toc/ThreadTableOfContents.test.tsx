@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { useEffect } from "react";
 import type { ThreadListEntry, ThreadWithRuntime } from "@bb/domain";
 import {
   act,
@@ -10,7 +11,15 @@ import {
   screen,
   waitFor,
 } from "@testing-library/react";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import {
+  afterEach,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  vi,
+  type Mock,
+} from "vitest";
 import type {
   ThreadConversationOutlineItem,
   ThreadConversationOutlineResponse,
@@ -34,6 +43,17 @@ import {
   sidebarNavigationQueryKey,
   threadListQueryKey,
 } from "@/hooks/queries/query-keys";
+import type {
+  ExperimentalThreadTocBand,
+  ExperimentalThreadTocInput,
+  ExperimentalThreadTocTabProps,
+} from "@get-bb/plugin-sdk";
+import { resetAllCrashedPluginSlotsForTest } from "@/components/plugin/PluginSlotMount";
+import {
+  removePluginSlotRegistrations,
+  setPluginSlotRegistrations,
+} from "@/lib/plugin-slots";
+import { makePluginRegistrationSet } from "@/test/fixtures/plugins";
 import {
   findActiveItemIds,
   selectTocRailItems,
@@ -123,6 +143,7 @@ function TocHost({
   hostWidth = 1_200,
   loadOlderTimelineRows = () => {},
   onNavigateToRow,
+  projectId = "proj_toc_test",
   threadId = "thr_toc_test",
   timelineRows,
 }: {
@@ -132,6 +153,7 @@ function TocHost({
   hostWidth?: number;
   loadOlderTimelineRows?: () => void | Promise<void>;
   onNavigateToRow?: (rowId: string) => void;
+  projectId?: string;
   threadId?: string;
   timelineRows: readonly TimelineRow[];
 }) {
@@ -153,6 +175,7 @@ function TocHost({
       <ThreadTableOfContents
         contextBoundarySeq={contextBoundarySeq}
         threadId={threadId}
+        projectId={projectId}
         timelineRows={timelineRows}
         hasOlderTimelineRows={hasOlderTimelineRows}
         loadOlderTimelineRows={loadOlderTimelineRows}
@@ -301,13 +324,13 @@ function sidebarNavigation(
 }
 
 const userItems: TocItem[] = [
-  { id: "user-1", label: "First prompt", role: "user" },
-  { id: "user-2", label: "Second prompt", role: "user" },
+  { id: "user-1", label: "First prompt", role: "user", messageSeq: 0 },
+  { id: "user-2", label: "Second prompt", role: "user", messageSeq: 0 },
 ];
 
 const agentItems: TocItem[] = [
-  { id: "agent-1", label: "First response", role: "assistant" },
-  { id: "agent-2", label: "Second response", role: "assistant" },
+  { id: "agent-1", label: "First response", role: "assistant", messageSeq: 0 },
+  { id: "agent-2", label: "Second response", role: "assistant", messageSeq: 0 },
 ];
 
 function manyUserItems(count: number): TocItem[] {
@@ -315,6 +338,7 @@ function manyUserItems(count: number): TocItem[] {
     id: `user-${index + 1}`,
     label: `Question ${index + 1}`,
     role: "user",
+    messageSeq: index + 1,
   }));
 }
 
@@ -395,6 +419,7 @@ describe("ThreadTableOfContents", () => {
         role: "user" as const,
         preview: `Old message ${index}`,
         attachmentSummary: null,
+        messageSeq: 0,
       })),
       5,
     );
@@ -435,12 +460,14 @@ describe("ThreadTableOfContents", () => {
         role: "user" as const,
         preview: `Question ${index}`,
         attachmentSummary: null,
+        messageSeq: 0,
       })),
       {
         id: "a1",
         role: "assistant",
         preview: "Agent answer",
         attachmentSummary: null,
+        messageSeq: 0,
       },
     ]);
     render(<TocHost timelineRows={[userConversationRow(1)]} />);
@@ -503,6 +530,7 @@ describe("ThreadTableOfContents", () => {
                         role: "assistant" as const,
                         preview: `Earlier agent answer ${index}`,
                         attachmentSummary: null,
+                        messageSeq: 0,
                       }))
                     : [],
                 ),
@@ -798,24 +826,28 @@ describe("ThreadTableOfContents", () => {
         role: "user",
         preview: "First question",
         attachmentSummary: null,
+        messageSeq: 0,
       },
       {
         id: "a1",
         role: "assistant",
         preview: "First answer",
         attachmentSummary: null,
+        messageSeq: 0,
       },
       {
         id: "u2",
         role: "user",
         preview: "Second question",
         attachmentSummary: null,
+        messageSeq: 0,
       },
       {
         id: "u3",
         role: "user",
         preview: "",
         attachmentSummary: { imageCount: 1, fileCount: 0 },
+        messageSeq: 2,
       },
     ]);
 
@@ -835,18 +867,21 @@ describe("ThreadTableOfContents", () => {
         role: "user",
         preview: "First cached question",
         attachmentSummary: null,
+        messageSeq: 0,
       },
       {
         id: "row_user_2",
         role: "user",
         preview: "Second cached question",
         attachmentSummary: null,
+        messageSeq: 0,
       },
       {
         id: "row_user_3",
         role: "user",
         preview: "Stale third question",
         attachmentSummary: null,
+        messageSeq: 0,
       },
     ]);
 
@@ -874,6 +909,7 @@ describe("ThreadTableOfContents", () => {
         role: "user",
         preview: "First question",
         attachmentSummary: null,
+        messageSeq: 0,
       },
       {
         id: "u2",
@@ -881,12 +917,14 @@ describe("ThreadTableOfContents", () => {
         preview:
           "[bb message from thread:thr_worker] Release bug report: the calendar is stale.",
         attachmentSummary: null,
+        messageSeq: 0,
       },
       {
         id: "u3",
         role: "user",
         preview: "Third question",
         attachmentSummary: null,
+        messageSeq: 0,
       },
     ]);
 
@@ -927,6 +965,7 @@ describe("ThreadTableOfContents", () => {
         role: "user",
         preview: "First question",
         attachmentSummary: null,
+        messageSeq: 0,
       },
       {
         id: "u2",
@@ -934,12 +973,14 @@ describe("ThreadTableOfContents", () => {
         preview:
           "[bb message from thread:thr_worker] Release bug report: the calendar is stale.",
         attachmentSummary: null,
+        messageSeq: 0,
       },
       {
         id: "u3",
         role: "user",
         preview: "Third question",
         attachmentSummary: null,
+        messageSeq: 0,
       },
     ]);
 
@@ -983,18 +1024,21 @@ describe("ThreadTableOfContents", () => {
         role: "user",
         preview: "First question",
         attachmentSummary: null,
+        messageSeq: 0,
       },
       {
         id: "u2",
         role: "user",
         preview: "Loaded question",
         attachmentSummary: null,
+        messageSeq: 0,
       },
       {
         id: "u3",
         role: "user",
         preview: "Third question",
         attachmentSummary: null,
+        messageSeq: 0,
       },
     ]);
 
@@ -1058,18 +1102,21 @@ describe("ThreadTableOfContents", () => {
         role: "user",
         preview: "Ancient question",
         attachmentSummary: null,
+        messageSeq: 0,
       },
       {
         id: "u2",
         role: "user",
         preview: "Second question",
         attachmentSummary: null,
+        messageSeq: 0,
       },
       {
         id: "u3",
         role: "user",
         preview: "Third question",
         attachmentSummary: null,
+        messageSeq: 0,
       },
     ]);
 
@@ -1095,18 +1142,21 @@ describe("ThreadTableOfContents", () => {
         role: "user",
         preview: "Unreachable",
         attachmentSummary: null,
+        messageSeq: 0,
       },
       {
         id: "u2",
         role: "user",
         preview: "Second question",
         attachmentSummary: null,
+        messageSeq: 0,
       },
       {
         id: "u3",
         role: "user",
         preview: "Third question",
         attachmentSummary: null,
+        messageSeq: 0,
       },
     ]);
 
@@ -1208,11 +1258,15 @@ describe("ThreadTableOfContents", () => {
   });
 
   it("finds active items with logarithmic row measurements", () => {
-    const allItems = Array.from({ length: 256 }, (_, index): TocItem => ({
-      id: `item-${index}`,
-      label: `Message ${index}`,
-      role: index % 2 === 0 ? "user" : "assistant",
-    }));
+    const allItems = Array.from(
+      { length: 256 },
+      (_, index): TocItem => ({
+        id: `item-${index}`,
+        label: `Message ${index}`,
+        role: index % 2 === 0 ? "user" : "assistant",
+        messageSeq: index,
+      }),
+    );
     const manyUserItems = allItems.filter((item) => item.role === "user");
     const manyAgentItems = allItems.filter((item) => item.role === "assistant");
     const visibleIndex = 200;
@@ -1409,5 +1463,301 @@ describe("ThreadTableOfContents timeline item cache", () => {
     });
 
     expect(activeRailTickIndexes()).toEqual([]);
+  });
+});
+
+describe("ThreadTableOfContents plugin extension", () => {
+  const PLUGIN_ID = "demo";
+  let tabProps: ExperimentalThreadTocTabProps | null;
+  let bands: readonly ExperimentalThreadTocBand[];
+  let onBandClick: Mock<
+    (band: ExperimentalThreadTocBand, input: ExperimentalThreadTocInput) => void
+  >;
+  let tickRects: number[];
+
+  function TabComponent(props: ExperimentalThreadTocTabProps) {
+    useEffect(() => {
+      tabProps = props;
+    });
+    return <div data-testid="topics-tab">Topics content</div>;
+  }
+
+  function register({ withTab = true }: { withTab?: boolean } = {}) {
+    setPluginSlotRegistrations(
+      PLUGIN_ID,
+      makePluginRegistrationSet({
+        threadTocExtensions: [
+          {
+            id: "topics",
+            title: "Topics",
+            useBands: () => bands,
+            onBandClick,
+            ...(withTab
+              ? { tab: { label: "Topics", component: TabComponent } }
+              : {}),
+          },
+        ],
+      }),
+    );
+  }
+
+  function rows(seqs: readonly number[]): TimelineConversationRow[] {
+    return seqs.map((seq) => userConversationRow(seq));
+  }
+
+  function bandElements(): HTMLElement[] {
+    return Array.from(
+      document.querySelectorAll<HTMLElement>("[data-toc-band]"),
+    );
+  }
+
+  function ticks(): HTMLElement[] {
+    const elements = Array.from(
+      document.querySelectorAll<HTMLElement>("[data-toc-tick]"),
+    );
+    elements.forEach((element, index) => {
+      const top = tickRects[index] ?? index * 11;
+      element.getBoundingClientRect = () => rect({ top, bottom: top + 3 });
+    });
+    return elements;
+  }
+
+  function trigger(): HTMLElement {
+    return screen.getByRole("button", { name: "Thread table of contents" });
+  }
+
+  function dragFromTo(from: number, to: number) {
+    const elements = ticks();
+    const start = elements[from]!.getBoundingClientRect().top + 1;
+    const end = elements[to]!.getBoundingClientRect().top + 1;
+    fireEvent.pointerDown(trigger(), {
+      clientY: start,
+      pointerId: 1,
+      button: 0,
+    });
+    fireEvent.pointerMove(trigger(), {
+      clientY: (start + end) / 2,
+      pointerId: 1,
+    });
+    fireEvent.pointerMove(trigger(), { clientY: end, pointerId: 1 });
+    fireEvent.pointerUp(trigger(), { clientY: end, pointerId: 1 });
+  }
+
+  beforeEach(() => {
+    tabProps = null;
+    bands = [];
+    tickRects = [];
+    onBandClick = vi.fn();
+  });
+
+  afterEach(() => {
+    removePluginSlotRegistrations(PLUGIN_ID);
+    resetAllCrashedPluginSlotsForTest();
+  });
+
+  it("renders no brackets, tab or selection state without a registered slot", () => {
+    render(<TocHost timelineRows={rows([1, 2, 3, 4])} />);
+    openTocPanel();
+
+    expect(bandElements()).toHaveLength(0);
+    expect(document.querySelectorAll("[data-toc-tick]")).toHaveLength(4);
+    expect(screen.queryByRole("button", { name: "Topics" })).toBeNull();
+  });
+
+  it("draws one bracket per band across the ticks whose message seq is in range", () => {
+    bands = [
+      { fromSeq: 2, toSeq: 4, hue: 200, label: "Topic A" },
+      { fromSeq: 3, toSeq: 3, hue: 20, dashed: true },
+      { fromSeq: 1, toSeq: 1, hue: 90, active: true },
+    ];
+    register();
+    render(<TocHost timelineRows={rows([1, 2, 3, 4, 5])} />);
+
+    const [a, b, c] = bandElements();
+    expect(bandElements()).toHaveLength(3);
+    expect(a?.dataset.rows).toBe("2 / 5");
+    expect(a?.getAttribute("title")).toBe("Topic A");
+    expect(a?.dataset.dashed).toBeUndefined();
+    expect(b?.dataset.rows).toBe("3 / 4");
+    expect(b?.dataset.dashed).toBe("true");
+    expect(c?.dataset.rows).toBe("1 / 2");
+    expect(c?.dataset.active).toBe("true");
+    expect(a?.dataset.lane).toBe("0");
+    expect(b?.dataset.lane).toBe("1");
+    expect(c?.dataset.lane).toBe("0");
+  });
+
+  it("snaps a range that holds no tick to the next tick, or the last one", () => {
+    bands = [
+      { fromSeq: 4, toSeq: 4, hue: 10 },
+      { fromSeq: 8, toSeq: 9, hue: 10 },
+    ];
+    register();
+    render(<TocHost timelineRows={rows([1, 3, 5, 7])} />);
+
+    const [between, after] = bandElements();
+    expect(between?.dataset.rows).toBe("3 / 4");
+    expect(after?.dataset.rows).toBe("4 / 5");
+  });
+
+  it("reports a bracket click to the extension without opening a jump", () => {
+    const band = { fromSeq: 2, toSeq: 3, hue: 120 };
+    bands = [band];
+    register();
+    render(<TocHost timelineRows={rows([1, 2, 3, 4])} />);
+
+    fireEvent.click(bandElements()[0]!);
+
+    expect(onBandClick).toHaveBeenCalledWith(band, {
+      threadId: "thr_toc_test",
+      projectId: "proj_toc_test",
+    });
+  });
+
+  it("adds the extension tab beside the message tabs and passes it the rail props", () => {
+    register();
+    const onNavigateToRow = vi.fn();
+    render(
+      <TocHost
+        onNavigateToRow={onNavigateToRow}
+        timelineRows={rows([1, 2, 3, 4])}
+      />,
+    );
+    openTocPanel();
+
+    fireEvent.click(screen.getByRole("button", { name: "Topics" }));
+
+    expect(screen.getByTestId("topics-tab")).not.toBeNull();
+    expect(
+      screen.queryByText("Loaded after client-side navigation 1"),
+    ).toBeNull();
+    expect(tabProps).toMatchObject({
+      threadId: "thr_toc_test",
+      projectId: "proj_toc_test",
+      railSelection: null,
+    });
+
+    act(() => tabProps?.jumpToSeq(3));
+    expect(onNavigateToRow).toHaveBeenCalledWith("row_user_3");
+
+    fireEvent.click(screen.getByText("Your messages"));
+    expect(screen.queryByTestId("topics-tab")).toBeNull();
+  });
+
+  it("jumps to the nearest user message at or before a seq that is not loaded as a row", () => {
+    register();
+    const onNavigateToRow = vi.fn();
+    const items = [1, 3, 5].map((seq) => ({
+      id: `row_user_${seq}`,
+      role: "user" as const,
+      preview: `Q ${seq}`,
+      attachmentSummary: null,
+      messageSeq: seq,
+    }));
+    setOutline(items, 9);
+    render(
+      <TocHost onNavigateToRow={onNavigateToRow} timelineRows={rows([5])} />,
+    );
+    openTocPanel();
+    fireEvent.click(screen.getByRole("button", { name: "Topics" }));
+
+    act(() => tabProps?.jumpToSeq(4));
+
+    expect(onNavigateToRow).toHaveBeenCalledWith("row_user_3");
+  });
+
+  it("selects a range by dragging along the ticks and keeps the panel open", () => {
+    register();
+    render(<TocHost timelineRows={rows([1, 2, 3, 4, 5])} />);
+
+    dragFromTo(1, 2);
+
+    expect(screen.getByTestId("topics-tab")).not.toBeNull();
+    expect(tabProps?.railSelection).toEqual({ fromSeq: 2, toSeq: 3 });
+    expect(trigger().getAttribute("aria-expanded")).toBe("true");
+
+    const toc = document.querySelector<HTMLElement>("[data-thread-toc]")!;
+    fireEvent.mouseLeave(toc);
+    expect(trigger().getAttribute("aria-expanded")).toBe("true");
+  });
+
+  it("extends the last tick's selection to the newest message", () => {
+    register();
+    setOutline(
+      [1, 2, 3].map((seq) => ({
+        id: `row_user_${seq}`,
+        role: "user" as const,
+        preview: `Q ${seq}`,
+        attachmentSummary: null,
+        messageSeq: seq,
+      })),
+      9,
+    );
+    render(<TocHost timelineRows={rows([1, 2, 3])} />);
+
+    dragFromTo(2, 1);
+
+    expect(tabProps?.railSelection).toEqual({ fromSeq: 2, toSeq: 9 });
+  });
+
+  it("keeps a plain click free of any selection", () => {
+    register();
+    render(<TocHost timelineRows={rows([1, 2, 3, 4])} />);
+    const elements = ticks();
+    const y = elements[1]!.getBoundingClientRect().top + 1;
+
+    fireEvent.pointerDown(trigger(), { clientY: y, pointerId: 1, button: 0 });
+    fireEvent.pointerUp(trigger(), { clientY: y, pointerId: 1 });
+    fireEvent.click(trigger());
+
+    expect(tabProps).toBeNull();
+    expect(trigger().getAttribute("aria-expanded")).toBe("true");
+    const toc = document.querySelector<HTMLElement>("[data-thread-toc]")!;
+    fireEvent.mouseLeave(toc);
+    expect(trigger().getAttribute("aria-expanded")).toBe("false");
+  });
+
+  it("clears the selection on Escape and through clearRailSelection", () => {
+    register();
+    render(<TocHost timelineRows={rows([1, 2, 3, 4, 5])} />);
+
+    dragFromTo(0, 1);
+    expect(tabProps?.railSelection).not.toBeNull();
+    expect(trigger().getAttribute("aria-expanded")).toBe("true");
+    act(() => tabProps?.clearRailSelection());
+    expect(trigger().getAttribute("aria-expanded")).toBe("false");
+    expect(document.querySelector("[data-selected]")).toBeNull();
+
+    dragFromTo(0, 1);
+    expect(trigger().getAttribute("aria-expanded")).toBe("true");
+    fireEvent.keyDown(document.body, { key: "Escape" });
+    expect(trigger().getAttribute("aria-expanded")).toBe("false");
+    expect(document.querySelector("[data-selected]")).toBeNull();
+  });
+
+  it("does not select by drag when no extension offers a tab", () => {
+    register({ withTab: false });
+    render(<TocHost timelineRows={rows([1, 2, 3, 4])} />);
+
+    dragFromTo(0, 2);
+
+    expect(tabProps).toBeNull();
+    expect(document.querySelector("[data-toc-tick][data-selected]")).toBeNull();
+  });
+
+  it("marks the selected ticks and drops animation under reduced motion", () => {
+    bands = [{ fromSeq: 1, toSeq: 2, hue: 5, active: true }];
+    register();
+    render(<TocHost timelineRows={rows([1, 2, 3, 4])} />);
+
+    dragFromTo(1, 2);
+
+    const selected = Array.from(
+      document.querySelectorAll<HTMLElement>("[data-toc-tick][data-selected]"),
+    );
+    expect(selected).toHaveLength(2);
+    expect(bandElements()[0]?.className).toContain(
+      "motion-reduce:transition-none",
+    );
   });
 });

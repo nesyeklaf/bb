@@ -1309,3 +1309,81 @@ describe("collectPluginAppRegistrations", () => {
     });
   });
 });
+
+describe("collectPluginAppRegistrations — experimental_threadTocExtension", () => {
+  function useBands() {
+    return [];
+  }
+
+  it("collects an extension with a tab and a band click handler", () => {
+    function onBandClick() {}
+    const definition = definePluginApp((app) => {
+      app.slots.experimental_threadTocExtension({
+        id: "topics",
+        title: "Topics",
+        useBands,
+        onBandClick,
+        tab: { label: "Topics", component: Component },
+      });
+    });
+    expect(
+      collectPluginAppRegistrations(definition).threadTocExtensions,
+    ).toEqual([
+      {
+        id: "topics",
+        title: "Topics",
+        useBands,
+        onBandClick,
+        tab: { label: "Topics", component: Component },
+      },
+    ]);
+  });
+
+  it("collects an extension that only draws bands", () => {
+    const definition = definePluginApp((app) => {
+      app.slots.experimental_threadTocExtension({
+        id: "topics",
+        title: "Topics",
+        useBands,
+      });
+    });
+    expect(
+      collectPluginAppRegistrations(definition).threadTocExtensions,
+    ).toEqual([{ id: "topics", title: "Topics", useBands }]);
+  });
+
+  it("rejects duplicate ids, a missing title or hook, and a malformed tab or handler", () => {
+    const register = (registration: object) =>
+      definePluginApp((app) => {
+        app.slots.experimental_threadTocExtension(registration as never);
+      });
+    const base = { id: "topics", title: "Topics", useBands };
+    expect(() =>
+      collectPluginAppRegistrations(
+        definePluginApp((app) => {
+          app.slots.experimental_threadTocExtension(base);
+          app.slots.experimental_threadTocExtension(base);
+        }),
+      ),
+    ).toThrow(/topics/);
+    expect(() =>
+      collectPluginAppRegistrations(register({ ...base, title: "" })),
+    ).toThrow(/title/);
+    expect(() =>
+      collectPluginAppRegistrations(register({ ...base, useBands: undefined })),
+    ).toThrow(/useBands/);
+    expect(() =>
+      collectPluginAppRegistrations(
+        register({ ...base, tab: { label: "", component: Component } }),
+      ),
+    ).toThrow(/label/);
+    expect(() =>
+      collectPluginAppRegistrations(
+        register({ ...base, tab: { label: "Topics", component: null } }),
+      ),
+    ).toThrow(/component/);
+    expect(() =>
+      collectPluginAppRegistrations(register({ ...base, onBandClick: "x" })),
+    ).toThrow(/onBandClick/);
+  });
+});

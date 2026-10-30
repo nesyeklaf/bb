@@ -68,6 +68,8 @@ the same change.
   and Browser toolbar controls, and sidebar replacement.
 - Read references/frontend-sidebar-navigation.md for navigation providers
   (rail or list placement) and controls beside the sidebar toggle.
+- Read references/frontend-thread-toc.md to add brackets and a tab to the thread
+  table-of-contents rail beside the chat.
 - Read references/frontend-thread-row-metadata.md to add a badge to every thread
   row (`experimental_threadRowMetadata`) or draw those badges on your own rows.
 - Read references/frontend-panel-tabs.md to list the side panel's open tabs,

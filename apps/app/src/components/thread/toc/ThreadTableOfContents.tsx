@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import type { ExperimentalThreadTocSelection } from "@get-bb/plugin-sdk";
 import type {
   ThreadConversationOutlineItem,
   ThreadConversationOutlineResponse,
@@ -16,14 +17,26 @@ import { PROMPT_MENTION_PILL_CLASS } from "@bb/client-core";
 import { cn } from "@bb/shared-ui/lib/utils";
 import { parseAgentMessageEnvelope } from "@bb/thread-view";
 import { useThreadTitleDisplayText } from "@/components/thread/ThreadTitleMentions";
+import {
+  notifyThreadTocBandClick,
+  ThreadTocTabMount,
+  useThreadTocExtensions,
+} from "@/components/plugin/PluginThreadTocExtensions";
+import {
+  assignBandLanes,
+  bandTickRange,
+  selectionFromTicks,
+} from "./toc-rail-bands";
 
 export interface TocItem {
   id: string;
   label: string;
   role: "user" | "assistant";
+  messageSeq: number;
 }
 
 type TocTab = "user" | "agent";
+type PanelTab = TocTab | `ext:${string}`;
 
 interface ActiveItemIds {
   agent: string | null;
@@ -33,6 +46,7 @@ interface ActiveItemIds {
 interface ThreadTableOfContentsProps {
   contextBoundarySeq: number | null;
   threadId: string;
+  projectId: string;
   timelineRows: readonly TimelineRow[];
   hasOlderTimelineRows: boolean;
   loadOlderTimelineRows: () => void | Promise<void>;
@@ -46,6 +60,8 @@ const TOC_MAX_RAIL_TICKS = 20;
 const TOC_ACTIVE_UPDATE_IDLE_MS = 120;
 const TOC_JUMP_MAX_PAGE_LOADS = 1000;
 const TOC_JUMP_RENDER_FRAMES = 6;
+const TOC_DRAG_THRESHOLD_PX = 4;
+const TOC_BAND_LANE_PITCH_PX = 3;
 function toPreviewLabel(text: string): string {
   return text.replace(/\s+/g, " ").trim();
 }
@@ -87,6 +103,7 @@ function getTimelineTocItem(row: TimelineConversationRow): TocItem {
     id: row.id,
     label: toTocLabel({ attachments: row.attachments, text: row.text }),
     role: row.role,
+    messageSeq: row.messageSeq,
   };
   timelineTocItemsByRow.set(row, item);
   return item;
@@ -102,6 +119,7 @@ function outlineItemToTocItem(item: ThreadConversationOutlineItem): TocItem {
         ? formatAttachmentCountLabel(summary.imageCount, summary.fileCount)
         : "Message"),
     role: item.role,
+    messageSeq: item.messageSeq,
   };
 }
 
@@ -505,9 +523,35 @@ export function findActiveItemIds({
   };
 }
 
+function bandColor(hue: number, alpha = 1): string {
+  const normalized = ((hue % 360) + 360) % 360;
+  return `oklch(0.72 0.14 ${normalized} / ${alpha})`;
+}
+
+function nearestTickId(
+  rootElement: HTMLElement | null,
+  clientY: number,
+): string | null {
+  if (!rootElement) return null;
+  let nearestId: string | null = null;
+  let nearestDistance = Number.POSITIVE_INFINITY;
+  for (const element of rootElement.querySelectorAll<HTMLElement>(
+    "[data-toc-tick]",
+  )) {
+    const rect = element.getBoundingClientRect();
+    const distance = Math.abs((rect.top + rect.bottom) / 2 - clientY);
+    if (distance < nearestDistance) {
+      nearestDistance = distance;
+      nearestId = element.dataset.tocTickId ?? null;
+    }
+  }
+  return nearestId;
+}
+
 export function ThreadTableOfContents({
   contextBoundarySeq,
   threadId,
+  projectId,
   timelineRows,
   hasOlderTimelineRows,
   loadOlderTimelineRows,
@@ -517,7 +561,24 @@ export function ThreadTableOfContents({
   const [rootElement, setRootElement] = useState<HTMLElement | null>(null);
   const tocVisible = useThreadTocVisible(rootElement);
   const [open, setOpen] = useState(false);
-  const [tab, setTab] = useState<TocTab>("user");
+  const [tab, setTab] = useState<PanelTab>("user");
+  const [railSelection, setRailSelection] =
+    useState<ExperimentalThreadTocSelection | null>(null);
+  const dragRef = useRef<{
+    startId: string | null;
+    startY: number;
+    moved: boolean;
+  } | null>(null);
+  const extensionInput = useMemo(
+    () => ({ threadId, projectId }),
+    [threadId, projectId],
+  );
+  const {
+    bands: extensionBands,
+    tabs: extensionTabs,
+    observers: extensionObservers,
+  } = useThreadTocExtensions(extensionInput);
+  const panelOpen = open || railSelection !== null;
   const outlineEnabled = tocVisible && timelineRows.length > 0;
   const userOutlineQuery = useThreadConversationOutline(threadId, "user", {
     enabled: outlineEnabled,
@@ -525,7 +586,7 @@ export function ThreadTableOfContents({
   const agentOutlineQuery = useThreadConversationOutline(
     threadId,
     "assistant",
-    { enabled: outlineEnabled && open && tab === "agent" },
+    { enabled: outlineEnabled && panelOpen && tab === "agent" },
   );
   const senderThreadMetadataById = useSenderThreadMetadataById();
   const { agentItems, userItems } = useConversationTocItems({
@@ -549,19 +610,33 @@ export function ThreadTableOfContents({
     scrollRef,
     topSentinelRef,
   } = useScrollOverflowState<HTMLDivElement>({
-    enabled: open,
+    enabled: panelOpen,
     measureOverflow: true,
   });
   const itemEls = useRef(new Map<string, HTMLElement>());
   const activeIdsRef = useRef<ActiveItemIds>({ agent: null, user: null });
   const hasAgentMessages = agentItems.length > 0;
-  const activeTab = tab === "agent" && hasAgentMessages ? "agent" : "user";
+  const extensionTab =
+    extensionTabs.find((entry) => tab === `ext:${entry.key}`) ?? null;
+  const activeTab: TocTab =
+    extensionTab === null && tab === "agent" && hasAgentMessages
+      ? "agent"
+      : "user";
   const items = activeTab === "user" ? userItems : agentItems;
   const activeId = activeTab === "user" ? activeUserId : activeAgentId;
   const railItems = useMemo(
     () => selectTocRailItems({ activeId: activeUserId, items: userItems }),
     [activeUserId, userItems],
   );
+  const railBands = useMemo(() => {
+    const entries = extensionBands.flatMap((entry) => {
+      const range = bandTickRange(railItems, entry.band);
+      return range ? [{ entry, range }] : [];
+    });
+    const lanes = assignBandLanes(entries.map(({ range }) => range));
+    return entries.map((item, index) => ({ ...item, lane: lanes[index] ?? 0 }));
+  }, [extensionBands, railItems]);
+  const outlineMaxSeq = userOutlineQuery.data?.maxSeq ?? 0;
 
   const hasOlderRef = useRef(hasOlderTimelineRows);
   hasOlderRef.current = hasOlderTimelineRows;
@@ -625,7 +700,20 @@ export function ThreadTableOfContents({
   }, [agentItems, bottomAnchor, tocVisible, userItems]);
 
   useEffect(() => {
-    if (!tocVisible || !open) return;
+    setRailSelection(null);
+  }, [threadId]);
+
+  useEffect(() => {
+    if (railSelection === null) return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setRailSelection(null);
+    };
+    document.addEventListener("keydown", onKeyDown);
+    return () => document.removeEventListener("keydown", onKeyDown);
+  }, [railSelection]);
+
+  useEffect(() => {
+    if (!tocVisible || !panelOpen) return;
     const container = scrollRef.current;
     const el = activeId ? itemEls.current.get(activeId) : null;
     if (!container || !el) return;
@@ -642,7 +730,7 @@ export function ThreadTableOfContents({
           container.scrollTop + (elRect.bottom - (containerRect.bottom - pad)),
       });
     }
-  }, [activeId, items, open, scrollRef, tocVisible]);
+  }, [activeId, items, panelOpen, scrollRef, tocVisible]);
 
   const handleSelect = useCallback(
     async (id: string) => {
@@ -696,6 +784,45 @@ export function ThreadTableOfContents({
     [bottomAnchor, onNavigateToRow, timelineRows],
   );
 
+  const jumpToSeq = useCallback(
+    (seq: number) => {
+      const row = timelineRows.find(
+        (timelineRow) =>
+          timelineRow.kind === "conversation" && timelineRow.messageSeq === seq,
+      );
+      if (row) {
+        void handleSelect(row.id);
+        return;
+      }
+      let target: TocItem | undefined;
+      for (const item of userItems) {
+        if (item.messageSeq > seq) break;
+        target = item;
+      }
+      target ??= userItems[0];
+      if (target) void handleSelect(target.id);
+    },
+    [handleSelect, timelineRows, userItems],
+  );
+
+  const clearRailSelection = useCallback(() => setRailSelection(null), []);
+
+  const updateDragSelection = (clientY: number) => {
+    const drag = dragRef.current;
+    if (!drag || drag.startId === null) return;
+    const endId = nearestTickId(rootElement, clientY);
+    if (endId === null) return;
+    const selection = selectionFromTicks({
+      fromTickId: drag.startId,
+      toTickId: endId,
+      maxSeq: outlineMaxSeq,
+      userTicks: userItems,
+    });
+    if (selection) setRailSelection(selection);
+  };
+
+  const canSelect = extensionTabs.length > 0;
+
   if (userItems.length < TOC_MIN_USER_MESSAGES) {
     return <span ref={setRootElement} aria-hidden className="hidden" />;
   }
@@ -721,30 +848,120 @@ export function ThreadTableOfContents({
         className={cn("relative", !tocVisible && "hidden")}
         inert={!tocVisible}
       >
+        {tocVisible ? extensionObservers : null}
         <button
           type="button"
           aria-label="Thread table of contents"
-          aria-expanded={open}
+          aria-expanded={panelOpen}
           aria-controls={`thread-toc-panel-${threadId}`}
           onClick={() => setOpen(true)}
-          className="no-scrollbar flex max-h-[calc(100vh-7rem)] w-8 cursor-pointer flex-col items-center gap-2 overflow-y-auto py-2"
+          onPointerDown={(event) => {
+            if (!canSelect || event.button !== 0) return;
+            dragRef.current = {
+              startId: nearestTickId(rootElement, event.clientY),
+              startY: event.clientY,
+              moved: false,
+            };
+          }}
+          onPointerMove={(event) => {
+            const drag = dragRef.current;
+            if (!drag) return;
+            if (
+              !drag.moved &&
+              Math.abs(event.clientY - drag.startY) < TOC_DRAG_THRESHOLD_PX
+            ) {
+              return;
+            }
+            if (!drag.moved) {
+              drag.moved = true;
+              event.currentTarget.setPointerCapture?.(event.pointerId);
+              const first = extensionTabs[0];
+              if (first) setTab(`ext:${first.key}`);
+            }
+            updateDragSelection(event.clientY);
+          }}
+          onPointerUp={(event) => {
+            if (dragRef.current?.moved) updateDragSelection(event.clientY);
+            dragRef.current = null;
+          }}
+          onPointerCancel={() => {
+            dragRef.current = null;
+          }}
+          className="no-scrollbar flex max-h-[calc(100vh-7rem)] w-8 cursor-pointer select-none flex-col items-center gap-2 overflow-y-auto py-2"
         >
-          <span aria-hidden className="flex w-full flex-col items-center gap-2">
-            {railItems.map((item) => (
+          <span
+            aria-hidden
+            className={cn(
+              "relative flex w-full flex-col items-center gap-2",
+              railBands.length > 0 && "pr-3",
+            )}
+          >
+            {railItems.map((item) => {
+              const selected =
+                railSelection !== null &&
+                item.messageSeq >= railSelection.fromSeq &&
+                item.messageSeq <= railSelection.toSeq;
+              return (
+                <span
+                  key={item.id}
+                  data-toc-tick=""
+                  data-toc-tick-id={item.id}
+                  data-selected={selected ? "" : undefined}
+                  className={cn(
+                    "h-[3px] shrink-0 rounded-full transition-all duration-150",
+                    selected
+                      ? "w-5 bg-foreground/70"
+                      : item.id === activeUserId
+                        ? "w-5 bg-foreground/30 group-hover/toc:bg-foreground/70"
+                        : "w-3 bg-foreground/5 group-hover/toc:bg-foreground/20",
+                  )}
+                />
+              );
+            })}
+            {railBands.length > 0 ? (
               <span
-                key={item.id}
-                className={cn(
-                  "h-[3px] shrink-0 rounded-full transition-all duration-150",
-                  item.id === activeUserId
-                    ? "w-5 bg-foreground/30 group-hover/toc:bg-foreground/70"
-                    : "w-3 bg-foreground/5 group-hover/toc:bg-foreground/20",
-                )}
-              />
-            ))}
+                className="absolute inset-y-0 right-0 grid w-3 gap-y-2"
+                style={{ gridTemplateRows: `repeat(${railItems.length}, 3px)` }}
+              >
+                {railBands.map(({ entry, range, lane }, index) => (
+                  <span
+                    key={`${entry.slot.pluginId}/${entry.slot.id}/${index}`}
+                    data-toc-band=""
+                    data-rows={`${range.start + 1} / ${range.end + 2}`}
+                    data-lane={lane}
+                    data-dashed={entry.band.dashed ? "true" : undefined}
+                    data-active={entry.band.active ? "true" : undefined}
+                    title={entry.band.label}
+                    onPointerDown={(event) => event.stopPropagation()}
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      notifyThreadTocBandClick(entry, extensionInput);
+                    }}
+                    className="pointer-events-auto relative cursor-pointer rounded-full transition-all duration-150 motion-reduce:transition-none"
+                    style={{
+                      gridRow: `${range.start + 1} / ${range.end + 2}`,
+                      gridColumn: 1,
+                      marginLeft: lane * TOC_BAND_LANE_PITCH_PX,
+                      width: entry.band.active ? 3 : 2,
+                      ...(entry.band.dashed
+                        ? {
+                            backgroundImage: `repeating-linear-gradient(to bottom, ${bandColor(entry.band.hue)} 0 3px, transparent 3px 6px)`,
+                          }
+                        : { backgroundColor: bandColor(entry.band.hue) }),
+                      ...(entry.band.active
+                        ? {
+                            boxShadow: `0 0 6px ${bandColor(entry.band.hue, 0.8)}`,
+                          }
+                        : {}),
+                    }}
+                  />
+                ))}
+              </span>
+            ) : null}
           </span>
         </button>
 
-        {open ? (
+        {panelOpen ? (
           <div
             id={`thread-toc-panel-${threadId}`}
             className="pointer-events-auto absolute right-full top-0 w-[18.25rem] max-w-[calc(100vw-3rem)] pr-1"
@@ -754,89 +971,110 @@ export function ThreadTableOfContents({
                 {hasAgentMessages ? (
                   <TocPanelTab
                     label="Agent messages"
-                    active={activeTab === "agent"}
+                    active={extensionTab === null && activeTab === "agent"}
                     onSelect={() => setTab("agent")}
                   />
                 ) : null}
                 <TocPanelTab
                   label="Your messages"
-                  active={activeTab === "user"}
+                  active={extensionTab === null && activeTab === "user"}
                   onSelect={() => setTab("user")}
                 />
-              </div>
-              <div className="relative isolate">
-                <div
-                  ref={scrollRef}
-                  className="max-h-64 overflow-y-auto overflow-x-hidden"
-                >
-                  <div
-                    ref={topSentinelRef}
-                    aria-hidden
-                    className="h-px w-full"
+                {extensionTabs.map((entry) => (
+                  <TocPanelTab
+                    key={entry.key}
+                    label={entry.label}
+                    active={extensionTab === entry}
+                    onSelect={() => setTab(`ext:${entry.key}`)}
                   />
-                  <ul className="flex flex-col">
-                    {items.map((item) => {
-                      const active = item.id === activeId;
-                      const pending = item.id === pendingJumpId;
-                      return (
-                        <li key={item.id}>
-                          <button
-                            ref={(node) => {
-                              if (node) itemEls.current.set(item.id, node);
-                              else itemEls.current.delete(item.id);
-                            }}
-                            type="button"
-                            aria-busy={pending}
-                            onClick={() => {
-                              void handleSelect(item.id);
-                            }}
-                            className={cn(
-                              "flex w-full cursor-pointer rounded-md px-2 py-1.5 text-left transition-colors",
-                              active
-                                ? "bg-state-hover"
-                                : "hover:bg-state-hover",
-                            )}
-                          >
-                            <span
-                              className={cn(
-                                "text-xs leading-snug",
-                                active
-                                  ? "text-foreground"
-                                  : "text-muted-foreground",
-                                pending && "animate-pulse",
-                              )}
-                            >
-                              <TocItemPreview
-                                item={item}
-                                senderThreadMetadataById={
-                                  senderThreadMetadataById
-                                }
-                              />
-                            </span>
-                          </button>
-                        </li>
-                      );
-                    })}
-                  </ul>
-                  <div
-                    ref={bottomSentinelRef}
-                    aria-hidden
-                    className="h-px w-full"
+                ))}
+              </div>
+              {extensionTab ? (
+                <div className="max-h-64 overflow-y-auto overflow-x-hidden">
+                  <ThreadTocTabMount
+                    slot={extensionTab.slot}
+                    threadId={threadId}
+                    projectId={projectId}
+                    jumpToSeq={jumpToSeq}
+                    railSelection={railSelection}
+                    clearRailSelection={clearRailSelection}
                   />
                 </div>
-                {aboveOverflow ? (
+              ) : (
+                <div className="relative isolate">
                   <div
-                    aria-hidden
-                    className="pointer-events-none absolute inset-x-0 top-0 z-10 h-8 bg-gradient-to-b from-popover/90 via-popover/60 to-transparent"
-                  />
-                ) : null}
-                {belowOverflow ? (
-                  <div
-                    aria-hidden
-                    className="pointer-events-none absolute inset-x-0 bottom-0 z-10 h-8 bg-gradient-to-t from-popover/90 via-popover/60 to-transparent"
-                  />
-                ) : null}
-              </div>
+                    ref={scrollRef}
+                    className="max-h-64 overflow-y-auto overflow-x-hidden"
+                  >
+                    <div
+                      ref={topSentinelRef}
+                      aria-hidden
+                      className="h-px w-full"
+                    />
+                    <ul className="flex flex-col">
+                      {items.map((item) => {
+                        const active = item.id === activeId;
+                        const pending = item.id === pendingJumpId;
+                        return (
+                          <li key={item.id}>
+                            <button
+                              ref={(node) => {
+                                if (node) itemEls.current.set(item.id, node);
+                                else itemEls.current.delete(item.id);
+                              }}
+                              type="button"
+                              aria-busy={pending}
+                              onClick={() => {
+                                void handleSelect(item.id);
+                              }}
+                              className={cn(
+                                "flex w-full cursor-pointer rounded-md px-2 py-1.5 text-left transition-colors",
+                                active
+                                  ? "bg-state-hover"
+                                  : "hover:bg-state-hover",
+                              )}
+                            >
+                              <span
+                                className={cn(
+                                  "text-xs leading-snug",
+                                  active
+                                    ? "text-foreground"
+                                    : "text-muted-foreground",
+                                  pending && "animate-pulse",
+                                )}
+                              >
+                                <TocItemPreview
+                                  item={item}
+                                  senderThreadMetadataById={
+                                    senderThreadMetadataById
+                                  }
+                                />
+                              </span>
+                            </button>
+                          </li>
+                        );
+                      })}
+                    </ul>
+                    <div
+                      ref={bottomSentinelRef}
+                      aria-hidden
+                      className="h-px w-full"
+                    />
+                  </div>
+                  {aboveOverflow ? (
+                    <div
+                      aria-hidden
+                      className="pointer-events-none absolute inset-x-0 top-0 z-10 h-8 bg-gradient-to-b from-popover/90 via-popover/60 to-transparent"
+                    />
+                  ) : null}
+                  {belowOverflow ? (
+                    <div
+                      aria-hidden
+                      className="pointer-events-none absolute inset-x-0 bottom-0 z-10 h-8 bg-gradient-to-t from-popover/90 via-popover/60 to-transparent"
+                    />
+                  ) : null}
+                </div>
+              )}
             </div>
           </div>
         ) : null}

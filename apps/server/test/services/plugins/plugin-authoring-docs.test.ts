@@ -37,6 +37,7 @@ import {
   type PluginSidebarFooterActionProps,
   type PluginSourceCodeRendererProps,
   type ExperimentalThreadContextSegmentProps,
+  type ExperimentalThreadTocTabProps,
   type ExperimentalThreadInfoProps,
   type ExperimentalThreadContextCardProps,
   type ExperimentalThreadRowMetadataProps,
@@ -259,9 +260,7 @@ const THREAD_EVENT_PAYLOAD_FIELDS = {
     "attemptNumber",
   ],
 } as const satisfies {
-  [
-    E in keyof PluginThreadEventPayloads
-  ]: readonly (keyof PluginThreadEventPayloads[E])[];
+  [E in keyof PluginThreadEventPayloads]: readonly (keyof PluginThreadEventPayloads[E])[];
 };
 
 type MissingThreadEventField = {
@@ -287,6 +286,7 @@ type SlotPropsByName = {
   experimental_threadList: PluginThreadListProps;
   experimental_sidebarNavigation: ExperimentalSidebarNavigationProps;
   experimental_threadContextSegment: ExperimentalThreadContextSegmentProps;
+  experimental_threadTocExtension: ExperimentalThreadTocTabProps;
   experimental_threadRowMetadata: ExperimentalThreadRowMetadataProps;
   experimental_threadInfoRow: ExperimentalThreadInfoProps;
   experimental_threadInfoSection: ExperimentalThreadInfoProps;
@@ -394,6 +394,13 @@ const FRONTEND_SLOT_PROP_FIELDS = {
     "threadId",
     "projectId",
     "environment",
+  ],
+  experimental_threadTocExtension: [
+    "threadId",
+    "projectId",
+    "jumpToSeq",
+    "railSelection",
+    "clearRailSelection",
   ],
   experimental_threadRowMetadata: ["thread", "data"],
   experimental_threadAction: [

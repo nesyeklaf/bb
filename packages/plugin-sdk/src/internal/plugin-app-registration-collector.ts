@@ -32,6 +32,7 @@ import type {
   PluginSidebarFooterActionRegistration,
   PluginSourceCodeRendererRegistration,
   ExperimentalThreadContextSegmentRegistration,
+  ExperimentalThreadTocExtensionRegistration,
   ExperimentalThreadInfoRowRegistration,
   ExperimentalThreadRowMetadataRegistration,
   ExperimentalThreadInfoSectionRegistration,
@@ -319,6 +320,7 @@ export interface CollectedPluginAppRegistrations {
   experimentalSidebarNavigations: CollectedSidebarNavigationRegistration[];
   threadHeaderActions: LegacyThreadHeaderActionRegistration[];
   threadContextSegments: ExperimentalThreadContextSegmentRegistration[];
+  threadTocExtensions: ExperimentalThreadTocExtensionRegistration[];
   threadInfoRows: ExperimentalThreadInfoRowRegistration[];
   threadRowMetadata: ExperimentalThreadRowMetadataRegistration<unknown>[];
   threadInfoSections: ExperimentalThreadInfoSectionRegistration[];
@@ -462,6 +464,7 @@ export function collectPluginAppRegistrations(
     experimentalSidebarNavigations: [],
     threadHeaderActions: [],
     threadContextSegments: [],
+    threadTocExtensions: [],
     threadInfoRows: [],
     threadRowMetadata: [],
     threadInfoSections: [],
@@ -502,6 +505,7 @@ export function collectPluginAppRegistrations(
     sidebarHeader: new Set<string>(),
     threadHeaderAction: new Set<string>(),
     threadContextSegment: new Set<string>(),
+    threadTocExtension: new Set<string>(),
     threadInfoRow: new Set<string>(),
     threadRowMetadata: new Set<string>(),
     threadInfoSection: new Set<string>(),
@@ -960,6 +964,47 @@ export function collectPluginAppRegistrations(
           ...optionalComponent("details"),
           ...(registration.useVisible !== undefined
             ? { useVisible: registration.useVisible }
+            : {}),
+        });
+      },
+      experimental_threadTocExtension(registration) {
+        const kind = "slots.experimental_threadTocExtension";
+        const id = requireSlotId(kind, registration?.id);
+        requireUniqueId(kind, seenIds.threadTocExtension, id);
+        if (typeof registration.useBands !== "function") {
+          throw new Error(`${kind}: "useBands" must be a function`);
+        }
+        if (
+          registration.onBandClick !== undefined &&
+          typeof registration.onBandClick !== "function"
+        ) {
+          throw new Error(`${kind}: "onBandClick" must be a function`);
+        }
+        const tab = registration.tab;
+        if (tab !== undefined) {
+          if (tab === null || typeof tab !== "object") {
+            throw new Error(`${kind}: "tab" must be an object`);
+          }
+          if (typeof tab.component !== "function") {
+            throw new Error(
+              `${kind}: "tab.component" must be a React component function`,
+            );
+          }
+        }
+        collected.threadTocExtensions.push({
+          id,
+          title: requireNonEmptyString(kind, "title", registration.title),
+          useBands: registration.useBands,
+          ...(registration.onBandClick !== undefined
+            ? { onBandClick: registration.onBandClick }
+            : {}),
+          ...(tab !== undefined
+            ? {
+                tab: {
+                  label: requireNonEmptyString(kind, "tab.label", tab.label),
+                  component: tab.component,
+                },
+              }
             : {}),
         });
       },

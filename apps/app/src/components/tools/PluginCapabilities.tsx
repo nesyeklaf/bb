@@ -305,6 +305,12 @@ function pluginAppSurfaceItems(
     ),
     ...namedSlotItems(
       pluginId,
+      slots.threadTocExtensions,
+      "thread-toc",
+      "Adds brackets and a tab to the thread table of contents.",
+    ),
+    ...namedSlotItems(
+      pluginId,
       slots.threadRowMetadata,
       "thread-row-item",
       "Adds an item to each thread row in the sidebar.",
