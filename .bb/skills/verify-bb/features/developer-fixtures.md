@@ -30,4 +30,3 @@ a prerequisite gap, not a pass. Stop only owned sessions/processes, restore
 preferences, and remove only synthetic resources after evidence is preserved.
 
 ## Maintenance notes
-

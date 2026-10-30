@@ -38,4 +38,3 @@ env:
 # link domain, so iOS hands `http://127.0.0.1:.../` to Safari — correctly.
 # The web-link branch of the resolver is covered by unit tests in
 # src/lib/shell/shell-links.test.ts.
-
