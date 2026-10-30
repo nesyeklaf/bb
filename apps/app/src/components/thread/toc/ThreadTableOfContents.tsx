@@ -579,6 +579,7 @@ export function ThreadTableOfContents({
   const [rootElement, setRootElement] = useState<HTMLElement | null>(null);
   const tocVisible = useThreadTocVisible(rootElement);
   const [open, setOpen] = useState(false);
+  const [railHoverId, setRailHoverId] = useState<string | null>(null);
   const [chosenTab, setTab] = useState<PanelTab | null>(null);
   const [railHalf, setRailHalf] = useState<TocRailHalf | null>(null);
   const halfTimerRef = useRef<number | null>(null);
@@ -808,6 +809,7 @@ export function ThreadTableOfContents({
         return;
       }
       setOpen(false);
+ setRailHoverId(null);
       setRailSelection(null);
       const focused = document.activeElement;
       if (focused instanceof HTMLElement && rootElement.contains(focused)) {
@@ -846,6 +848,20 @@ export function ThreadTableOfContents({
       });
     }
   }, [activeId, items, panelOpen, scrollRef, tocVisible]);
+
+  useEffect(() => {
+    if (!tocVisible || !panelOpen || railHoverId === null) return;
+    const container = scrollRef.current;
+    const el = itemEls.current.get(railHoverId);
+    if (!container || !el) return;
+    const containerRect = container.getBoundingClientRect();
+    const elRect = el.getBoundingClientRect();
+    const offset =
+      elRect.top -
+      containerRect.top -
+      (containerRect.height - elRect.height) / 2;
+    container.scrollTop += offset;
+  }, [panelOpen, railHoverId, scrollRef, tocVisible]);
 
   const handleSelect = useCallback(
     async (id: string) => {
@@ -967,11 +983,14 @@ export function ThreadTableOfContents({
   };
   const onRailPointer = (event: ReactPointerEvent<HTMLElement>) => {
     syncRailHalf(event);
-    if (!canSelect || dragRef.current?.moved) return;
-    const half = railHalfAt(
-      event.clientX,
-      event.currentTarget.getBoundingClientRect(),
+    if (dragRef.current?.moved) return;
+    const half = canSelect
+      ? railHalfAt(event.clientX, event.currentTarget.getBoundingClientRect())
+      : "messages";
+    setRailHoverId(
+      half === "messages" ? nearestTickId(rootElement, event.clientY) : null,
     );
+    if (!canSelect) return;
     if (half === "topics") {
       if (event.target instanceof Element && event.target.closest("[data-toc-band]")) return;
       pickBandAtPointer(event.clientY);
@@ -1026,6 +1045,7 @@ export function ThreadTableOfContents({
           return;
         }
         setOpen(false);
+ setRailHoverId(null);
       }}
       onFocusCapture={() => setOpen(true)}
       onBlurCapture={(event) => {
@@ -1034,6 +1054,7 @@ export function ThreadTableOfContents({
           !event.currentTarget.contains(event.relatedTarget)
         ) {
           setOpen(false);
+ setRailHoverId(null);
         }
       }}
     >
@@ -1117,7 +1138,8 @@ export function ThreadTableOfContents({
             )}
           >
             {railItems.map((item, tickIndex) => {
-              const emphasized = highlightedTicks.has(tickIndex);
+              const emphasized =
+                highlightedTicks.has(tickIndex) || item.id === railHoverId;
               const selected =
                 railSelection !== null &&
                 item.messageSeq >= railSelection.fromSeq &&
@@ -1261,6 +1283,7 @@ export function ThreadTableOfContents({
                       {items.map((item) => {
                         const active = item.id === activeId;
                         const pending = item.id === pendingJumpId;
+                        const hovered = item.id === railHoverId;
                         return (
                           <li key={item.id}>
                             <button
@@ -1275,7 +1298,7 @@ export function ThreadTableOfContents({
                               }}
                               className={cn(
                                 "flex w-full cursor-pointer rounded-md px-2 py-1.5 text-left transition-colors",
-                                active
+                                active || hovered
                                   ? "bg-state-hover"
                                   : "hover:bg-state-hover",
                               )}
@@ -1283,7 +1306,7 @@ export function ThreadTableOfContents({
                               <span
                                 className={cn(
                                   "text-xs leading-snug",
-                                  active
+                                  active || hovered
                                     ? "text-foreground"
                                     : "text-muted-foreground",
                                   pending && "animate-pulse",

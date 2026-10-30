@@ -799,6 +799,26 @@ describe("ThreadTableOfContents", () => {
     expect(trigger.getAttribute("aria-expanded")).toBe("false");
   });
 
+  it("highlights and centers the message nearest the pointer while it moves along the rail", () => {
+    {
+      render(<TocHost timelineRows={Array.from({ length: 6 }, (_, index) => userConversationRow(index + 1))} />);
+      const toc = document.querySelector<HTMLElement>("[data-thread-toc]");
+      if (!toc) throw new Error("Expected the thread table of contents.");
+      const trigger = screen.getByRole("button", { name: "Thread table of contents" });
+      const ticks = Array.from(toc.querySelectorAll<HTMLElement>("[data-toc-tick]"));
+      ticks.forEach((tick, index) => {
+        tick.getBoundingClientRect = () => rect({ top: index * 10, bottom: index * 10 + 3 });
+      });
+      fireEvent.mouseEnter(toc);
+      const target = ticks[1]?.dataset.tocTickId;
+      expect(target).toBeTruthy();
+      fireEvent.pointerMove(trigger, { clientX: 5, clientY: 11 });
+      const rows = screen.getAllByRole("button", { name: /Loaded after client-side navigation/ });
+      const hovered = rows.filter((row) => row.className.includes("bg-state-hover") && !row.className.includes("hover:bg-state-hover"));
+      expect(hovered.some((row) => row.textContent?.includes("navigation 2"))).toBe(true);
+    }
+  });
+
   it("scrolls the message list when the wheel turns over the popover padding", () => {
     render(<TocHost timelineRows={Array.from({ length: 30 }, (_, index) => userConversationRow(index + 1))} />);
     const toc = document.querySelector<HTMLElement>("[data-thread-toc]");
