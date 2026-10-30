@@ -76,3 +76,28 @@ export function selectionFromTicks({
       : Math.max(maxSeq, high.messageSeq),
   };
 }
+
+/** The band the pointer is on or nearest to, so moving along the rail picks a band without aiming at its line. Ties go to the narrower band. */
+export function pickBandAtTick(
+  ranges: readonly TickRange[],
+  tickIndex: number,
+): number | null {
+  let best: number | null = null;
+  let bestDistance = Number.POSITIVE_INFINITY;
+  let bestSpan = Number.POSITIVE_INFINITY;
+  ranges.forEach((range, index) => {
+    const distance =
+      tickIndex < range.start
+        ? range.start - tickIndex
+        : tickIndex > range.end
+          ? tickIndex - range.end
+          : 0;
+    const span = range.end - range.start;
+    if (distance < bestDistance || (distance === bestDistance && span < bestSpan)) {
+      best = index;
+      bestDistance = distance;
+      bestSpan = span;
+    }
+  });
+  return best;
+}

@@ -30,6 +30,7 @@ import {
 import {
   assignBandLanes,
   bandTickRange,
+  pickBandAtTick,
   selectionFromTicks,
 } from "./toc-rail-bands";
 import { TOC_HALF_SWITCH_DELAY_MS, railHalfAt, railHalfTint, type TocRailHalf } from "./toc-rail-half";
@@ -608,6 +609,7 @@ export function ThreadTableOfContents({
     observers: extensionObservers,
   } = useThreadTocExtensions(extensionInput);
   const panelOpen = open || railSelection !== null;
+  const pickedBandRef = useRef<(typeof extensionBands)[number] | null>(null);
   const defaultExtensionTab = extensionTabs.find(
     (entry) => entry.slot.tab?.experimental_default === true,
   );
@@ -782,11 +784,15 @@ export function ThreadTableOfContents({
 
   useEffect(() => {
     if (panelOpen) return;
+    const picked = pickedBandRef.current;
+    pickedBandRef.current = null;
+    if (picked) notifyThreadTocBandHover(picked, false, extensionInput);
+    setPointerBand(null);
     setHoveredRangeState(null);
     setRailHalf(null);
     setTab(null);
     clearHalfTimer();
-  }, [panelOpen, clearHalfTimer]);
+  }, [panelOpen, clearHalfTimer, extensionInput]);
 
   useEffect(() => {
     if (railSelection === null) return;
@@ -912,6 +918,39 @@ export function ThreadTableOfContents({
     const target = defaultExtensionTab ?? extensionTabs[0];
     setTab(half === "topics" && target ? `ext:${target.key}` : "user");
   };
+  const setPickedBand = (entry: (typeof extensionBands)[number] | null) => {
+    const previous = pickedBandRef.current;
+    if (previous === null && entry === null) return;
+    if (previous && entry && sameRange(previous.band, entry.band)) return;
+    if (previous) notifyThreadTocBandHover(previous, false, extensionInput);
+    pickedBandRef.current = entry;
+    setPointerBand(
+      entry ? { fromSeq: entry.band.fromSeq, toSeq: entry.band.toSeq } : null,
+    );
+    if (entry) notifyThreadTocBandHover(entry, true, extensionInput);
+  };
+  const pickBandAtPointer = (clientY: number) => {
+    const tickId = nearestTickId(rootElement, clientY);
+    const tickIndex = railItems.findIndex((item) => item.id === tickId);
+    const picked =
+      tickIndex < 0
+        ? null
+        : pickBandAtTick(
+            railBands.map(({ range }) => range),
+            tickIndex,
+          );
+    setPickedBand(picked === null ? null : (railBands[picked]?.entry ?? null));
+  };
+  const onRailPointer = (event: ReactPointerEvent<HTMLElement>) => {
+    syncRailHalf(event);
+    if (!canSelect || dragRef.current?.moved) return;
+    const half = railHalfAt(
+      event.clientX,
+      event.currentTarget.getBoundingClientRect(),
+    );
+    if (half === "topics") pickBandAtPointer(event.clientY);
+    else setPickedBand(null);
+  };
   const syncRailHalf = (event: ReactPointerEvent<HTMLElement>) => {
     if (!canSelect || dragRef.current?.moved) return;
     const half = railHalfAt(
@@ -974,7 +1013,7 @@ export function ThreadTableOfContents({
           aria-controls={`thread-toc-panel-${threadId}`}
           onClick={() => setOpen(true)}
           data-rail-half={railHalf ?? undefined}
-          onPointerEnter={syncRailHalf}
+          onPointerEnter={onRailPointer}
           onPointerDown={(event) => {
             syncRailHalf(event);
             if (!canSelect || event.button !== 0) return;
@@ -987,7 +1026,7 @@ export function ThreadTableOfContents({
           onPointerMove={(event) => {
             const drag = dragRef.current;
             if (!drag) {
-              syncRailHalf(event);
+              onRailPointer(event);
               return;
             }
             if (
@@ -1004,9 +1043,23 @@ export function ThreadTableOfContents({
             }
             updateDragSelection(event.clientY);
           }}
+          onPointerLeave={() => setPickedBand(null)}
           onPointerUp={(event) => {
-            if (dragRef.current?.moved) updateDragSelection(event.clientY);
+            const wasDrag = dragRef.current?.moved === true;
+            if (wasDrag) updateDragSelection(event.clientY);
             dragRef.current = null;
+            const picked = pickedBandRef.current;
+            if (
+              !wasDrag &&
+              picked &&
+              event.button === 0 &&
+              railHalfAt(
+                event.clientX,
+                event.currentTarget.getBoundingClientRect(),
+              ) === "topics"
+            ) {
+              notifyThreadTocBandClick(picked, extensionInput);
+            }
           }}
           onPointerCancel={() => {
             dragRef.current = null;
@@ -1067,16 +1120,11 @@ export function ThreadTableOfContents({
                     data-active={entry.band.active ? "true" : undefined}
                     data-highlighted={highlighted ? "true" : undefined}
                     title={entry.band.label}
-                    onPointerEnter={() => {
-                      setPointerBand({
-                        fromSeq: entry.band.fromSeq,
-                        toSeq: entry.band.toSeq,
-                      });
-                      notifyThreadTocBandHover(entry, true, extensionInput);
-                    }}
-                    onPointerLeave={() => {
-                      setPointerBand(null);
-                      notifyThreadTocBandHover(entry, false, extensionInput);
+                    onPointerEnter={() => setPickedBand(entry)}
+                    onPointerLeave={(event) => {
+                      const rail = event.currentTarget.closest("button");
+                      if (rail?.contains(event.relatedTarget as Node | null)) return;
+                      setPickedBand(null);
                     }}
                     onPointerDown={(event) => event.stopPropagation()}
                     onClick={(event) => {
@@ -1110,7 +1158,10 @@ export function ThreadTableOfContents({
         {panelOpen ? (
           <div
             id={`thread-toc-panel-${threadId}`}
-            onPointerEnter={clearHalfTimer}
+            onPointerEnter={() => {
+              clearHalfTimer();
+              setPickedBand(null);
+            }}
             className="pointer-events-auto absolute right-full top-0 w-[18.25rem] max-w-[calc(100vw-3rem)] pr-1"
           >
             <div

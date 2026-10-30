@@ -1842,6 +1842,32 @@ describe("ThreadTableOfContents plugin extension", () => {
     expect(screen.getByTestId("topics-tab")).not.toBeNull();
   });
 
+  it("picks the topic nearest to the pointer in the topic half without aiming at its line", () => {
+    const near = { fromSeq: 1, toSeq: 1, hue: 10 };
+    const far = { fromSeq: 4, toSeq: 4, hue: 120 };
+    bands = [near, far];
+    const onBandHover = vi.fn();
+    register({ isDefault: true, onBandHover });
+    render(<TocHost timelineRows={rows([1, 2, 3, 4])} />);
+    openTocPanel();
+    const elements = ticks();
+    const at = (index: number) => elements[index]!.getBoundingClientRect().top + 1;
+
+    fireEvent.pointerMove(trigger(), { clientX: 75, clientY: at(0), pointerId: 1 });
+    expect(tabProps?.hoveredBand).toEqual({ fromSeq: 1, toSeq: 1 });
+
+    fireEvent.pointerMove(trigger(), { clientX: 75, clientY: at(2), pointerId: 1 });
+    expect(tabProps?.hoveredBand).toEqual({ fromSeq: 4, toSeq: 4 });
+    expect(onBandHover).toHaveBeenLastCalledWith(far, expect.anything());
+
+    fireEvent.pointerDown(trigger(), { clientX: 75, clientY: at(2), pointerId: 1, button: 0 });
+    fireEvent.pointerUp(trigger(), { clientX: 75, clientY: at(2), pointerId: 1, button: 0 });
+    expect(onBandClick).toHaveBeenCalledWith(far, expect.anything());
+
+    fireEvent.pointerMove(trigger(), { clientX: 25, clientY: at(0), pointerId: 1 });
+    expect(tabProps?.hoveredBand ?? null).toBeNull();
+  });
+
   it("keeps the view while the pointer stays inside one half", async () => {
     register({ isDefault: true });
     render(<TocHost timelineRows={rows([1, 2, 3, 4])} />);
