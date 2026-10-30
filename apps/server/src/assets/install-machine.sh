@@ -823,17 +823,11 @@ elif command -v bb-app >/dev/null 2>&1; then
     warning_step "Could not download the server's bb-app package (HTTP $package_status); using bb-app at $bb_app"
   fi
 elif [ "$package_status" = 404 ]; then
-  require_npm
+  rm -rf "$package_dir"
   rm -f "$host_artifact_digest_file"
-  warning_step "The server does not provide its bb-app package"
-  active_step "Installing bb-app from the npm registry"
-  if ! npm install -g "$bb_app_allow_scripts" --prefix "$machine_npm_prefix" bb-app; then
-    rm -rf "$package_dir"
-    fail_step "Could not install bb-app for this machine. Check the npm error above, then rerun this command."
-    exit 1
-  fi
-  bb_app_npm_prefix=$machine_npm_prefix
-  complete_step "Installed bb-app from the npm registry"
+  fail_step "The server does not provide its bb-app package, so this machine cannot be installed from it."
+  detail "Install the bb-app package of this server on the machine, or use a server build that ships it." >&2
+  exit 1
 else
   rm -rf "$package_dir"
   fail_step "Could not download the server's bb-app package from $package_url (HTTP $package_status)."
