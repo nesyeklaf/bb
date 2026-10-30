@@ -3,7 +3,7 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { createFakePluginHost } from "@get-bb/plugin-sdk/testing";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { ALERT_BODY, ALERT_TITLE, createAlerter } from "./alert.js";
+import { ALERT_BODY, ALERT_TITLE, alertBody, createAlerter } from "./alert.js";
 import type { ConnectionState } from "./classify.js";
 import { createStore, type Observation } from "./store.js";
 
@@ -25,9 +25,10 @@ async function harness() {
 }
 
 function observation(
-  hostname: string,
+  hostname: string | null,
   state: ConnectionState,
   seenAt = 1_000,
+  comm = "node",
 ): Observation {
   return {
     sourceId: "server",
@@ -40,7 +41,7 @@ function observation(
     reason: "test",
     seenAt,
     newSocket: true,
-    attribution: { pid: 10, startTime: 1, comm: "node" },
+    attribution: { pid: 10, startTime: 1, comm },
   };
 }
 
@@ -82,6 +83,28 @@ describe("red destination alert", () => {
     expect(restarted.list({ since: 0, states: ["red"] })).toHaveLength(1);
   });
 
+  it("retries next sweep when the notifications plugin is not running yet, then sends once", async () => {
+    const { open } = await harness();
+    const store = open();
+    const notRunning = Object.assign(new Error("HTTP 503"), { status: 503 });
+    const send = vi
+      .fn<(notification: { title: string; body: string }) => Promise<void>>()
+      .mockRejectedValueOnce(notRunning)
+      .mockResolvedValue(undefined);
+    const deferred: unknown[] = [];
+    const alerter = createAlerter({
+      store,
+      send,
+      onSendDeferred: (error) => deferred.push(error),
+    });
+    store.record([observation("bad.example", "red")]);
+    expect(await alerter.sweep()).toBe(0);
+    expect(await alerter.sweep()).toBe(1);
+    expect(await alerter.sweep()).toBe(0);
+    expect(send).toHaveBeenCalledTimes(2);
+    expect(deferred).toEqual([notRunning]);
+  });
+
   it("does not repeat after a failed send and keeps the row red", async () => {
     const { open } = await harness();
     const store = open();
@@ -109,10 +132,13 @@ describe("red destination alert", () => {
     const alerter = createAlerter({ store, send });
     store.record([observation("bad.example", "red")]);
     await alerter.sweep();
-    store.reclassifyHostnames(() => true);
+    store.reclassify({ isAllowed: () => true, thirdPartyProcesses: new Set() });
     expect(store.list({ since: 0 })[0]?.state).toBe("allowed");
     await alerter.sweep();
-    store.reclassifyHostnames(() => false);
+    store.reclassify({
+      isAllowed: () => false,
+      thirdPartyProcesses: new Set(),
+    });
     expect(store.list({ since: 0 })[0]?.state).toBe("red");
     await alerter.sweep();
     expect(send).toHaveBeenCalledTimes(1);
@@ -138,16 +164,51 @@ describe("red destination alert", () => {
     expect(send).not.toHaveBeenCalled();
   });
 
-  it("sends one notification per distinct red key", async () => {
+  it("sends one notification per sweep that counts the new red keys", async () => {
     const { open } = await harness();
     const store = open();
     const send = vi.fn(async () => {});
+    const alerter = createAlerter({ store, send });
     store.record([
       observation("a.example", "red"),
       observation("b.example", "red"),
       observation("c.example", "allowed"),
     ]);
+    expect(await alerter.sweep()).toBe(2);
+    store.record([observation("d.example", "red", 2_000)]);
+    expect(await alerter.sweep()).toBe(1);
+    expect(send.mock.calls).toEqual([
+      [{ title: ALERT_TITLE, body: alertBody(2) }],
+      [{ title: ALERT_TITLE, body: ALERT_BODY }],
+    ]);
+  });
+
+  it("turns stored red rows of third-party programs into third-party on reclassify and never alerts for them", async () => {
+    const { open } = await harness();
+    const store = open();
+    const send = vi.fn(async () => {});
+    store.record([
+      observation("google.example", "red", 1_000, "chromium"),
+      observation(null, "red", 1_000, "opencode"),
+      observation("mixed.example", "red", 1_000, "chromium"),
+      observation("mixed.example", "red", 1_100, "node"),
+    ]);
+    store.reclassify({
+      isAllowed: () => false,
+      thirdPartyProcesses: new Set(["chromium", "opencode"]),
+    });
+    const states = store
+      .list({ since: 0 })
+      .map((entry) => [entry.hostname, entry.state, entry.reason]);
+    expect(states).toEqual(
+      expect.arrayContaining([
+        ["google.example", "third-party", "chromium is not bb: unlisted host"],
+        [null, "third-party", "opencode is not bb: test"],
+        ["mixed.example", "red", "unlisted host"],
+      ]),
+    );
     await createAlerter({ store, send }).sweep();
-    expect(send).toHaveBeenCalledTimes(2);
+    expect(send).toHaveBeenCalledTimes(1);
+    expect(send).toHaveBeenCalledWith({ title: ALERT_TITLE, body: ALERT_BODY });
   });
 });

@@ -106,9 +106,10 @@ export default function connectionOverview(bb: BbPluginApi) {
     allowedHosts = allowedHostSet(
       (await settings.get())[EXTRA_ALLOWED_HOSTS] ?? "",
     );
-    store.reclassifyHostnames((hostname) =>
-      allowedHosts.has(normalizeHost(hostname)),
-    );
+    store.reclassify({
+      isAllowed: (hostname) => allowedHosts.has(normalizeHost(hostname)),
+      thirdPartyProcesses: THIRD_PARTY_PROCESSES,
+    });
     bb.rpc.experimental_invalidate([OVERVIEW_TAG]);
   }
   settings.onChange(() => void refreshAllowlist());
@@ -150,6 +151,10 @@ export default function connectionOverview(bb: BbPluginApi) {
     },
     onSendFailed: (error) =>
       bb.log.warn(`connection overview: alert not sent: ${String(error)}`),
+    onSendDeferred: (error) =>
+      bb.log.info(
+        `connection overview: alert deferred to the next sweep: ${String(error)}`,
+      ),
   });
 
   async function resolveListedHosts() {

@@ -257,20 +257,57 @@ export function createStore(
         reason: string;
       }[];
     },
-    reclassifyHostnames(isAllowed: (hostname: string) => boolean) {
+    reclassify(options: {
+      isAllowed: (hostname: string) => boolean;
+      thirdPartyProcesses: ReadonlySet<string>;
+    }) {
       const rows = db
         .prepare(
-          "SELECT key, hostname FROM destinations WHERE hostname IS NOT NULL AND direction = 'out'",
+          "SELECT key, hostname, state, reason, attributions FROM destinations WHERE direction = 'out' AND (hostname IS NOT NULL OR state IN ('red', 'yellow'))",
         )
-        .all() as { key: string; hostname: string }[];
+        .all() as {
+        key: string;
+        hostname: string | null;
+        state: ConnectionState;
+        reason: string;
+        attributions: string;
+      }[];
       const set = db.prepare(
         "UPDATE destinations SET state = ?, reason = ? WHERE key = ?",
       );
       db.transaction(() => {
-        for (const row of rows)
-          if (isAllowed(row.hostname))
-            set.run("allowed", "listed host", row.key);
-          else set.run("red", "unlisted host", row.key);
+        for (const row of rows) {
+          let state = row.state;
+          let reason = row.reason;
+          if (row.hostname !== null) {
+            const allowed = options.isAllowed(row.hostname);
+            state = allowed ? "allowed" : "red";
+            reason = allowed ? "listed host" : "unlisted host";
+          }
+          const comms = [
+            ...new Set(
+              (JSON.parse(row.attributions) as Attribution[]).map(
+                (entry) => entry.comm,
+              ),
+            ),
+          ];
+          if (
+            (state === "red" || state === "yellow") &&
+            comms.length > 0 &&
+            comms.every((comm) => options.thirdPartyProcesses.has(comm))
+          ) {
+            state = "third-party";
+            reason = comms.join(",") + " is not bb: " + reason;
+          }
+          if (state !== row.state || reason !== row.reason)
+            set.run(state, reason, row.key);
+        }
+      })();
+    },
+    releaseClaims(keys: readonly string[]) {
+      const release = db.prepare("DELETE FROM alert_claims WHERE key = ?");
+      db.transaction(() => {
+        for (const key of keys) release.run(key);
       })();
     },
     capReached,

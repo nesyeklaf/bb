@@ -156,9 +156,11 @@ describe("collector and store", () => {
       "api.github.com": "allowed",
       "intranet.example.org": "red",
     });
-    store.reclassifyHostnames((hostname) =>
-      allowedHostSet("intranet.example.org").has(hostname),
-    );
+    store.reclassify({
+      isAllowed: (hostname) =>
+        allowedHostSet("intranet.example.org").has(hostname),
+      thirdPartyProcesses: new Set(),
+    });
     expect(store.list({ since: 0, states: ["red"] })).toEqual([]);
   });
 
