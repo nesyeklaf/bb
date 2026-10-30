@@ -9,7 +9,7 @@ export function ProviderRequirementBanner({
 }: {
   title: string;
   description: ReactNode;
-  action: ReactNode;
+  action?: ReactNode;
 }) {
   return (
     <PromptStackCard ariaLabel={title} className="@container overflow-hidden">

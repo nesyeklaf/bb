@@ -78,8 +78,8 @@ server, or clients acts on it yet: the runtime sends `turn/steer` either way,
 and a steer whose turn is gone is dropped on the bridge's `staleTurn` recovery
 hint whatever the mode.
 
-The sessionless `provider/health`, `provider/usage`,
-`provider/installation/status`, and `provider/installation/run` methods are
+The sessionless `provider/health`, `provider/usage` and
+`provider/installation/status` methods are
 different: their support is declared by each provider through
 `bb.providers.register` (`maintenance`), so the server can skip an
 unsupported host probe and clients can omit providers that never expose usage
@@ -88,28 +88,18 @@ declare health or usage for every provider it owns and still return
 `{ supported: false }` for one provider id; a successful usage result may
 likewise contain an empty `windows` array.
 
-Installation has a split execution boundary. The bridge owns
-provider-specific discovery, version/source comparison, and the
-install/update decision. `provider/installation/status` returns that state
-plus a display-only command. A status request may include a typed operation
-requirement such as `thread_rewind`; the bridge owns the minimum provider
-version that operation needs and reports it through the ordinary status.
-With `checkUpdates: false` (the daemon sends it for startup compatibility
-gates) the bridge probes only the local executable and version, without
-registry, global-package, or doctor discovery: `latestVersion` and
-`npmGlobalPackageVersion` are `null`, and `versionUnsupported` still
-identifies a known unsupported local version. Omitting `checkUpdates` means
-full discovery, as Settings and install/update actions use. When the daemon
-gates a thread start or rewind on that status, it remembers a passing answer
-for a few minutes (until it runs an install or update itself, or the shell
-environment changes). It never remembers `versionUnsupported: true`, nor
-`installed: false` from a bridge that reports a `minimumSupportedVersion`.
-When the user acts, `provider/installation/run` rechecks the state and
-returns either `available: false` or a typed executable/argument plan with a
-post-run verification rule. The host daemon—not the bridge, server, or
-browser—chooses the environment and working directory, serializes
-installations, supervises the process, streams output, and asks the bridge
-for fresh status to verify success.
+Installation status is a local probe. The bridge owns provider-specific
+discovery of the executable and its version; `provider/installation/status`
+returns what is installed on the host and never contacts a registry, package
+manager or provider release feed. A status request may include a typed
+operation requirement such as `thread_rewind`; the bridge owns the minimum
+provider version that operation needs and reports it through the ordinary
+status, and `versionUnsupported` identifies a known unsupported local
+version. bb does not install or update provider CLIs. When the daemon gates a
+thread start or rewind on that status, it remembers a passing answer for a
+few minutes (until the shell environment changes). It never remembers
+`versionUnsupported: true`, nor `installed: false` from a bridge that reports a
+`minimumSupportedVersion`.
 
 Every handshake capability gates a request method, which is why the set holds
 no compaction fact: there is no compact request method. Compaction is a

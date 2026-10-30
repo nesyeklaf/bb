@@ -24,7 +24,6 @@ import {
   createPluginService,
   type PluginService,
 } from "../../../src/services/plugins/plugin-service.js";
-import { createNoopTelemetryService } from "../../../src/services/system/telemetry.js";
 import { testLogger } from "../../helpers/test-app.js";
 
 const logger = testLogger as unknown as Logger;
@@ -391,7 +390,6 @@ describe("git plugin cache lifecycle", () => {
     await commitPlugin("1.0.0");
     service = createPluginService({
       aiServices: createAiServiceRegistry(),
-      telemetry: createNoopTelemetryService(),
       db,
       hub: {
         getDaemonSessionIdForHost: () => null,

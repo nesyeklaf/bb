@@ -8,7 +8,6 @@ import {
   inspectEnvironmentCleanup,
 } from "./command-handlers/environment-hook.js";
 import {
-  providerCliInstallEventSchema,
   type DesktopBrowserCommand,
   type DesktopBrowserResult,
   type HostDaemonCommand,
@@ -17,10 +16,8 @@ import {
   type HostDaemonOnlineRpcCommandType,
   type HostDaemonOnlineRpcResult,
   type HostDaemonSettledCommandType,
-  type ProviderCliInstallEvent,
 } from "@bb/host-daemon-contract";
 import type { AgentRuntimeBridgeLaunch } from "@bb/agent-runtime";
-import semver from "semver";
 import {
   ExpectedCommandDispatchError,
   resolveRuntimeBridgeLaunch,
@@ -62,14 +59,6 @@ import {
 } from "./command-handlers/path-mutations.js";
 import { resolveInteractiveRequest } from "./command-handlers/interactive.js";
 import { pickHostFolder } from "./command-handlers/native-folder-picker.js";
-import {
-  ProviderInstallationInProgressError,
-  streamProviderInstallation,
-} from "./provider-installation.js";
-import type {
-  ProviderInstallationStatus,
-  ProviderInstallationVerification,
-} from "@bb/provider-bridge-protocol";
 import {
   discardThreadRewind,
   deleteThreadStorage,
@@ -159,188 +148,6 @@ function throwExpectedWorkspacePathNotFoundOrRethrow(error: unknown): never {
     throw new ExpectedCommandDispatchError(error.code, error.message);
   }
   throw error;
-}
-
-function providerCliEnvFromShellEnv(
-  shellEnv: NodeJS.ProcessEnv,
-): NodeJS.ProcessEnv {
-  return shellEnv.PATH ? { ...process.env, PATH: shellEnv.PATH } : process.env;
-}
-
-function handleProviderCliInstallEventLine(
-  line: string,
-  events: ProviderCliInstallEvent[],
-): void {
-  const trimmedLine = line.trim();
-  if (trimmedLine.length === 0) {
-    return;
-  }
-  events.push(providerCliInstallEventSchema.parse(JSON.parse(trimmedLine)));
-}
-
-function collectProviderCliInstallEventLines(
-  buffer: string,
-  events: ProviderCliInstallEvent[],
-): string {
-  const lines = buffer.split(/\r?\n/u);
-  const lastLine = lines.pop();
-  for (const line of lines) {
-    handleProviderCliInstallEventLine(line, events);
-  }
-  return lastLine ?? "";
-}
-
-async function readProviderCliInstallEvents(
-  stream: ReadableStream<Uint8Array>,
-): Promise<ProviderCliInstallEvent[]> {
-  const reader = stream.getReader();
-  const decoder = new TextDecoder();
-  const events: ProviderCliInstallEvent[] = [];
-  let buffer = "";
-
-  while (true) {
-    const result = await reader.read();
-    if (result.done) {
-      break;
-    }
-    buffer += decoder.decode(result.value, { stream: true });
-    buffer = collectProviderCliInstallEventLines(buffer, events);
-  }
-
-  buffer += decoder.decode();
-  handleProviderCliInstallEventLine(buffer, events);
-  return events;
-}
-
-function failProviderInstallationVerification(args: {
-  providerId: string;
-  events: ProviderCliInstallEvent[];
-  message: string;
-}): ProviderCliInstallEvent[] {
-  const verifiedEvents = [...args.events];
-  const completedIndex = verifiedEvents.findIndex(
-    (event) => event.type === "completed" && event.success,
-  );
-  const completedEvent = verifiedEvents[completedIndex];
-  if (completedEvent?.type !== "completed") {
-    return args.events;
-  }
-  verifiedEvents[completedIndex] = { ...completedEvent, success: false };
-  verifiedEvents.splice(completedIndex, 0, {
-    type: "error",
-    provider: args.providerId,
-    message: args.message,
-  });
-  return verifiedEvents;
-}
-
-function installationVerificationPassed(
-  verification: ProviderInstallationVerification,
-  status: ProviderInstallationStatus,
-): boolean {
-  switch (verification.kind) {
-    case "installed":
-      return status.installed;
-    case "version_at_least": {
-      const actual =
-        status.currentVersion === null
-          ? null
-          : semver.valid(status.currentVersion);
-      const expected = semver.valid(verification.version);
-      return (
-        actual !== null && expected !== null && semver.gte(actual, expected)
-      );
-    }
-    case "version_changed": {
-      const actual = status.currentVersion;
-      if (actual === null) return false;
-      const parsedActual = semver.valid(actual);
-      const parsedPrevious = semver.valid(verification.previousVersion);
-      return parsedActual !== null && parsedPrevious !== null
-        ? semver.gt(parsedActual, parsedPrevious)
-        : actual !== verification.previousVersion;
-    }
-  }
-  return false;
-}
-
-async function runProviderInstallationOnHost(
-  command: CommandOf<"provider.installation.run">,
-  options: CommandDispatchOptions,
-): Promise<HostDaemonOnlineRpcResult<"provider.installation.run">> {
-  try {
-    const env = providerCliEnvFromShellEnv(
-      options.runtimeManager.getShellEnv(),
-    );
-    const bridgeLaunch = await resolveRuntimeBridgeLaunch(
-      command.bridgeLaunch,
-      options,
-    );
-    const maintenanceArgs = {
-      providerId: command.providerId,
-      bridgeLaunch,
-    };
-    const run = await options.providerInstallationRun({
-      ...maintenanceArgs,
-      action: command.action,
-    });
-    if (!run.available) {
-      return {
-        events: [
-          {
-            type: "error",
-            provider: command.providerId,
-            message: run.message,
-          },
-        ],
-      };
-    }
-    const stream =
-      options.streamProviderInstallation ?? streamProviderInstallation;
-    let events = await readProviderCliInstallEvents(
-      stream({
-        providerId: command.providerId,
-        plan: run.command,
-        env,
-      }),
-    );
-    if (events.some((event) => event.type === "completed" && event.success)) {
-      try {
-        const status =
-          await options.providerInstallationStatus(maintenanceArgs);
-        if (!installationVerificationPassed(run.verification, status)) {
-          events = failProviderInstallationVerification({
-            providerId: command.providerId,
-            events,
-            message: `${command.providerId} ${command.action} exited successfully, but the provider could not verify the installed result.`,
-          });
-        }
-      } catch {
-        events = failProviderInstallationVerification({
-          providerId: command.providerId,
-          events,
-          message: `${command.providerId} ${command.action} exited successfully, but its installation status could not be verified.`,
-        });
-      }
-    }
-    if (events.some((event) => event.type === "completed" && event.success)) {
-      await options.runtimeManager.invalidateProviderMaintenanceRuntime();
-    }
-    return { events };
-  } catch (error) {
-    if (error instanceof ProviderInstallationInProgressError) {
-      return {
-        events: [
-          {
-            type: "error",
-            provider: command.providerId,
-            message: error.message,
-          },
-        ],
-      };
-    }
-    throw error;
-  }
 }
 
 async function withRetainedThreadEnvironment<TResult>(
@@ -665,7 +472,6 @@ const onlineRpcHandlers: OnlineRpcHandlerMap = {
       bridgeLaunch,
     });
   },
-  "provider.installation.run": runProviderInstallationOnHost,
   "server_move.inspect": (command, options) =>
     requireServerMove(options).inspect(command),
   "server_move.probe": (command, options) =>

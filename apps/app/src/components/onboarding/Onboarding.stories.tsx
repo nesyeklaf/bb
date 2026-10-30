@@ -26,11 +26,6 @@ export default {
 const noop = () => {};
 const MACHINE_NAME = "Sawyer's MacBook Pro";
 const CONNECT_URL = "https://sawyer.getbb.app";
-const MOBILE_LINKS = {
-  ios: "https://testflight.apple.com/join/example",
-  android: "https://example.com/bb-android.apk",
-};
-
 type AgentId = "claude-code" | "codex" | "pi";
 type AgentStates = Record<AgentId, AgentSetupState>;
 
@@ -41,7 +36,7 @@ const AGENT_BASE: readonly { id: AgentId; name: string; logoUrl: string }[] = [
 ];
 
 const CHECKING: AgentSetupState = { status: "checking" };
-const INSTALL: AgentSetupState = { status: "install", canInstall: true };
+const INSTALL: AgentSetupState = { status: "install" };
 const SIGNED_OUT: AgentSetupState = {
   status: "signIn",
   reason: "signedOut",
@@ -295,8 +290,6 @@ function AgentFrame({
   loading = false,
   signInVariant = "guided",
   onSignIn = noop,
-  onInstall = noop,
-  onViewInstallLog = noop,
   onCancelSignIn = noop,
   onRecheck = noop,
   ...chrome
@@ -306,8 +299,6 @@ function AgentFrame({
   loading?: boolean;
   signInVariant?: SignInVariant;
   onSignIn?: (id: string) => void;
-  onInstall?: (id: string) => void;
-  onViewInstallLog?: (id: string) => void;
   onCancelSignIn?: (id: string) => void;
   onRecheck?: () => void;
 }) {
@@ -334,8 +325,6 @@ function AgentFrame({
         machineName={machineName}
         agents={loading ? null : buildAgents(states, signInVariant)}
         onSignIn={onSignIn}
-        onInstall={onInstall}
-        onViewInstallLog={onViewInstallLog}
         onCancelSignIn={onCancelSignIn}
         onRecheck={onRecheck}
       />
@@ -478,7 +467,6 @@ function DevicesFrame({
         }
         connectSetupOpen={connectSetupOpen}
         otherMachineCount={otherMachineCount}
-        mobileLinks={MOBILE_LINKS}
         onToggleConnectSetup={onToggleConnectSetup}
         onCopyConnectUrl={noop}
         onAddMachine={noop}
@@ -603,10 +591,6 @@ function InteractiveFlowRun({ scenario }: { scenario: Scenario }) {
                 id === "codex" ? CODEX_READY : CLAUDE_READY,
               ),
             );
-          }}
-          onInstall={(id) => {
-            setAgent(id, { status: "installing" });
-            later(1800, () => resolveAgent(id, "installing", SIGNED_OUT));
           }}
           onCancelSignIn={(id) => setAgent(id, SIGNED_OUT)}
         />
@@ -796,22 +780,17 @@ export function Step1AgentStates() {
         </StoryWindow>
       </Captioned>
       <Captioned
-        label="Installing, failed, update needed, unknown"
-        hint="Install and Update reuse the provider CLI install action. A failed install offers its log. Unknown health never blocks or nags."
+        label="Update needed, unknown"
+        hint="Unknown health never blocks or nags."
       >
         <StoryWindow>
           <AgentFrame
             states={{
-              "claude-code": { status: "installing" },
-              codex: {
-                status: "installFailed",
-                message: "Install failed",
-                canInstall: true,
-              },
+              "claude-code": CHECKING,
+              codex: CHECKING,
               pi: {
                 status: "update",
                 detail: "Needs version 0.84.0 or newer",
-                canInstall: true,
               },
             }}
           />

@@ -1,5 +1,3 @@
-import { createDesktopAppUpdateService } from "./services/system/desktop-app-update.js";
-import { createDesktopUpdateChannel } from "./services/system/desktop-update-channel.js";
 import { serve } from "@hono/node-server";
 import { existsSync } from "node:fs";
 import { homedir } from "node:os";
@@ -12,7 +10,6 @@ import { createLogger } from "@bb/logger";
 import {
   getAppSettings,
   getDisabledProviderIds,
-  listRunningThreads,
   setAppSettings,
 } from "@bb/db";
 import { initDb } from "./db.js";
@@ -25,13 +22,10 @@ import { PluginHostArtifactRegistry } from "./services/plugins/plugin-host-artif
 import { createProviderNativeRootsCache } from "./services/providers/native-roots.js";
 import { createProviderLiveCommandsCache } from "./services/providers/provider-live-commands.js";
 import { createAiServiceRegistry } from "./services/ai/ai-service-registry.js";
-import { createAppUpdateService } from "./services/system/app-update.js";
 import {
   createCliCommandService,
   createWindowsUserPath,
 } from "./services/system/cli-command.js";
-import { createAppVersionService } from "./services/system/app-version.js";
-import { createLauncherChannel } from "./services/system/launcher-channel.js";
 import { createBbAppManagedConfigReloader } from "./services/system/bb-app-managed-config.js";
 import { startGatedPerformanceDiagnostics } from "./services/system/performance-diagnostics.js";
 import { startEventLoopStallMonitor } from "./services/system/event-loop-stall-monitor.js";
@@ -45,10 +39,6 @@ import {
   type ProviderRegistryService,
 } from "./services/providers/provider-registry.js";
 import type { PluginService } from "./services/plugins/plugin-service.js";
-import {
-  appInstallFromServerConfig,
-  createTelemetryService,
-} from "./services/system/telemetry.js";
 import { TerminalSessionLifecycle } from "./services/terminals/terminal-session-lifecycle.js";
 import { createLifecycleDedupers } from "./lifecycle-dedupers.js";
 import type { ServerLogger, ServerRuntimeConfig } from "./types.js";
@@ -218,18 +208,6 @@ export async function runServer(serverConfig: ServerConfig): Promise<void> {
     logger,
   });
 
-  const telemetry = await createTelemetryService({
-    apiKey: serverConfig.BB_POSTHOG_API_KEY,
-    appInstall: appInstallFromServerConfig(serverConfig),
-    appSurface: serverConfig.BB_APP_SURFACE,
-    appVersion: serverConfig.BB_APP_VERSION,
-    dataDir: serverConfig.BB_DATA_DIR,
-    enabled:
-      serverConfig.BB_TELEMETRY && isProduction && pendingServerMove === null,
-    telemetryEnabled: getAppSettings(db).telemetryEnabled,
-    logger,
-  });
-
   const machineAuth = await createMachineAuthService({
     dataDir: serverConfig.BB_DATA_DIR,
     db,
@@ -254,48 +232,11 @@ export async function runServer(serverConfig: ServerConfig): Promise<void> {
     pluginHostArtifacts,
     aiServices,
     skillTreeRegistry,
-    telemetry,
     terminalSessions,
   });
   pendingInteractions.start();
   setPluginToolCallRegistry(new PluginToolCallRegistry({ logger }));
 
-  const appVersion = createAppVersionService({
-    installKind: serverConfig.BB_APP_INSTALL_KIND ?? null,
-    sourceCommit: serverConfig.BB_APP_SOURCE_COMMIT ?? null,
-    config: runtimeConfig,
-    logger,
-  });
-  const appUpdateMode = serverConfig.BB_APP_UPDATE_MODE ?? null;
-  const desktopUpdateChannel =
-    serverConfig.BB_APP_SURFACE === "desktop"
-      ? createDesktopUpdateChannel(process)
-      : null;
-  const appUpdate =
-    desktopUpdateChannel === null
-      ? createAppUpdateService({
-          currentCommit:
-            serverConfig.BB_APP_INSTALL_KIND === "source"
-              ? (serverConfig.BB_APP_SOURCE_COMMIT ?? null)
-              : null,
-          appSurface: serverConfig.BB_APP_SURFACE,
-          appVersion,
-          config: runtimeConfig,
-          countRunningThreads: () => listRunningThreads(db).length,
-          launcher:
-            appUpdateMode === null ? null : createLauncherChannel(process),
-          logger,
-          mode: appUpdateMode,
-          notifyChanged: () => hub.notifySystem(["app-update-changed"]),
-        })
-      : createDesktopAppUpdateService({
-          channel: desktopUpdateChannel,
-          currentVersion: runtimeConfig.appVersion,
-          dataDir: serverConfig.BB_DATA_DIR,
-          countRunningThreads: () => listRunningThreads(db).length,
-          notifyChanged: () => hub.notifySystem(["app-update-changed"]),
-          logger,
-        });
   const cliCommand = createCliCommandService({
     env: process.env,
     homeDir: homedir(),
@@ -313,8 +254,6 @@ export async function runServer(serverConfig: ServerConfig): Promise<void> {
     tunnelIngress,
   } = createApp(
     {
-      appUpdate,
-      appVersion,
       bbAppManagedConfig,
       cliCommand,
       config: runtimeConfig,
@@ -330,7 +269,6 @@ export async function runServer(serverConfig: ServerConfig): Promise<void> {
       providerLiveCommands,
       aiServices,
       skillTreeRegistry,
-      telemetry,
       terminalSessions,
       watchInterests,
       sharedPorts,
@@ -361,7 +299,6 @@ export async function runServer(serverConfig: ServerConfig): Promise<void> {
       pluginHostArtifacts,
       aiServices,
       skillTreeRegistry,
-      telemetry,
       terminalSessions,
     },
     { sessions: serverImport.importedDaemonSessions },
@@ -391,7 +328,6 @@ export async function runServer(serverConfig: ServerConfig): Promise<void> {
     aiServices,
     sharedPorts,
     skillTreeRegistry,
-    telemetry,
     terminalSessions,
   });
 
@@ -409,7 +345,6 @@ export async function runServer(serverConfig: ServerConfig): Promise<void> {
     skillTreeRegistry,
     pluginSchedules: pluginService,
     plugins: pluginService,
-    telemetry,
     terminalSessions,
   };
   const providerModelCatalogPrewarm =
@@ -448,7 +383,6 @@ export async function runServer(serverConfig: ServerConfig): Promise<void> {
   });
   let sweepInterval: ReturnType<typeof setInterval> | null = null;
   if (pendingServerMove === null) {
-    telemetry.capture({ name: "app_started" });
     if (serverMoveRun?.kind === "completed") {
       logger.info(
         { moveId: serverMoveRun.run.status.moveId },
@@ -487,7 +421,6 @@ export async function runServer(serverConfig: ServerConfig): Promise<void> {
     shutdownPromise = (async () => {
       hub.stopClientChangeNotifications();
       serverMove.dispose();
-      appUpdate.dispose();
       providerModelCatalogPrewarm?.stop();
       eventLoopStallMonitor.stop();
       await performanceDiagnostics.stop();

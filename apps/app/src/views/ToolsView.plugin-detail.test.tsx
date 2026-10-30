@@ -219,11 +219,6 @@ describe("Plugins catalog close arbitration", () => {
         ...createBbDesktopApi({
           platform: "macos",
           version: "0.0.0-test",
-          lastCheckedAt: null,
-          latestVersion: null,
-          pendingVersion: null,
-          updateAvailable: false,
-          updateDownloaded: false,
         }),
         onCloseWindowRequest(handler) {
           handlers.add(handler);

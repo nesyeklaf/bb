@@ -43,7 +43,6 @@ type GlobalSkillInstallDeps = Pick<
   | "aiServices"
   | "pluginHostArtifacts"
   | "skillTreeRegistry"
-  | "telemetry"
 >;
 
 interface InstallGlobalCliSkillsArgs {

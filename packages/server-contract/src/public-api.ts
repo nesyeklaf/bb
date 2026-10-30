@@ -8,12 +8,10 @@ import {
 } from "./api/machine-environment.js";
 import {
   machineEnvironmentReplaceSchema,
-  recordTelemetryEventRequestSchema,
   setAiServiceSelectionRequestSchema,
   systemProviderEnabledRequestSchema,
   testAiServiceRequestSchema,
   type MachineEnvironmentReplace,
-  type RecordTelemetryEventRequest,
   type SetAiServiceSelectionRequest,
   type SystemAiServicesResponse,
   type SystemProviderCatalogEntry,
@@ -82,7 +80,6 @@ import {
   noRequest,
   optionalQueryRequest,
   queryRequest,
-  textResponse,
   type ApiSchemaFromRouteDescriptors,
   type EmptyInput,
 } from "@bb/hono-typed-routes";
@@ -155,8 +152,6 @@ import {
   type HostPickFolderResponse,
   type HostPathsExistRequest,
   type HostPathsExistResponse,
-  type HostProviderCliInstallEvent,
-  type HostProviderCliInstallRequest,
   type HostProviderCliStatusResponse,
   type HostRetryUpdateResponse,
   type ProjectAttachmentContentQuery,
@@ -201,7 +196,6 @@ import {
   type SystemAttentionResponse,
   type SystemConfigReloadResponse,
   type SystemConfigResponse,
-  type SystemMobileAppReleasesResponse,
   type SystemCliSkillsStatusQuery,
   type SystemCliSkillsStatusResponse,
   type SystemInstallCliSkillsRequest,
@@ -215,13 +209,7 @@ import {
   type SystemProvidersQuery,
   type SystemProviderStatesResponse,
   type SystemUsageLimitsQuery,
-  type SystemAppUpdateAcknowledgeRequest,
-  type SystemAppUpdateApplyRequest,
-  type SystemAppUpdateQuery,
-  type SystemAppUpdateStatus,
   type SystemCliCommandStatus,
-  type SystemVersionQuery,
-  type SystemVersionResponse,
   type SystemVoiceTranscriptionForm,
   type SystemVoiceTranscriptionResponse,
   type TerminalListResponse,
@@ -336,7 +324,6 @@ import {
   hostRemovePathRequestSchema,
   hostPickFolderRequestSchema,
   hostPathsExistRequestSchema,
-  hostProviderCliInstallRequestSchema,
   projectAttachmentContentQuerySchema,
   projectBranchesQuerySchema,
   projectCommandsQuerySchema,
@@ -366,10 +353,6 @@ import {
   systemEnvironmentProvidersQuerySchema,
   systemProvidersQuerySchema,
   systemUsageLimitsQuerySchema,
-  systemVersionQuerySchema,
-  systemAppUpdateAcknowledgeRequestSchema,
-  systemAppUpdateApplyRequestSchema,
-  systemAppUpdateQuerySchema,
   threadEventWaitQuerySchema,
   threadEventsQuerySchema,
   threadMessageQuerySchema,
@@ -1005,14 +988,6 @@ export const publicApiRoutes = {
       method: "get",
       request: noRequest<PathId>(),
       response: jsonResponse<HostProviderCliStatusResponse>(),
-    }),
-    providerCliInstall: defineRoute({
-      path: "/hosts/:id/provider-clis/install",
-      method: "post",
-      request: jsonRequest<PathId, HostProviderCliInstallRequest>(
-        hostProviderCliInstallRequestSchema,
-      ),
-      response: textResponse<HostProviderCliInstallEvent>(),
     }),
     deleteOldServerCopy: defineRoute({
       path: "/hosts/:id/old-server-copy",
@@ -1904,12 +1879,6 @@ export const publicApiRoutes = {
       request: noRequest(),
       response: jsonResponse<SystemAttentionResponse>(),
     }),
-    mobileAppReleases: defineRoute({
-      path: "/system/mobile-app-releases",
-      method: "get",
-      request: noRequest(),
-      response: jsonResponse<SystemMobileAppReleasesResponse>(),
-    }),
     config: defineRoute({
       path: "/system/config",
       method: "get",
@@ -1937,14 +1906,6 @@ export const publicApiRoutes = {
         testAiServiceRequestSchema,
       ),
       response: jsonResponse<TestAiServiceResponse>(),
-    }),
-    recordTelemetryEvent: defineRoute({
-      path: "/system/telemetry/events",
-      method: "post",
-      request: jsonRequest<EmptyInput, RecordTelemetryEventRequest>(
-        recordTelemetryEventRequestSchema,
-      ),
-      response: jsonResponse<{ ok: true }>(),
     }),
     generalSettings: defineRoute({
       path: "/settings/general",
@@ -2119,38 +2080,6 @@ export const publicApiRoutes = {
       method: "post",
       request: formRequest<EmptyInput, SystemVoiceTranscriptionForm>(),
       response: jsonResponse<SystemVoiceTranscriptionResponse>(),
-    }),
-    version: defineRoute({
-      path: "/system/version",
-      method: "get",
-      request: optionalQueryRequest<EmptyInput, SystemVersionQuery>(
-        systemVersionQuerySchema,
-      ),
-      response: jsonResponse<SystemVersionResponse>(),
-    }),
-    appUpdate: defineRoute({
-      path: "/system/app-update",
-      method: "get",
-      request: optionalQueryRequest<EmptyInput, SystemAppUpdateQuery>(
-        systemAppUpdateQuerySchema,
-      ),
-      response: jsonResponse<SystemAppUpdateStatus>(),
-    }),
-    applyAppUpdate: defineRoute({
-      path: "/system/app-update/apply",
-      method: "post",
-      request: jsonRequest<EmptyInput, SystemAppUpdateApplyRequest>(
-        systemAppUpdateApplyRequestSchema,
-      ),
-      response: jsonResponse<SystemAppUpdateStatus>(),
-    }),
-    acknowledgeAppUpdate: defineRoute({
-      path: "/system/app-update/acknowledge",
-      method: "post",
-      request: jsonRequest<EmptyInput, SystemAppUpdateAcknowledgeRequest>(
-        systemAppUpdateAcknowledgeRequestSchema,
-      ),
-      response: jsonResponse<SystemAppUpdateStatus>(),
     }),
     cliCommand: defineRoute({
       path: "/system/cli-command",

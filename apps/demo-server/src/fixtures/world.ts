@@ -7,7 +7,6 @@ import type {
 import type {
   ProjectWithThreadsResponse,
   SidebarBootstrapResponse,
-  SystemVersionResponse,
   ThreadResponse,
   ThreadTabsResponse,
 } from "@bb/server-contract";
@@ -185,17 +184,6 @@ export function hosts(now: number): Host[] {
 }
 
 export const EMPTY_TABS: ThreadTabsResponse = { revision: 0, tabs: [] };
-
-export const SYSTEM_VERSION: SystemVersionResponse = {
-  currentVersion: "0.39.0",
-  latestVersion: "0.39.0",
-  currentCommit: null,
-  installKind: "npm",
-  source: "npm",
-  updateAvailable: false,
-  isDevelopment: false,
-  upgradeCommand: "npx bb-app@latest",
-};
 
 export const PLUGIN_CONTRIBUTIONS = { cliCommands: [], mentionProviders: [] };
 

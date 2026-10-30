@@ -66,7 +66,7 @@ export function Requirements() {
       </StoryRow>
       <StoryRow
         label="provider CLI not installed"
-        hint="the selected provider has no CLI on this machine, and bb can install it"
+        hint="the selected provider has no CLI on this machine"
       >
         <ResponsiveStage>
           <ProviderCliBanner
@@ -74,73 +74,16 @@ export function Requirements() {
             installed={false}
             currentVersion={null}
             minimumSupportedVersion={null}
-            canRunAction
-            actionRunning={false}
-            onAction={noop}
           />
         </ResponsiveStage>
       </StoryRow>
-      <StoryRow
-        label="install running"
-        hint="the install action reports its own progress"
-      >
-        <ResponsiveStage>
-          <ProviderCliBanner
-            displayName="Claude Code"
-            installed={false}
-            currentVersion={null}
-            minimumSupportedVersion={null}
-            canRunAction
-            actionRunning
-            onAction={noop}
-          />
-        </ResponsiveStage>
-      </StoryRow>
-      <StoryRow
-        label="provider CLI too old"
-        hint="both versions are known, and bb can run the update itself"
-      >
+      <StoryRow label="provider CLI too old" hint="both versions are known">
         <ResponsiveStage>
           <ProviderCliBanner
             installed
             displayName="Codex"
             currentVersion="0.135.0"
             minimumSupportedVersion="0.136.0"
-            canRunAction
-            actionRunning={false}
-            onAction={noop}
-          />
-        </ResponsiveStage>
-      </StoryRow>
-      <StoryRow
-        label="update running"
-        hint="the action reports its own progress and refuses a second click"
-      >
-        <ResponsiveStage>
-          <ProviderCliBanner
-            installed
-            displayName="Codex"
-            currentVersion="0.135.0"
-            minimumSupportedVersion="0.136.0"
-            canRunAction
-            actionRunning
-            onAction={noop}
-          />
-        </ResponsiveStage>
-      </StoryRow>
-      <StoryRow
-        label="bb cannot update it"
-        hint="the machine installs this CLI itself, so the banner explains without offering an action"
-      >
-        <ResponsiveStage>
-          <ProviderCliBanner
-            installed
-            displayName="Claude Code"
-            currentVersion="2.0.9"
-            minimumSupportedVersion="2.1.0"
-            canRunAction={false}
-            actionRunning={false}
-            onAction={noop}
           />
         </ResponsiveStage>
       </StoryRow>
@@ -154,9 +97,6 @@ export function Requirements() {
             displayName="Cursor"
             currentVersion={null}
             minimumSupportedVersion="0.49.0"
-            canRunAction
-            actionRunning={false}
-            onAction={noop}
           />
         </ResponsiveStage>
       </StoryRow>
@@ -170,9 +110,6 @@ export function Requirements() {
             displayName="Cursor"
             currentVersion="0.48.2"
             minimumSupportedVersion={null}
-            canRunAction
-            actionRunning={false}
-            onAction={noop}
           />
         </ResponsiveStage>
       </StoryRow>
@@ -186,9 +123,6 @@ export function Requirements() {
             displayName="Cursor"
             currentVersion={null}
             minimumSupportedVersion={null}
-            canRunAction
-            actionRunning={false}
-            onAction={noop}
           />
         </ResponsiveStage>
       </StoryRow>

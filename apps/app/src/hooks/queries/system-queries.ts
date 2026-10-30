@@ -13,7 +13,6 @@ import type {
   SystemExecutionOptionsResponse,
   SystemProvidersQuery,
   SystemProviderStatesResponse,
-  SystemVersionResponse,
 } from "@bb/server-contract";
 import type { ProviderCliStatusResponse } from "@bb/host-daemon-contract";
 import { BbHttpError, sdk } from "@/lib/sdk";
@@ -45,14 +44,10 @@ import {
   systemProviderCatalogQueryKey,
   systemProviderStatesQueryKey,
   systemThemeQueryKey,
-  systemVersionQueryKey,
   uiPreferencesQueryKey,
 } from "./query-keys";
 import { requireEnabledQueryArg, type QueryOptions } from "./query-helpers";
-import {
-  SERVER_SESSION_QUERY_POLICY,
-  SESSION_STATIC_QUERY_POLICY,
-} from "./query-policies";
+import { SESSION_STATIC_QUERY_POLICY } from "./query-policies";
 
 interface UseSystemExecutionOptionsArgs {
   selectedModel?: string;
@@ -591,15 +586,6 @@ export function useCliCommandStatus(options?: QueryOptions) {
     queryFn: ({ signal }) => sdk.system.experimental_cliCommand({ signal }),
     enabled: options?.enabled ?? true,
     staleTime: 30_000,
-  });
-}
-
-export function useSystemVersion(options?: QueryOptions) {
-  return useQuery<SystemVersionResponse>({
-    queryKey: systemVersionQueryKey(),
-    queryFn: ({ signal }) => sdk.system.version({ signal }),
-    enabled: options?.enabled ?? true,
-    ...SERVER_SESSION_QUERY_POLICY,
   });
 }
 

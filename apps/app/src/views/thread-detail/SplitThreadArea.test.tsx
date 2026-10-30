@@ -2588,12 +2588,7 @@ describe("SplitThreadArea", () => {
 
   it("carves a plugin pane drag handle out of the macOS window-drag region", async () => {
     const desktopInfo: BbDesktopInfo = {
-      lastCheckedAt: null,
-      latestVersion: null,
-      pendingVersion: null,
       platform: "macos",
-      updateAvailable: false,
-      updateDownloaded: false,
       version: "0.0.0-test",
     };
     window.bbDesktop = createBbDesktopApi(desktopInfo);
@@ -2630,12 +2625,7 @@ describe("SplitThreadArea", () => {
 
   it("makes only top-row split headers desktop window-drag regions", async () => {
     const desktopInfo: BbDesktopInfo = {
-      lastCheckedAt: null,
-      latestVersion: null,
-      pendingVersion: null,
       platform: "macos",
-      updateAvailable: false,
-      updateDownloaded: false,
       version: "0.0.0-test",
     };
     window.bbDesktop = createBbDesktopApi(desktopInfo);
@@ -2719,12 +2709,7 @@ describe("SplitThreadArea", () => {
 
   it("reserves collapsed window-left chrome only for the structural top-left plugin pane", async () => {
     const desktopInfo: BbDesktopInfo = {
-      lastCheckedAt: null,
-      latestVersion: null,
-      pendingVersion: null,
       platform: "macos",
-      updateAvailable: false,
-      updateDownloaded: false,
       version: "0.0.0-test",
     };
     window.bbDesktop = createBbDesktopApi(desktopInfo);

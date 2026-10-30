@@ -51,7 +51,6 @@ vi.mock("@/hooks/queries/system-queries", () => ({
 }));
 
 const desktopInfo = {
-  lastCheckedAt: null,
   latestVersion: null,
   pendingVersion: null,
   platform: "macos" as const,

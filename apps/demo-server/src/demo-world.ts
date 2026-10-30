@@ -26,7 +26,6 @@ import {
   type ThreadPendingInteractionsResponse,
   type ThreadQueuedMessageListResponse,
   type ThreadTabsResponse,
-  type SystemAppUpdateStatus,
   type SystemCliCommandStatus,
   type ServerMoveStatusResponse,
   type UiPreferencesResponse,
@@ -51,7 +50,6 @@ import {
   seedStartedAt,
   seedUpdatedAt,
   sidebarBootstrap,
-  SYSTEM_VERSION,
   THREAD_DEFAULT_EXECUTION_OPTIONS,
   threadListEntry,
   threadResponse,
@@ -260,16 +258,6 @@ export class DemoWorld {
             move: null,
             lastMove: null,
           } satisfies ServerMoveStatusResponse);
-        case "/system/app-update":
-          return json({
-            activity: { phase: "idle" },
-            available: null,
-            blocked: null,
-            current: { commit: null, version: SYSTEM_VERSION.currentVersion },
-            lastResult: null,
-            runningThreadCount: 0,
-            support: { kind: "unsupported", reason: "unmanaged" },
-          } satisfies SystemAppUpdateStatus);
         case "/system/cli-command":
           return json({
             installedPath: null,
@@ -284,8 +272,6 @@ export class DemoWorld {
             shadowedBy: null,
             supported: false,
           } satisfies SystemCliCommandStatus);
-        case "/system/version":
-          return json(SYSTEM_VERSION);
         case "/system/execution-options":
           return json(SYSTEM_EXECUTION_OPTIONS);
         case "/system/providers":

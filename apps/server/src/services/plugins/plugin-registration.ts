@@ -29,7 +29,6 @@ import {
   type PluginRuntimeStatus,
   type PluginSourceSelection,
 } from "@bb/server-contract";
-import type { TelemetryEvent } from "../system/telemetry.js";
 import { resolveSelectedSubdirectory } from "./collection-manifest.js";
 import {
   isCommitSha,
@@ -57,30 +56,6 @@ import {
   type NpmSourceIntentForResolution,
   type PluginResolvedUpdateVersion,
 } from "./update-resolver.js";
-
-export function pluginInstalledTelemetryEvent(
-  pluginId: string,
-  provenance: PluginProvenance,
-  sourceIntent: PluginSourceIntent,
-): Extract<TelemetryEvent, { name: "plugin_installed" }> {
-  const isPublic =
-    provenance.kind === "builtin" ||
-    (provenance.kind === "catalog" &&
-      (provenance.marketplace === CURATED_PLUGIN_MARKETPLACE_NAME ||
-        provenance.marketplace === BUNDLED_MARKETPLACE_NAME));
-  return {
-    name: "plugin_installed",
-    properties: {
-      plugin_id: isPublic ? pluginId : null,
-      provenance: provenance.kind,
-      marketplace:
-        isPublic && provenance.kind === "catalog"
-          ? provenance.marketplace
-          : null,
-      source_kind: sourceIntent.kind,
-    },
-  };
-}
 
 interface PluginRegistrationContext {
   deps: PluginServiceDeps;
@@ -419,13 +394,6 @@ export function createPluginRegistration(context: PluginRegistrationContext) {
     if (isFreshInstall) await runInstallHandlers(manifest.id);
     const entry = list().find((p) => p.id === manifest.id);
     if (!entry) throw new Error(`plugin ${manifest.id} missing after install`);
-    deps.telemetry.capture(
-      pluginInstalledTelemetryEvent(
-        manifest.id,
-        args.provenance,
-        args.sourceIntent,
-      ),
-    );
     return entry;
   }
 

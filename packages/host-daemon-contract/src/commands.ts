@@ -39,8 +39,6 @@ import {
   pathsExistRequestSchema,
   pathsExistResponseSchema,
   pickFolderResponseSchema,
-  providerCliInstallEventSchema,
-  providerCliInstallActionKindSchema,
 } from "./local.js";
 import { HOST_ARTIFACT_MAX_BYTES } from "./protocol.js";
 import {
@@ -937,15 +935,6 @@ const providerInstallationStatusCommandSchema = z
   })
   .strict();
 
-const providerInstallationRunCommandSchema = z
-  .object({
-    type: z.literal("provider.installation.run"),
-    providerId: z.string().min(1),
-    action: providerCliInstallActionKindSchema,
-    bridgeLaunch: hostDaemonBridgeLaunchSchema,
-  })
-  .strict();
-
 export type {
   ProviderHealth,
   ProviderHealthResult,
@@ -1195,12 +1184,6 @@ const providerUsageCommandSchema = z
     type: z.literal("provider.usage"),
     providerId: z.string().min(1),
     bridgeLaunch: hostDaemonBridgeLaunchSchema,
-  })
-  .strict();
-
-const providerCliInstallResultSchema = z
-  .object({
-    events: z.array(providerCliInstallEventSchema),
   })
   .strict();
 
@@ -1846,15 +1829,6 @@ export const hostDaemonCommandRegistry = {
     resultSchema: providerInstallationStatusSchema,
     transport: "onlineRpc",
     retryable: true,
-    flushEventsBeforeResult: false,
-    envLane: null,
-  }),
-  "provider.installation.run": defineHostDaemonCommandDescriptor({
-    type: "provider.installation.run",
-    schema: providerInstallationRunCommandSchema,
-    resultSchema: providerCliInstallResultSchema,
-    transport: "onlineRpc",
-    retryable: false,
     flushEventsBeforeResult: false,
     envLane: null,
   }),

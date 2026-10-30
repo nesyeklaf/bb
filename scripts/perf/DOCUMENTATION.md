@@ -23,7 +23,7 @@ Scenario results are measurements, not pass/fail against the contract. `PASS` me
 
    ```sh
    BB_SKIP_ONBOARDING=1 NODE_ENV=production node --conditions=source --import tsx scripts/start-bb.mjs \
-     --data-dir ~/bb-perf/data --server-port 39886 --host-daemon-port 39887 --no-in-app-updates
+     --data-dir ~/bb-perf/data --server-port 39886 --host-daemon-port 39887
    ```
 
 3. Streaming only: install the paced provider into that instance and spawn one thread on it. Keep `BB_SERVER_URL` pointed at the perf instance, because the `bb` CLI otherwise talks to whatever bb the shell environment names.

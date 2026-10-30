@@ -1,4 +1,3 @@
-import { mobileAppDownloads } from "@bb/domain";
 import type {
   MachineEnvironmentReplace,
   MachineEnvironmentSet,
@@ -17,15 +16,10 @@ import type { ProviderUsageResponse } from "@bb/host-daemon-contract";
 import type {
   SetAiServiceSelectionRequest,
   SystemAiServicesResponse,
-  SystemAppUpdateAcknowledgeRequest,
-  SystemAppUpdateApplyRequest,
-  SystemAppUpdateQuery,
-  SystemAppUpdateStatus,
   SystemCliCommandStatus,
   SystemAttentionResponse,
   SystemConfigReloadResponse,
   SystemConfigResponse,
-  SystemMobileAppReleasesResponse,
   SystemExecutionOptionsQuery,
   SystemExecutionOptionsResponse,
   SystemCliSkillsStatusResponse,
@@ -34,10 +28,7 @@ import type {
   SystemProviderStatesResponse,
   SystemProvidersQuery,
   SystemUsageLimitsQuery,
-  SystemVersionQuery,
-  SystemVersionResponse,
   SystemVoiceTranscriptionResponse,
-  RecordTelemetryEventRequest,
   TestAiServiceRequest,
   TestAiServiceResponse,
   UiPreferenceResponse,
@@ -70,20 +61,6 @@ export interface SystemUsageLimitsArgs extends Omit<
   signal?: AbortSignal;
 }
 
-export interface SystemVersionArgs {
-  force?: boolean;
-  signal?: AbortSignal;
-}
-
-export interface SystemAppUpdateArgs {
-  force?: boolean;
-  signal?: AbortSignal;
-}
-
-export type SystemApplyAppUpdateArgs = SystemAppUpdateApplyRequest;
-export type SystemAcknowledgeAppUpdateArgs = SystemAppUpdateAcknowledgeRequest;
-export type SystemAppUpdateStatusResult = SystemAppUpdateStatus;
-
 export interface SystemCliCommandArgs {
   signal?: AbortSignal;
 }
@@ -102,10 +79,6 @@ export type SystemAiServicesResult = SystemAiServicesResponse;
 export type SystemSetAiServiceSelectionArgs = SetAiServiceSelectionRequest;
 export type SystemTestAiServiceArgs = TestAiServiceRequest;
 export type SystemTestAiServiceResult = TestAiServiceResponse;
-export type SystemRecordTelemetryEventArgs = RecordTelemetryEventRequest;
-export interface SystemRecordTelemetryEventResult {
-  ok: true;
-}
 
 export interface SystemAiServicesArgs {
   signal?: AbortSignal;
@@ -130,7 +103,6 @@ export interface SystemProviderStatesArgs extends SystemProvidersQuery {
   signal?: AbortSignal;
 }
 export type SystemProviderStatesResult = SystemProviderStatesResponse;
-export type SystemVersionResult = SystemVersionResponse;
 
 export interface SystemUiPreferencesArgs {
   signal?: AbortSignal;
@@ -180,9 +152,6 @@ export interface SystemArea {
   installCliSkills(
     args: SystemInstallCliSkillsArgs,
   ): Promise<SystemInstallCliSkillsResult>;
-  experimental_recordTelemetryEvent(
-    args: SystemRecordTelemetryEventArgs,
-  ): Promise<SystemRecordTelemetryEventResult>;
   reloadConfig(): Promise<SystemReloadConfigResult>;
   setAiServiceSelection(
     args: SystemSetAiServiceSelectionArgs,
@@ -194,8 +163,6 @@ export interface SystemArea {
     args: SystemVoiceTranscriptionArgs,
   ): Promise<SystemVoiceTranscriptionResult>;
   uiPreferences: SystemUiPreferencesArea;
-  mobileAppDownloads(): typeof mobileAppDownloads;
-  mobileAppReleases(): Promise<SystemMobileAppReleasesResponse>;
   updateExperiments(
     args: ExperimentUpdates,
   ): Promise<SystemUpdateExperimentsResult>;
@@ -209,33 +176,11 @@ export interface SystemArea {
     args?: SystemProviderStatesArgs,
   ): Promise<SystemProviderStatesResult>;
   usageLimits(args?: SystemUsageLimitsArgs): Promise<SystemUsageLimitsResult>;
-  version(args?: SystemVersionArgs): Promise<SystemVersionResult>;
-  appUpdate(args?: SystemAppUpdateArgs): Promise<SystemAppUpdateStatusResult>;
-  applyAppUpdate(
-    args: SystemApplyAppUpdateArgs,
-  ): Promise<SystemAppUpdateStatusResult>;
-  acknowledgeAppUpdate(
-    args: SystemAcknowledgeAppUpdateArgs,
-  ): Promise<SystemAppUpdateStatusResult>;
   experimental_cliCommand(
     args?: SystemCliCommandArgs,
   ): Promise<SystemCliCommandStatusResult>;
   experimental_installCliCommand(): Promise<SystemCliCommandStatusResult>;
   experimental_removeCliCommand(): Promise<SystemCliCommandStatusResult>;
-}
-
-function versionQuery(args: SystemVersionArgs | undefined): SystemVersionQuery {
-  return args?.force === undefined
-    ? {}
-    : { force: args.force ? "true" : "false" };
-}
-
-function appUpdateQuery(
-  args: SystemAppUpdateArgs | undefined,
-): SystemAppUpdateQuery {
-  return args?.force === undefined
-    ? {}
-    : { force: args.force ? "true" : "false" };
 }
 
 export function createSystemArea(args: CreateSdkAreaArgs): SystemArea {
@@ -349,11 +294,6 @@ export function createSystemArea(args: CreateSdkAreaArgs): SystemArea {
         transport.api.v1.system["cli-skills"].install.$post({ json: input }),
       );
     },
-    async experimental_recordTelemetryEvent(input) {
-      return transport.readJson(
-        transport.api.v1.system.telemetry.events.$post({ json: input }),
-      );
-    },
     async reloadConfig() {
       return transport.readJson(transport.api.v1.system.config.reload.$post());
     },
@@ -375,14 +315,6 @@ export function createSystemArea(args: CreateSdkAreaArgs): SystemArea {
       return systemVoiceTranscriptionResponseSchema.parse(
         await response.json(),
       );
-    },
-    async mobileAppReleases() {
-      return transport.readJson(
-        transport.api.v1.system["mobile-app-releases"].$get(),
-      );
-    },
-    mobileAppDownloads() {
-      return { ...mobileAppDownloads };
     },
     async updateExperiments(input) {
       return transport.readJson(
@@ -429,34 +361,6 @@ export function createSystemArea(args: CreateSdkAreaArgs): SystemArea {
           },
           ...signalRequestArgs(input.signal),
         ),
-      );
-    },
-    async version(input) {
-      return transport.readJson(
-        transport.api.v1.system.version.$get(
-          { query: versionQuery(input) },
-          ...signalRequestArgs(input?.signal),
-        ),
-      );
-    },
-    async appUpdate(input) {
-      return transport.readJson(
-        transport.api.v1.system["app-update"].$get(
-          { query: appUpdateQuery(input) },
-          ...signalRequestArgs(input?.signal),
-        ),
-      );
-    },
-    async applyAppUpdate(input) {
-      return transport.readJson(
-        transport.api.v1.system["app-update"].apply.$post({ json: input }),
-      );
-    },
-    async acknowledgeAppUpdate(input) {
-      return transport.readJson(
-        transport.api.v1.system["app-update"].acknowledge.$post({
-          json: input,
-        }),
       );
     },
     async experimental_cliCommand(input) {

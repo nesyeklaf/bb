@@ -682,7 +682,6 @@ has been exercised or that every behavior has been understood.
 - `api-route: packages/server-contract/src/public-api.ts: /hosts/:id/paths/exist post`
 - `api-route: packages/server-contract/src/public-api.ts: /hosts/:id/permission-ceiling patch`
 - `api-route: packages/server-contract/src/public-api.ts: /hosts/:id/pick-folder post`
-- `api-route: packages/server-contract/src/public-api.ts: /hosts/:id/provider-clis/install post`
 - `api-route: packages/server-contract/src/public-api.ts: /hosts/:id/provider-clis/status get`
 - `api-route: packages/server-contract/src/public-api.ts: /hosts/:id/retry-update post`
 - `api-route: packages/server-contract/src/public-api.ts: /hosts/join-codes post`
@@ -877,4 +876,3 @@ has been exercised or that every behavior has been understood.
 - `setting-or-key: packages/domain/src/app-settings.ts: showUnhandledProviderEvents`
 - `setting-or-key: packages/domain/src/app-settings.ts: steerActiveThreadOnEnter`
 - `setting-or-key: packages/domain/src/app-settings.ts: streamerMode`
-- `setting-or-key: packages/domain/src/experiments.ts: changelogPreview`

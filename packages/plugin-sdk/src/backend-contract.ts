@@ -1460,8 +1460,7 @@ export interface PluginProviderMaintenance {
    * omit the provider. A shared bridge that declares true may still report
    * usage unavailable for one provider id or return no windows. */
   usage?: boolean;
-  /** `provider/installation/status` and `provider/installation/run`:
-   * host-local installation management. */
+  /** `provider/installation/status`: host-local installation report. */
   installation?: boolean;
 }
 

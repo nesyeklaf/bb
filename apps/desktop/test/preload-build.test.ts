@@ -131,7 +131,6 @@ async function startDesktopSmokeServer(
           pluginThemes: [],
           dataDir: args.dataDir,
           experiments: {
-            changelogPreview: false,
             serverMove: false,
             performanceDiagnostics: false,
             timelinePush: false,
@@ -376,7 +375,6 @@ describe("desktop build", () => {
       const childEnv: NodeJS.ProcessEnv = {
         ...process.env,
         BB_DATA_DIR: join(smokeRoot, "data"),
-        BB_DESKTOP_AUTO_UPDATE: "0",
         BB_DESKTOP_OPEN_DEVTOOLS: "0",
         BB_DESKTOP_VERSION_CHECK: "0",
         BB_SERVER_PORT: String(smokeServer.port),

@@ -929,8 +929,6 @@ const handlers: Record<string, RequestHandler> = {
         planLabel: null,
         installedVersion: "999.0.0",
         minimumSupportedVersion: "1.0.0",
-        canInstall: false,
-        canUpdate: false,
         loginCommand: null,
       },
     });
@@ -948,22 +946,9 @@ const handlers: Record<string, RequestHandler> = {
       executableName: "fake-provider",
       executablePath: "/fake/bin/fake-provider",
       installed: true,
-      installSource: "external",
       currentVersion: "999.0.0",
-      latestVersion: "999.0.0",
       minimumSupportedVersion: "1.0.0",
-      npmPackageName: null,
-      npmGlobalPackageVersion: null,
-      installAction: null,
-      needsUpdate: false,
       versionUnsupported: false,
-    });
-  },
-
-  [BRIDGE_REQUEST_METHODS.providerInstallationRun]: (id) => {
-    io.sendResult(id, {
-      available: false,
-      message: "Fake provider installation is unavailable",
     });
   },
 

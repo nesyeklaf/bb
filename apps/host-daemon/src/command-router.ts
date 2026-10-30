@@ -75,7 +75,6 @@ export interface CommandRouterOptions {
   providerHealth: CommandDispatchOptions["providerHealth"];
   providerUsage: CommandDispatchOptions["providerUsage"];
   providerInstallationStatus: CommandDispatchOptions["providerInstallationStatus"];
-  providerInstallationRun: CommandDispatchOptions["providerInstallationRun"];
   refreshShellEnv: CommandDispatchOptions["refreshShellEnv"];
   resolveInteractiveRequest?: CommandDispatchOptions["resolveInteractiveRequest"];
   pluginHostManager?: PluginHostManager;
@@ -314,7 +313,6 @@ export class CommandRouter {
       providerHealth: this.options.providerHealth,
       providerUsage: this.options.providerUsage,
       providerInstallationStatus: this.options.providerInstallationStatus,
-      providerInstallationRun: this.options.providerInstallationRun,
       refreshShellEnv: this.options.refreshShellEnv,
       emitEnvironmentHookProgress: this.options.emitEnvironmentHookProgress,
       resolveInteractiveRequest: this.options.resolveInteractiveRequest,

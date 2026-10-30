@@ -286,9 +286,6 @@ function UnsupportedCodexCliRow() {
               installed
               currentVersion="0.135.0"
               minimumSupportedVersion="0.136.0"
-              canRunAction
-              actionRunning={false}
-              onAction={noop}
             />
           ),
         }}
@@ -326,9 +323,6 @@ function MissingCodexCliRow() {
               installed={false}
               currentVersion={null}
               minimumSupportedVersion={null}
-              canRunAction
-              actionRunning={false}
-              onAction={noop}
             />
           ),
         }}

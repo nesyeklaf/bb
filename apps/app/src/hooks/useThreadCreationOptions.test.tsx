@@ -54,8 +54,6 @@ function readyProviderStates(providerId: string): SystemProviderStatesResponse {
         accountEmail: null,
         installedVersion: null,
         minimumSupportedVersion: null,
-        canInstall: false,
-        canUpdate: false,
         loginCommand: null,
         localLoginCommand: null,
       },

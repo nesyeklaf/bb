@@ -79,10 +79,7 @@ notification behavior but cannot forward activation tokens.
 Electron downloads its development runtime lazily; the desktop test command
 installs it before starting parallel workers.
 
-The macOS bundle declares macOS 13 as its minimum. The release feed generator
-writes the corresponding Darwin kernel minimum, 22.0.0, into both JSON and YAML
-update feeds. Run it before publishing release artifacts so older Macs reject
-incompatible updates.
+The macOS bundle declares macOS 13 as its minimum.
 
 ## Window state
 
@@ -183,7 +180,7 @@ pnpm exec turbo run smoke:packaged --filter=@bb/desktop
 
 `desktop:build:win` writes `release/bb-<version>-x64.exe`, a one-click per-user
 NSIS installer that installs to `%LOCALAPPDATA%\Programs\bb` (`bb-nightly` on
-the nightly channel) without elevation, plus `latest.yml` for electron-updater.
+the nightly channel) without elevation.
 Without a signing certificate the installer is unsigned, so Windows SmartScreen
 warns before running it. electron-builder signs it when `WIN_CSC_LINK` (a
 base64 `.pfx`) and `WIN_CSC_KEY_PASSWORD` are set; the release workflows pass
@@ -193,11 +190,6 @@ secrets.
 `afterPack` copies `@parcel/watcher-win32-x64` into the package when
 electron-builder leaves it out and loads it with the packaged Electron; without
 it the file watcher cannot start.
-
-Windows builds check `desktop-version-windows.json` for new versions and
-install them with electron-updater from `latest.yml` (`nightly.yml` on the
-nightly channel). The update downloads in the background and the installer runs
-silently when the app quits or when the user chooses Relaunch.
 
 ### Linux (AppImage, x64)
 
@@ -244,26 +236,8 @@ CI builds Linux artifacts on the pinned `ubuntu-22.04` runner. The AppImage
 links against the build machine's glibc, so that pin sets the oldest
 distribution that can run a published build. Raise it deliberately.
 
-Linux gets both update paths, but they are not equivalent:
-
-- The JSON version feed (`desktop-version-linux.json`) is polled on every Linux
-  install and reports that a newer release exists.
-- Self-installing auto-update runs only inside an AppImage whose directory the
-  app can write to. electron-updater detects the AppImage through the `APPIMAGE`
-  environment variable, and its install step unlinks the running file _before_
-  moving the replacement in — so a read-only directory would delete the app and
-  leave nothing behind. Both the startup check and the install handler verify
-  write and search access on the parent directory first.
-- Everything else — an extracted directory, a distribution package, or an
-  AppImage in a read-only location — reports new versions without installing
-  them.
-
-The Linux AppImage is unsigned, and electron-updater performs no signature
-check on Linux: it verifies only the SHA-512 recorded in the update metadata
-that ships beside it. macOS installs through Squirrel, which additionally
-requires the replacement to satisfy the running app's code-signing
-requirement. Write access to the release assets is therefore sufficient to
-push code to Linux clients. Treat the release token accordingly.
+The Linux AppImage is unsigned. The desktop app never checks for or installs
+updates; install a new build by hand.
 
 ## Releasing
 
@@ -291,17 +265,9 @@ immutable releases and `desktop-latest` for the moving pointer.
 `build-desktop.yml` builds macOS, Linux, and Windows in parallel jobs, then
 publishes all three from one job. The moving release resets all of its assets
 on each publish, so a single publisher is what keeps one platform from deleting
-another's binaries. Each platform has its own update feed file inside the same release
-tag:
+another's binaries.
 
-| Platform | Artifacts              | electron-updater metadata | Version feed                   |
-| -------- | ---------------------- | ------------------------- | ------------------------------ |
-| macOS    | `.dmg`, `.zip` (arm64) | `latest-mac.yml`          | `desktop-version.json`         |
-| Linux    | `.AppImage` (x64)      | `latest-linux.yml`        | `desktop-version-linux.json`   |
-| Windows  | `.exe` installer (x64) | `latest.yml`              | `desktop-version-windows.json` |
-
-macOS keeps the unsuffixed feed name because released macOS builds already
-request it. Linux artifacts are unsigned, and the Windows installer is unsigned
+Linux artifacts are unsigned, and the Windows installer is unsigned
 unless the Windows certificate secrets are configured; only the macOS binaries
 wait on the Apple signing secrets.
 
@@ -327,11 +293,8 @@ The nightly desktop is a separate installation:
 - product name: `bb Nightly`
 - bundle identifier: `dev.bb.desktop.nightly`
 - Linux binary name: `bb-nightly`, so it never shadows stable `bb` on PATH
-- app/update release: `desktop-nightly`
+- release: `desktop-nightly`
 - Windows install directory: `%LOCALAPPDATA%\Programs\bb-nightly`
-- update metadata: `nightly-mac.yml`, `nightly-linux.yml`, and `nightly.yml`
-  (Windows)
-- version feeds: `desktop-version.json` (macOS),
   `desktop-version-linux.json` (Linux), and `desktop-version-windows.json`
   (Windows)
 - icon: `assets/icon-nightly.icns` and `assets/icon-nightly.png`
@@ -352,7 +315,7 @@ overridden.
 
 Nightly builds set `BB_DESKTOP_RELEASE_CHANNEL=nightly` at build time. The value
 is baked into the Electron main/preload bundles and selects the nightly product
-identity, yellow icon, and update URLs. Omit the variable (or set it to
+identity and yellow icon. Omit the variable (or set it to
 `latest`) for stable and local builds.
 
 ## About panel
@@ -401,20 +364,9 @@ binaries from `desktop-latest`. If only some required signing secrets are set,
 the workflow fails before packaging so a misconfigured release cannot silently
 produce unsigned or signed-but-not-notarized artifacts.
 
-## Auto-update
+## Nightly signing
 
-The renderer update toast keeps using `desktop-version.json` as the lightweight
-feature surface. The installer path uses `electron-updater` against the same
-`desktop-latest` release asset directory and reads `latest-mac.yml`. These
-checks run in parallel on launch, hourly, and when the app becomes active: the
-JSON feed can show "update available" even when CI has published metadata only,
-while the Electron updater only flips the toast to "ready to install" after a
-signed update has actually downloaded. Local dev builds skip Electron auto-update
-unless `BB_DESKTOP_AUTO_UPDATE=1` is set.
-
-`bb Nightly` follows the equivalent isolated `desktop-nightly` release and
-`nightly-mac.yml`; it never reads or moves the stable feed. The scheduled
-workflow requires the complete signing/notarization secret set before
+The scheduled workflow requires the complete signing/notarization secret set before
 publishing nightly desktop assets.
 
 To verify a downloaded or unpacked build:

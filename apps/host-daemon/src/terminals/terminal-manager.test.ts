@@ -235,9 +235,6 @@ function createFakeRuntime(): AgentRuntime {
     providerInstallationStatus: vi.fn(async () => {
       throw new Error("Unexpected provider installation status call");
     }),
-    providerInstallationRun: vi.fn(async () => {
-      throw new Error("Unexpected provider installation run call");
-    }),
     listRunningProviders: vi.fn(() => []),
     getActiveTurnId: vi.fn(() => null),
     waitForActiveTurn: vi.fn(async () => null),

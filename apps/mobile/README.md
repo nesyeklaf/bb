@@ -798,35 +798,16 @@ palette, run `pnpm --filter @bb/mobile theme:generate` and commit the result;
   client's floating gear can sit over the header's right icons on larger
   simulators.
 
-Mobile app downloads are always available in Settings → Mobile (`/settings/mobile`).
-**Join iOS TestFlight** opens https://testflight.apple.com/join/T9MayTMb.
-**Download Android APK** downloads directly from the public `get-bb/bb` GitHub
-`android-testing` release's `bb-android.apk` asset. The APK does not pass through
-the bb server or bb connect. No experiment or Android developer tools are needed.
-Pair either app through Settings → Mobile → **Add mobile device**.
-
-Use `bb settings mobile-app --json` or SDK `system.mobileAppDownloads()` to get
-both public links. Add `--details --json` or call `system.mobileAppReleases()`
-(GET `/api/v1/system/mobile-app-releases`) for Android version/build, size, and
-upload date. The server fetches only public metadata, caches it for five minutes,
-and returns `android: null` if unavailable or inconsistent. Download links remain
-usable during metadata failures. iOS version and release date are shown in TestFlight.
-Inside the Android app, Settings → Mobile also shows the installed version and
-compares its native build number with the published APK: up to date, update
-available, or newer than the published release. Older apps without build-number
-reporting and unavailable release metadata show that update status cannot be
-determined. The download button remains available in every state.
 The nightly release pipeline builds and publishes an Android preview APK after
 a successful npm nightly publication, alongside the iOS build. This runs on the
 daily 3 AM America/Los_Angeles schedule, a manual nightly publish, and the
 nightly publication following a stable release. Successful builds replace the
-APK and version metadata used by Settings → Mobile. These builds do not submit
+published APK. These builds do not submit
 to Google Play.
 
 The Android version name matches the published bb-app nightly version, including
 its full `-nightly.RUN.ATTEMPT` suffix. EAS continues to increment the integer
-Android build number independently. The APK's version name and build number
-are also used in the Settings → Mobile download metadata.
+Android build number independently.
 
 For an immediate update, run **Mobile Android (EAS)**, profile `preview`,
 **publish** on, or

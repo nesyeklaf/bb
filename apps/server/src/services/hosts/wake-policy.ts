@@ -68,7 +68,6 @@ const hostCommandWakePolicy = {
   "provider.list_commands": "work",
   "provider.health": "work",
   "provider.installation.status": "work",
-  "provider.installation.run": "work",
   "provider.usage": "work",
   "host.discover_repos": "work",
 } satisfies Record<HostDaemonRpcCommand["type"], "never" | "work">;

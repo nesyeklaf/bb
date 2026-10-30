@@ -320,7 +320,6 @@
     "initialize",
     "model/list",
     "provider/health",
-    "provider/installation/run",
     "provider/installation/status",
     "provider/usage",
     "skills/configure",

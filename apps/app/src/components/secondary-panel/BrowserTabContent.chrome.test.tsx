@@ -20,7 +20,6 @@ import {
 import { BrowserTabContent } from "./BrowserTabContent";
 
 const desktopInfo = {
-  lastCheckedAt: null,
   latestVersion: null,
   pendingVersion: null,
   platform: "macos" as const,

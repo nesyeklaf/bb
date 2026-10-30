@@ -26,7 +26,7 @@ describe("experiments", () => {
     try {
       expect(getExperiments(db)).toEqual(defaultExperiments);
 
-      setExperiments(db, { changelogPreview: true });
+      setExperiments(db, { threadContextCard: true });
       db.$client
         .prepare(
           "INSERT INTO system_experiments (key, value, updated_at) VALUES ('futureExperiment', true, 1)",
@@ -35,7 +35,7 @@ describe("experiments", () => {
 
       expect(getExperiments(db)).toEqual({
         ...defaultExperiments,
-        changelogPreview: true,
+        threadContextCard: true,
       });
     } finally {
       db.$client.close();
@@ -65,13 +65,13 @@ describe("experiments", () => {
     const db = createMigratedConnection();
 
     try {
-      setExperiments(db, { timelinePush: false, changelogPreview: true });
+      setExperiments(db, { timelinePush: false, threadContextCard: true });
       setAppSettings(db, { ...defaultAppSettings, earlyAdopter: true });
 
       expect(getExperiments(db)).toEqual({
         ...earlyAdopterExperiments,
         timelinePush: false,
-        changelogPreview: true,
+        threadContextCard: true,
       });
 
       db.$client.prepare("DELETE FROM system_experiments").run();

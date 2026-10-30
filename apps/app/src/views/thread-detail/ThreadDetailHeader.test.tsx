@@ -688,12 +688,7 @@ describe("ThreadDetailHeader", () => {
 
   it("keeps the header title out of the macOS window-drag region so double click renames", async () => {
     window.bbDesktop = createBbDesktopApi({
-      lastCheckedAt: null,
-      latestVersion: null,
-      pendingVersion: null,
       platform: "macos",
-      updateAvailable: false,
-      updateDownloaded: false,
       version: "0.0.0-test",
     });
     render(
@@ -720,12 +715,7 @@ describe("ThreadDetailHeader", () => {
 
   it("places the window toggle's reserved slot over the title-bar toggle so its whole box stays clickable", () => {
     window.bbDesktop = createBbDesktopApi({
-      lastCheckedAt: null,
-      latestVersion: null,
-      pendingVersion: null,
       platform: "macos",
-      updateAvailable: false,
-      updateDownloaded: false,
       version: "0.0.0-test",
     });
     const { container } = render(

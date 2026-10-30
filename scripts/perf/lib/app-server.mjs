@@ -81,7 +81,6 @@ export const startAppServer = async ({
     String(port),
     "--host-daemon-port",
     String(hostPort),
-    "--no-in-app-updates",
   ];
   if (perfDiagnostics) args.push("--perf-diagnostics");
   const proc = spawn(process.execPath, args, {

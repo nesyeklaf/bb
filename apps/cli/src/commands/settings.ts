@@ -651,36 +651,6 @@ export function registerSettingsCommands(
     );
 
   settings
-    .command("mobile-app")
-    .description("Show iOS TestFlight and Android APK download links")
-    .option("--details", "Include available public release metadata")
-    .option("--json", "Print machine-readable JSON output")
-    .action(
-      action(async (opts: JsonOptions & { details?: boolean }) => {
-        const system = createCliBbSdk(getUrl()).system;
-        const links = system.mobileAppDownloads();
-        if (opts.details) {
-          const releases = await system.mobileAppReleases();
-          if (outputJson(opts, { downloads: links, releases })) return;
-          console.log(
-            `iOS TestFlight: ${links.ios}\nAndroid APK: ${links.android}`,
-          );
-          console.log(
-            releases.android
-              ? `Android ${releases.android.version} (build ${releases.android.versionCode}) · Updated ${releases.android.updatedAt} · ${Math.ceil(releases.android.size / 1024 / 1024)} MB`
-              : "Android release details are unavailable.",
-          );
-          console.log("iOS version and release date are shown in TestFlight.");
-          return;
-        }
-        if (outputJson(opts, links)) return;
-        console.log(
-          `iOS TestFlight: ${links.ios}\nAndroid APK: ${links.android}`,
-        );
-      }),
-    );
-
-  settings
     .command("experiment <key> <value>")
     .description("Set an experiment value")
     .option("--json", "Print machine-readable JSON output")
@@ -826,21 +796,6 @@ export function registerSettingsCommands(
         const result = await createCliBbSdk(getUrl()).system.usageLimits({
           hostId,
           refresh: opts.refresh,
-        });
-        if (outputJson(opts, result)) return;
-        console.log(JSON.stringify(result, null, 2));
-      }),
-    );
-
-  settings
-    .command("version")
-    .description("Check the running and latest BB versions")
-    .option("--force", "Bypass the latest-version cache")
-    .option("--json", "Print machine-readable JSON output")
-    .action(
-      action(async (opts: JsonOptions & { force?: boolean }) => {
-        const result = await createCliBbSdk(getUrl()).system.version({
-          force: opts.force,
         });
         if (outputJson(opts, result)) return;
         console.log(JSON.stringify(result, null, 2));

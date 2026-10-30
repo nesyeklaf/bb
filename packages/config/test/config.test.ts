@@ -319,7 +319,6 @@ describe("consumer-specific config", () => {
     );
     expect(serverConfig.featureFlags).toEqual({
       placeholder: false,
-      initiatorTelemetry: true,
       timelineWindowEventBudget: 1_500,
     });
   });
@@ -365,22 +364,6 @@ describe("consumer-specific config", () => {
     ).toBe("launch-123");
   });
 
-  it("carries the launcher's in-app update mode and rejects unknown modes", () => {
-    expect(
-      loadServerConfig({ env: createServerRuntimeEnv({}) }),
-    ).not.toHaveProperty("BB_APP_UPDATE_MODE");
-    expect(
-      loadServerConfig({
-        env: createServerRuntimeEnv({ BB_APP_UPDATE_MODE: "source" }),
-      }).BB_APP_UPDATE_MODE,
-    ).toBe("source");
-    expect(() =>
-      loadServerConfig({
-        env: createServerRuntimeEnv({ BB_APP_UPDATE_MODE: "brew" }),
-      }),
-    ).toThrow("BB_APP_UPDATE_MODE must be one of npm, source");
-  });
-
   it("defaults the server bind host to loopback", () => {
     const serverConfig = loadServerConfig({
       env: createServerRuntimeEnv({
@@ -419,16 +402,6 @@ describe("consumer-specific config", () => {
     });
 
     expect(serverConfig.featureFlags.placeholder).toBe(true);
-  });
-
-  it("parses the initiator telemetry flag from env", () => {
-    const serverConfig = loadServerConfig({
-      env: createServerRuntimeEnv({
-        BB_FF_INITIATOR_TELEMETRY: "false",
-      }),
-    });
-
-    expect(serverConfig.featureFlags.initiatorTelemetry).toBe(false);
   });
 
   it("parses the timeline window event budget from env", () => {
@@ -483,7 +456,7 @@ describe("consumer-specific config", () => {
     expect(serverConfig.BB_APP_VERSION).toBe("0.1.2");
   });
 
-  it("parses the internal app surface marker for server telemetry", () => {
+  it("parses the internal app surface marker", () => {
     const serverConfig = loadServerConfig({
       env: createServerRuntimeEnv({
         BB_APP_SURFACE: "desktop",

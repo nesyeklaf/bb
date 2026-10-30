@@ -15,7 +15,6 @@ import {
   createPluginService,
   type PluginService,
 } from "../../../src/services/plugins/plugin-service.js";
-import { createNoopTelemetryService } from "../../../src/services/system/telemetry.js";
 import { seedThreadFixture } from "../../helpers/seed.js";
 import {
   startTestServer,
@@ -408,7 +407,6 @@ describe("plugin instance lifecycle without cooperation", () => {
     await writeFixture(join(workDir, "lifecycle"));
     service = createPluginService({
       aiServices: createAiServiceRegistry(),
-      telemetry: createNoopTelemetryService(),
       db: createMigratedConnection(),
       hub: {
         getDaemonSessionIdForHost: () => null,

@@ -26,7 +26,6 @@ import {
   createPluginService,
   type PluginService,
 } from "../../../src/services/plugins/plugin-service.js";
-import { createNoopTelemetryService } from "../../../src/services/system/telemetry.js";
 import { testLogger } from "../../helpers/test-app.js";
 
 const logger = testLogger as unknown as Logger;
@@ -86,7 +85,6 @@ describe("retired bundled plugins", () => {
   function createService(): PluginService {
     return createPluginService({
       aiServices: createAiServiceRegistry(),
-      telemetry: createNoopTelemetryService(),
       db,
       hub: {
         getDaemonSessionIdForHost: () => null,

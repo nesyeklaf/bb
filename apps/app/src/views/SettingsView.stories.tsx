@@ -130,7 +130,6 @@ function useSettingsStoryState() {
     useState(false);
   const [summarizeShellCommands, setSummarizeShellCommands] = useState(true);
   const [streamerMode, setStreamerMode] = useState(false);
-  const [telemetryEnabled, setTelemetryEnabled] = useState(true);
   const [managedBranchPrefix, setManagedBranchPrefix] = useState(
     defaultAppSettings.managedBranchPrefix,
   );
@@ -156,8 +155,6 @@ function useSettingsStoryState() {
     summarizeShellCommands,
     setSummarizeShellCommands,
     streamerMode,
-    telemetryEnabled,
-    setTelemetryEnabled,
     showDiagnosticEvents,
     setAppearance,
     setDirectoryTargetId,
@@ -245,8 +242,6 @@ function GeneralSettingsStory({
       <VoiceInputStory />
       <PrivacySettingsSection
         onStreamerModeChange={state.setStreamerMode}
-        telemetryEnabled={state.telemetryEnabled}
-        onTelemetryEnabledChange={state.setTelemetryEnabled}
         streamerMode={state.streamerMode}
         disabled={false}
         enabled={state.showDiagnosticEvents}

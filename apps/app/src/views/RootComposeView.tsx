@@ -32,12 +32,6 @@ import {
   ProviderCliBanner,
   providerCliBlockedReason,
 } from "@/components/promptbox/banner/ProviderCliBanner";
-import {
-  buildProviderCliIssue,
-  hasProviderCliAction,
-  useProviderCliInstallRunner,
-} from "@/components/provider-cli/provider-cli-install";
-import { providerCliJobKey } from "@/components/provider-cli/provider-cli-install-store";
 import { PROJECT_CHECKOUT_ENVIRONMENT_PROVIDER_ID } from "@bb/client-core";
 import {
   encodeProviderValue,
@@ -665,8 +659,6 @@ function RootComposeSurface({
     hostId: rootProjectHostId,
     enabled: rootProjectHostId !== null,
   });
-  const { queuedJobKeys, runningJobKey, startInstall } =
-    useProviderCliInstallRunner();
   const selectedProviderCliStatus =
     providerCliStatus.data?.[selectedProviderId] ?? null;
   const blockingProviderCliStatus =
@@ -676,23 +668,6 @@ function RootComposeSurface({
       ? selectedProviderCliStatus
       : null;
   const isProviderCliBlocked = blockingProviderCliStatus !== null;
-  const selectedProviderCliIssue = useMemo(() => {
-    if (blockingProviderCliStatus === null) {
-      return null;
-    }
-    const issue = buildProviderCliIssue({
-      provider: selectedProviderId,
-      status: blockingProviderCliStatus,
-    });
-    return issue && hasProviderCliAction(issue) ? issue : null;
-  }, [blockingProviderCliStatus, selectedProviderId]);
-  const handleRunProviderCliAction = useCallback(() => {
-    if (selectedProviderCliIssue === null || rootProjectHostId === null) return;
-    startInstall({
-      hostId: rootProjectHostId,
-      issue: selectedProviderCliIssue,
-    });
-  }, [selectedProviderCliIssue, rootProjectHostId, startInstall]);
 
   useFixedPanelTabsStorageMaintenance();
   const fixedPanelTabsState = useFixedPanelTabsState(
@@ -1339,27 +1314,9 @@ function RootComposeSurface({
         minimumSupportedVersion={
           blockingProviderCliStatus.minimumSupportedVersion
         }
-        canRunAction={selectedProviderCliIssue !== null}
-        actionRunning={
-          rootProjectHostId !== null &&
-          (runningJobKey ===
-            providerCliJobKey(rootProjectHostId, selectedProviderId) ||
-            queuedJobKeys.has(
-              providerCliJobKey(rootProjectHostId, selectedProviderId),
-            ))
-        }
-        onAction={handleRunProviderCliAction}
       />
     );
-  }, [
-    blockingProviderCliStatus,
-    rootProjectHostId,
-    handleRunProviderCliAction,
-    queuedJobKeys,
-    runningJobKey,
-    selectedProviderCliIssue,
-    selectedProviderId,
-  ]);
+  }, [blockingProviderCliStatus]);
 
   if (!projects && sidebarNavigationError) {
     return (

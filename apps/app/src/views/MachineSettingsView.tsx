@@ -7,7 +7,6 @@ import type { HostPlatform } from "@bb/host-daemon-contract";
 import { Button } from "@bb/shared-ui/button";
 import { Icon } from "@bb/shared-ui/icon";
 import { cn } from "@bb/shared-ui/lib/utils";
-import { Pill } from "@bb/shared-ui/pill";
 import { ResourceOverflowMenu } from "@bb/shared-ui/resource-list";
 import { machineActions } from "@/components/machines/machine-actions";
 import { MachineLifecycleActions } from "@/components/machines/MachineLifecycleActions";
@@ -52,11 +51,10 @@ import { useSystemMachineProviders } from "@/hooks/queries/machine-provider-quer
 import { useServerMoveStatus } from "@/hooks/queries/server-move-queries";
 import { useSidebarNavigation } from "@/hooks/queries/sidebar-navigation-query";
 import {
+  useHostProviderCliStatus,
   useSystemConfig,
   useSystemProviders,
 } from "@/hooks/queries/system-queries";
-import { isProviderCliUpdateIssue } from "@/components/provider-cli/provider-cli-install";
-import { useUpdateInventory } from "@/hooks/useUpdateInventory";
 import { useHostDaemon } from "@/hooks/useHostDaemon";
 import {
   formatHostUpdateStatus,
@@ -267,7 +265,6 @@ export function MachineSettingsView() {
   const systemConfig = useSystemConfig();
   const { localDaemonHostId, platform: localDaemonPlatform } = useHostDaemon();
   const sidebarNavigationQuery = useSidebarNavigation();
-  const updateInventory = useUpdateInventory();
   const renameHost = useRenameHost();
   const retryHostUpdate = useRetryHostUpdate();
   const suspendHost = useSuspendHost();
@@ -311,15 +308,13 @@ export function MachineSettingsView() {
       .map((project) => ({ id: project.id, name: project.name }));
   }, [hostId, sidebarNavigationQuery.data]);
 
-  const machine = updateInventory.machines.find(
-    (candidate) => candidate.host.id === hostId,
-  );
-  const updateIssueCount = (machine?.issues ?? []).filter(
-    isProviderCliUpdateIssue,
-  ).length;
+  const providerCliStatus = useHostProviderCliStatus({
+    hostId: hostId ?? null,
+    enabled: host?.status === "connected",
+  });
   const providerRoster = useSystemProviders().data;
   const installedProviders = useMemo(() => {
-    const status = machine?.providerStatus;
+    const status = providerCliStatus.data;
     if (!status) return [];
     return Object.entries(status).flatMap(([providerId, entry]) => {
       if (!entry.installed) return [];
@@ -339,7 +334,7 @@ export function MachineSettingsView() {
         },
       ];
     });
-  }, [machine?.providerStatus, providerRoster]);
+  }, [providerCliStatus.data, providerRoster]);
 
   const now = Date.now();
   const platformLabel =
@@ -448,9 +443,9 @@ export function MachineSettingsView() {
             <SettingsDetailRow label="Installed">
               {host.status !== "connected" ? (
                 <span>Unavailable while offline</span>
-              ) : machine?.statusPending ? (
+              ) : providerCliStatus.isPending ? (
                 <span>Checking…</span>
-              ) : machine?.statusError ? (
+              ) : providerCliStatus.isError ? (
                 <span>Status unavailable</span>
               ) : (
                 <>
@@ -488,20 +483,6 @@ export function MachineSettingsView() {
                   ) : (
                     <span>None installed</span>
                   )}
-                  {updateIssueCount > 0 ? (
-                    <Link
-                      to={getSettingsRoutePath("updates")}
-                      className="shrink-0 rounded outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-                    >
-                      <Pill
-                        variant="outline"
-                        size="sm"
-                        className="border-attention/50 bg-surface-attention text-warning-text transition-colors hover:border-attention hover:text-foreground"
-                      >
-                        {updateIssueCount} to fix
-                      </Pill>
-                    </Link>
-                  ) : null}
                 </>
               )}
             </SettingsDetailRow>

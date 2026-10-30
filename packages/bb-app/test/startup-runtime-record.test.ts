@@ -73,7 +73,6 @@ it.each([
       await runBbApp(
         [
           "start",
-          "--no-in-app-updates",
           "--data-dir",
           dataDir,
           "--server-port",

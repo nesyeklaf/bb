@@ -47,8 +47,7 @@ The native Windows host is alpha. It runs from the Windows desktop installer or
 [`apps/mobile`](../apps/mobile) is the iOS and Android client for a bb server.
 It runs no agents, host daemon, or plugins itself: it loads the server's web
 app and adds native screens for pairing, saved servers, device settings, and
-push registration. Install it from Settings → Mobile (iOS TestFlight or the
-Android APK; see [configuration.md](configuration.md)).
+push registration. Pair it from Settings → Mobile → **Add mobile device**.
 
 - **Direct** mode takes any `http(s)://` URL the phone can reach. It is
   unauthenticated, the same trust model as a browser on a LAN; iOS allows

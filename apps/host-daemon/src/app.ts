@@ -831,10 +831,6 @@ export async function createHostDaemonApp(
       withMaintenanceRuntime({ allowStale: false }, (runtime) =>
         runtime.providerInstallationStatus(args),
       ),
-    providerInstallationRun: (args) =>
-      withMaintenanceRuntime({ allowStale: false }, (runtime) =>
-        runtime.providerInstallationRun(args),
-      ),
     refreshShellEnv: async (args) => {
       await runtimeShellEnvCache.refresh(args);
     },

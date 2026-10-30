@@ -165,48 +165,13 @@ type HealthResponse = z.infer<typeof healthResponseSchema>;
 const providerCliKeySchema = z.string().min(1);
 export type ProviderCliKey = z.infer<typeof providerCliKeySchema>;
 
-const providerCliInstallOutputStreamValues = ["stdout", "stderr"] as const;
-const providerCliInstallOutputStreamSchema = z.enum(
-  providerCliInstallOutputStreamValues,
-);
-
-const providerCliInstallSourceValues = [
-  "notInstalled",
-  "npmGlobal",
-  "external",
-] as const;
-const providerCliInstallSourceSchema = z.enum(providerCliInstallSourceValues);
-
-const providerCliInstallActionKindValues = ["install", "update"] as const;
-export const providerCliInstallActionKindSchema = z.enum(
-  providerCliInstallActionKindValues,
-);
-export type ProviderCliInstallActionKind = z.infer<
-  typeof providerCliInstallActionKindSchema
->;
-
-const providerCliInstallActionSchema = z.object({
-  kind: providerCliInstallActionKindSchema,
-  label: z.enum(["Install", "Update"]),
-  command: z.string().min(1),
-});
-export type ProviderCliInstallAction = z.infer<
-  typeof providerCliInstallActionSchema
->;
-
 const providerCliStatusSchema = z.object({
   displayName: z.string().min(1),
   executableName: z.string().min(1),
   executablePath: z.string().min(1).nullable(),
   installed: z.boolean(),
-  installSource: providerCliInstallSourceSchema,
   currentVersion: z.string().min(1).nullable(),
-  latestVersion: z.string().min(1).nullable(),
   minimumSupportedVersion: z.string().min(1).nullable(),
-  npmPackageName: z.string().min(1).nullable(),
-  npmGlobalPackageVersion: z.string().min(1).nullable(),
-  installAction: providerCliInstallActionSchema.nullable(),
-  needsUpdate: z.boolean(),
   versionUnsupported: z.boolean(),
 });
 export type ProviderCliStatus = z.infer<typeof providerCliStatusSchema>;
@@ -217,51 +182,6 @@ export const providerCliStatusResponseSchema = z.record(
 );
 export type ProviderCliStatusResponse = z.infer<
   typeof providerCliStatusResponseSchema
->;
-
-export const providerCliInstallRequestSchema = z.object({
-  provider: providerCliKeySchema,
-  actionKind: providerCliInstallActionKindSchema,
-});
-export type ProviderCliInstallRequest = z.infer<
-  typeof providerCliInstallRequestSchema
->;
-
-const providerCliInstallStartedEventSchema = z.object({
-  type: z.literal("started"),
-  provider: providerCliKeySchema,
-  command: z.string().min(1),
-});
-
-const providerCliInstallOutputEventSchema = z.object({
-  type: z.literal("output"),
-  provider: providerCliKeySchema,
-  stream: providerCliInstallOutputStreamSchema,
-  text: z.string(),
-});
-
-const providerCliInstallCompletedEventSchema = z.object({
-  type: z.literal("completed"),
-  provider: providerCliKeySchema,
-  exitCode: z.number().int().nullable(),
-  signal: z.string().min(1).nullable(),
-  success: z.boolean(),
-});
-
-const providerCliInstallErrorEventSchema = z.object({
-  type: z.literal("error"),
-  provider: providerCliKeySchema,
-  message: z.string().min(1),
-});
-
-export const providerCliInstallEventSchema = z.discriminatedUnion("type", [
-  providerCliInstallStartedEventSchema,
-  providerCliInstallOutputEventSchema,
-  providerCliInstallCompletedEventSchema,
-  providerCliInstallErrorEventSchema,
-]);
-export type ProviderCliInstallEvent = z.infer<
-  typeof providerCliInstallEventSchema
 >;
 
 export type HostDaemonLocalSchema = {

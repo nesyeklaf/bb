@@ -196,8 +196,6 @@ interface GeneralSettingsSectionProps {
 interface PrivacySettingsSectionProps {
   onStreamerModeChange: (enabled: boolean) => void;
   streamerMode: boolean;
-  telemetryEnabled: boolean;
-  onTelemetryEnabledChange: (enabled: boolean) => void;
   disabled: boolean;
   enabled: boolean;
   onEnabledChange: (enabled: boolean) => void;
@@ -1069,8 +1067,6 @@ export function PrivacySettingsSection({
   onEnabledChange,
   streamerMode,
   onStreamerModeChange,
-  telemetryEnabled,
-  onTelemetryEnabledChange,
 }: PrivacySettingsSectionProps) {
   return (
     <SettingsSection title="Privacy & diagnostics">
@@ -1084,18 +1080,6 @@ export function PrivacySettingsSection({
             disabled={disabled}
             onCheckedChange={onStreamerModeChange}
             aria-label={STREAMER_MODE_SETTING_LABEL}
-          />
-        </SettingsWithControl>
-
-        <SettingsWithControl
-          label="Share anonymous usage data"
-          description="Send anonymous usage data, such as app starts, setup progress and feature use, to help improve bb. Turning this off takes effect immediately for this server."
-        >
-          <Switch
-            checked={telemetryEnabled}
-            disabled={disabled}
-            onCheckedChange={onTelemetryEnabledChange}
-            aria-label="Share anonymous usage data"
           />
         </SettingsWithControl>
 
@@ -1123,11 +1107,6 @@ const EXPERIMENT_DEFINITIONS: Record<
     label: "App links",
     description:
       "Open links like linear:// or slack:// in their apps on this device. BB asks first unless you choose Always allow. Manage approvals in General → Links → App links.",
-  },
-  changelogPreview: {
-    label: "Changelog preview",
-    description:
-      "Show the latest release notes as a compact preview on the Updates page.",
   },
   compactExpiredCache: {
     label: "Compact before resuming expired sessions",
@@ -1415,9 +1394,7 @@ export function SettingsView() {
     content = <MachineEnvironmentSettings />;
   } else if (activeSection === "updates") {
     content = (
-      <UpdatesSettingsSection
-        showChangelogPreview={experiments.changelogPreview}
-      />
+      <UpdatesSettingsSection />
     );
   } else if (activeSection === "mobile") {
     content = <MobileAppSection />;
@@ -1507,12 +1484,6 @@ export function SettingsView() {
         <CliSkillsSettingsSection />
         <VoiceInputSettingsSection />
         <PrivacySettingsSection
-          telemetryEnabled={generalSettings.telemetryEnabled}
-          onTelemetryEnabledChange={(enabled) =>
-            updateGeneralSettingsMutation.mutate({
-              telemetryEnabled: enabled,
-            })
-          }
           streamerMode={generalSettings.streamerMode}
           onStreamerModeChange={(enabled) =>
             updateGeneralSettingsMutation.mutate({

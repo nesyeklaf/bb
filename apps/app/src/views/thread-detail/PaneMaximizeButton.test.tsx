@@ -188,12 +188,7 @@ describe("PaneMaximizeButton", () => {
 
   it("preserves full-screen copy in every desktop app context", async () => {
     const desktopInfo: BbDesktopInfo = {
-      lastCheckedAt: null,
-      latestVersion: null,
-      pendingVersion: null,
       platform: "linux",
-      updateAvailable: false,
-      updateDownloaded: false,
       version: "0.0.0-test",
     };
     window.bbDesktop = createBbDesktopApi(desktopInfo);
@@ -213,12 +208,7 @@ describe("PaneMaximizeButton", () => {
   it("hides the native desktop browser while the arrangement menu can cover it", () => {
     vi.useFakeTimers();
     const desktopInfo: BbDesktopInfo = {
-      lastCheckedAt: null,
-      latestVersion: null,
-      pendingVersion: null,
       platform: "macos",
-      updateAvailable: false,
-      updateDownloaded: false,
       version: "0.0.0-test",
     };
     window.bbDesktop = createBbDesktopApi(desktopInfo);

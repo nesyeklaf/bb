@@ -7,12 +7,7 @@ import type {
 } from "@bb/desktop-contract";
 
 const STORY_DESKTOP_INFO: BbDesktopInfo = {
-  lastCheckedAt: null,
-  latestVersion: null,
-  pendingVersion: null,
   platform: "macos",
-  updateAvailable: false,
-  updateDownloaded: false,
   version: "0.0.0-story",
 };
 
@@ -52,13 +47,9 @@ function createStoryDesktopApi(
   return {
     ...STORY_DESKTOP_INFO,
     browser: createStoryDesktopBrowserApi(browserState),
-    async checkForUpdates() {
-      return STORY_DESKTOP_INFO;
-    },
     async getInfo() {
       return STORY_DESKTOP_INFO;
     },
-    async installUpdate() {},
     onChange() {
       return () => {};
     },

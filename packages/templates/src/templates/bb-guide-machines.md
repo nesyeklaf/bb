@@ -51,8 +51,6 @@ does not prove reachability.
                                           environment cleanup failed; the provider's
                                           removal still runs
   bb machine provider-cli status <machine>
-  bb machine provider-cli install <machine> <provider-id>
-    --action <install|update>
 
 `bb machine show` includes `threadStorageRootPath` from the latest daemon
 session without waking the machine (null before the first session).
@@ -115,45 +113,7 @@ that bypasses the logger are appended to `logs/server-stdio.log` and
 `logs/host-daemon-stdio.log`; a file over 10 MB is renamed to `-stdio.1.log`
 when its service starts. Follow them with `tail -F`.
 
-Updates commands
-
-One consolidated view of bb and provider CLI updates across machines — the
-CLI counterpart of Settings → Updates.
-
-  bb updates [status]                     Show bb-app and provider CLI update status for
-                                          every persistent machine
-    --machine <id-or-name>                Limit to one machine (including a sandbox)
-    --json                                Print the aggregate as JSON
-  bb updates apply                        Run every available provider CLI install/update,
-                                          one at a time
-    --machine <id-or-name>                Limit to one machine
-    --json                                Print per-target results as JSON
-  bb updates app [status]                 Show whether bb can update itself, the available
-                                          version, and the last result
-    --json                                Print the status as JSON
-  bb updates app apply                    Download the update and restart bb into it
-    --yes                                 Interrupt running threads without asking
-    --no-wait                             Return once the update starts
-    --json                                Print the final status as JSON
-  bb updates app dismiss                  Mark the last update result as seen
-
-`bb updates app apply` also updates a server hosted by the desktop app, restarting
-that hosting app through its native updater. It never updates the desktop you
-are viewing from unless that desktop hosts this server.
-
-`bb updates apply` covers provider CLIs only. `bb updates app apply` updates
-bb itself when it was started from `npx bb-app` (or a global `bb-app`) without
-`--no-in-app-updates`: it installs the new version next to the running one and
-restarts into it. It does not roll back if the new version fails to start.
-Desktop users update through the desktop app's relaunch, and `bb-server` cannot
-update itself. Connected daemons follow the server version automatically.
-
 Targeting machines
-
-For source installs, `bb updates` shows the checkout commit and explains manual
-Git updates when no update shim is running. It does not compare that checkout
-with npm releases. Failed or unavailable release checks show “Latest unknown”;
-“Up to date” requires a successful check.
 
 Machine selectors accept either an exact machine ID or an unambiguous machine
 name. `--host` is an alias for `--machine`.

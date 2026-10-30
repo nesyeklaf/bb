@@ -224,46 +224,6 @@ describe("@bb/sdk", () => {
     ]);
   });
 
-  it("reads provider installation events through the response instance", async () => {
-    const events = [
-      {
-        type: "started",
-        provider: "codex",
-        command: "npm install --global @openai/codex",
-      },
-      {
-        type: "completed",
-        provider: "codex",
-        exitCode: 0,
-        signal: null,
-        success: true,
-      },
-    ];
-    const response = new Response(null, {
-      status: 200,
-      headers: { "content-type": "application/x-ndjson" },
-    });
-    Object.defineProperty(response, "text", {
-      value: async () =>
-        events.map((event) => JSON.stringify(event)).join("\n"),
-    });
-    const sdk = createBbSdk({
-      transport: createHttpTransport({
-        baseUrl: "http://bb.test",
-        fetch: async () => response,
-        runtime: "node",
-      }),
-    });
-
-    await expect(
-      sdk.hosts.installProviderCli({
-        hostId: "host_test",
-        provider: "codex",
-        actionKind: "install",
-      }),
-    ).resolves.toEqual(events);
-  });
-
   it("sends thread pane presentation actions through the typed transport", async () => {
     const queue = createFetchQueue([{ body: { delivered: 3 } }]);
     const sdk = createBbSdk({

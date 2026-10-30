@@ -40,14 +40,8 @@ function status(
     executableName: "codex",
     executablePath: "/usr/local/bin/codex",
     installed: true,
-    installSource: "npmGlobal",
     currentVersion: "0.146.0",
-    latestVersion: null,
     minimumSupportedVersion: "0.136.0",
-    npmPackageName: "@openai/codex",
-    npmGlobalPackageVersion: "0.146.0",
-    installAction: null,
-    needsUpdate: false,
     versionUnsupported: false,
     ...overrides,
   };
@@ -77,12 +71,6 @@ describe("createProviderInstallationGate", () => {
       installed: false,
       executablePath: null,
       currentVersion: null,
-      npmGlobalPackageVersion: null,
-      installAction: {
-        kind: "install",
-        label: "Install",
-        command: "npm i -g @openai/codex",
-      },
     });
     const tooOld = status({
       currentVersion: "0.135.0",
@@ -105,11 +93,8 @@ describe("createProviderInstallationGate", () => {
       executableName: "claude",
       executablePath: null,
       installed: false,
-      installSource: "notInstalled",
       currentVersion: null,
       minimumSupportedVersion: null,
-      npmPackageName: "@anthropic-ai/claude-code",
-      npmGlobalPackageVersion: null,
     });
     const probe = vi.fn(async () => notInstalled);
 

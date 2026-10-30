@@ -1805,7 +1805,6 @@ describe("migrate", () => {
         machineGitCredentialsEnabled: true,
         streamerMode: false,
         allowFastServiceTier: true,
-        telemetryEnabled: true,
         managedBranchPrefix: "bb/",
         idleProviderSessionTimeoutMinutes: 30,
         onboardingCompletedAt: "2026-08-01T00:00:00.000Z",

@@ -1076,21 +1076,19 @@ fs.writeFileSync(path.join(process.env.BB_DATA_DIR, "config.json"), JSON.stringi
     );
   });
 
-  it("falls back to npm only when the server artifact returns 404", () => {
+  it("fails without calling npm when the server provides no package", () => {
     const fixture = createFixture();
     writeServerInstallTools(fixture, 404);
     const result = runScript(BOOTSTRAP_ARGS, fixture, {
       BB_INSTALL_SKIP_SERVICE: "1",
     });
 
-    expect(result.status, result.stderr).toBe(0);
-    expect(readFileSync(join(fixture.dataDir, "npm.log"), "utf8")).toMatch(
-      /^install -g --allow-scripts=better-sqlite3,node-pty,@parcel\/watcher --prefix \/.*\/data\/npm bb-app\n$/u,
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain(
+      "The server does not provide its bb-app package",
     );
-    const daemonPid = Number(
-      readFileSync(join(fixture.dataDir, "install-daemon.pid"), "utf8"),
-    );
-    process.kill(daemonPid, "SIGTERM");
+    expect(existsSync(join(fixture.dataDir, "npm.log"))).toBe(false);
+    expect(existsSync(join(fixture.dataDir, "install-daemon.pid"))).toBe(false);
   });
 
   it("fails loudly when npm skipped the native add-on install scripts", () => {

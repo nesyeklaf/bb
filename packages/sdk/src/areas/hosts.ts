@@ -1,4 +1,3 @@
-import { hostProviderCliInstallEventSchema } from "@bb/server-contract";
 import type { Host, HostType } from "@bb/domain";
 import type {
   CreateHostJoinCodeResponse,
@@ -15,8 +14,6 @@ import type {
   HostPathsExistResponse,
   HostPickFolderRequest,
   HostPickFolderResponse,
-  HostProviderCliInstallEvent,
-  HostProviderCliInstallRequest,
   HostProviderCliStatusResponse,
   HostRetryUpdateResponse,
   DeleteOldServerCopyResponse,
@@ -76,10 +73,6 @@ export interface HostPickFolderArgs extends HostPickFolderRequest {
   signal?: AbortSignal;
 }
 
-export interface HostProviderCliInstallArgs extends HostProviderCliInstallRequest {
-  hostId: string;
-}
-
 export interface HostListArgs {
   includeCreating?: boolean;
   type?: HostType;
@@ -106,7 +99,6 @@ export type HostGetResult = Host & {
 export type HostEnrollmentCommandResult = HostEnrollmentCommandResponse;
 export type HostReconnectResult = HostReconnectResponse;
 export type HostCloneDefaultPathResult = HostCloneDefaultPathResponse;
-export type HostProviderCliInstallResult = HostProviderCliInstallEvent[];
 export type HostListResult = Host[];
 export type HostPathsExistResult = HostPathsExistResponse;
 export type HostPickFolderResult = HostPickFolderResponse;
@@ -136,9 +128,6 @@ export interface HostsArea {
   cloneDefaultPath(
     args: HostCloneDefaultPathArgs,
   ): Promise<HostCloneDefaultPathResult>;
-  installProviderCli(
-    args: HostProviderCliInstallArgs,
-  ): Promise<HostProviderCliInstallResult>;
   list(args?: HostListArgs): Promise<HostListResult>;
   experimental_listProviders(
     args?: MachineProviderListArgs,
@@ -265,24 +254,6 @@ export function createHostsArea(args: CreateSdkAreaArgs): HostsArea {
           ...signalRequestArgs(input.signal),
         ),
       );
-    },
-    async installProviderCli(input) {
-      const response = await transport.resolve(
-        transport.api.v1.hosts[":id"]["provider-clis"].install.$post({
-          param: { id: input.hostId },
-          json: {
-            provider: input.provider,
-            actionKind: input.actionKind,
-          },
-        }),
-      );
-      const text: string = await response.text();
-      return text
-        .split(/\r?\n/u)
-        .filter((line) => line.trim().length > 0)
-        .map((line) =>
-          hostProviderCliInstallEventSchema.parse(JSON.parse(line)),
-        );
     },
     async list(input) {
       return transport.readJson(

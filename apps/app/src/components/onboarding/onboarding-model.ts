@@ -1,4 +1,3 @@
-import type { ProviderCliStatus } from "@bb/host-daemon-contract";
 import type {
   HostDiscoveredRepo,
   ServerAccessStatus,
@@ -42,30 +41,20 @@ export type AgentSetupState =
       canSignIn: boolean;
     }
   | { status: "signingIn" }
-  | { status: "install"; canInstall: boolean }
-  | { status: "update"; detail: string | null; canInstall: boolean }
-  | { status: "installing" }
-  | { status: "installFailed"; message: string; canInstall: boolean }
+  | { status: "install" }
+  | { status: "update"; detail: string | null }
   | { status: "unknown"; message: string | null };
 
 interface ResolveAgentSetupStateArgs {
   health: SystemProviderState;
-  cliStatus: ProviderCliStatus | undefined;
-  installing: boolean;
-  installFailure: string | null;
   signingIn: boolean;
   signInFailed: boolean;
-  installInfoPending: boolean;
 }
 
 export function resolveAgentSetupState({
   health,
-  cliStatus,
-  installing,
-  installFailure,
   signingIn,
   signInFailed,
-  installInfoPending,
 }: ResolveAgentSetupStateArgs): AgentSetupState {
   if (health.status === "ready") {
     const detail = [health.accountEmail, health.planLabel]
@@ -73,27 +62,16 @@ export function resolveAgentSetupState({
       .join(" · ");
     return { status: "ready", detail: detail === "" ? null : detail };
   }
-  if (installing) return { status: "installing" };
-  const canInstall =
-    cliStatus?.installAction !== null && cliStatus?.installAction !== undefined;
-  if (installFailure !== null) {
-    return { status: "installFailed", message: installFailure, canInstall };
-  }
-  const awaitingInstallInfo = cliStatus === undefined && installInfoPending;
   switch (health.status) {
     case "not_installed":
-      return awaitingInstallInfo
-        ? { status: "checking" }
-        : { status: "install", canInstall };
+      return { status: "install" };
     case "unsupported_version":
-      if (awaitingInstallInfo) return { status: "checking" };
       return {
         status: "update",
         detail:
           health.minimumSupportedVersion === null
             ? health.statusMessage
             : `Needs version ${health.minimumSupportedVersion} or newer`,
-        canInstall,
       };
     case "unauthenticated":
     case "expired":

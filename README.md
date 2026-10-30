@@ -86,22 +86,6 @@ For install requirements, provider setup, configuration, and package-focused
 docs, start with
 [`packages/bb-app`](./packages/bb-app/README.md).
 
-### Telemetry
-
-Production runs (the desktop app, `npx bb-app`, and `pnpm start` checkouts) send
-anonymous usage telemetry (app starts, thread creation counts, user message
-counts, and plugin installs) to help us understand adoption. Each event carries
-the app version, how bb was installed (desktop, npm, or source checkout), and
-the OS release, CPU architecture, and Node version. Source checkouts report whether
-`origin` points to `github.com/get-bb/bb`, another repository, or is unavailable.
-Telemetry never includes Git commit hashes or remote URLs. Identification is a random per-install
-id stored in your data dir — no user, host, project, workspace, or message
-content is ever attached. Plugin install events name only public plugins
-(bundled plugins and `bb-community` marketplace entries); installs from a local
-path, a private git or npm source, or a third-party marketplace report no name. Development runs (`pnpm dev`, `pnpm start:worktree`) never send. Opt out any run with
-`BB_TELEMETRY=false`. See
-[`apps/server/src/services/system/telemetry.ts`](./apps/server/src/services/system/telemetry.ts).
-
 ## Development
 
 Use the development loop when working on bb itself:
@@ -129,7 +113,7 @@ This builds the same optimized frontend and runtime artifacts as `pnpm start`,
 then serves the app from the BB server on the checkout-specific dev server port.
 It keeps the normal checkout-specific dev data directory and host-daemon port.
 There is no Vite dev server or hot reload in this mode; rerun the command after
-source changes. As with `pnpm dev`, worktree starts do not send telemetry.
+source changes.
 
 For the Electron desktop shell, keep `pnpm dev` running and start the desktop
 package in a second terminal:

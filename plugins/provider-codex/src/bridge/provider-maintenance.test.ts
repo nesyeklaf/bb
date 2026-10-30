@@ -39,27 +39,6 @@ async function writeFakeCli(args: {
   );
 }
 
-function installationStatus() {
-  return {
-    executableName: "codex",
-    executablePath: "/usr/local/bin/codex",
-    installed: true,
-    installSource: "npmGlobal" as const,
-    currentVersion: "1.0.0",
-    latestVersion: "1.1.0",
-    minimumSupportedVersion: "0.136.0",
-    npmPackageName: "@openai/codex",
-    npmGlobalPackageVersion: "1.0.0",
-    installAction: {
-      kind: "update" as const,
-      label: "Update" as const,
-      command: "codex update",
-    },
-    needsUpdate: true,
-    versionUnsupported: false,
-  };
-}
-
 describe("Codex provider maintenance", () => {
   it("normalizes subscription windows and plan labels at the plugin boundary", () => {
     expect(
@@ -108,26 +87,6 @@ describe("Codex provider maintenance", () => {
     expect(
       __testing.minimumSupportedVersionForRequirement("thread_rewind"),
     ).toBe("0.143.0");
-  });
-
-  it("resolves a fresh typed update plan and rejects a stale action", () => {
-    expect(
-      __testing.buildProviderInstallationRun(installationStatus(), "update"),
-    ).toEqual({
-      available: true,
-      command: {
-        command: "codex",
-        args: ["update"],
-        displayCommand: "codex update",
-      },
-      verification: { kind: "version_at_least", version: "1.1.0" },
-    });
-    expect(
-      __testing.buildProviderInstallationRun(installationStatus(), "install"),
-    ).toEqual({
-      available: false,
-      message: "Codex install is no longer available on this host.",
-    });
   });
 });
 
@@ -213,14 +172,10 @@ describe("Codex credential health and usage", () => {
         touchPath: marker,
       });
 
-      const status = await getCodexProviderInstallationStatus(
-        requirement,
-        false,
-      );
+      const status = await getCodexProviderInstallationStatus(requirement);
 
       expect(status.installed).toBe(true);
       expect(status.versionUnsupported).toBe(unsupported);
-      expect(status.latestVersion).toBeNull();
       await expect(fs.stat(marker)).rejects.toMatchObject({ code: "ENOENT" });
     },
   );
@@ -235,8 +190,6 @@ describe("Codex credential health and usage", () => {
         planLabel: null,
         installedVersion: "0.150.0",
         minimumSupportedVersion: "0.136.0",
-        canInstall: true,
-        canUpdate: true,
         loginCommand: "codex login --device-auth",
         localLoginCommand: "codex login",
       },

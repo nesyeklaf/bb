@@ -1,6 +1,11 @@
 import { appendFileSync, mkdirSync, renameSync, statSync } from "node:fs";
 import { join } from "node:path";
-import type { DesktopAutoUpdateLogger } from "./desktop-auto-update.js";
+
+export interface DesktopLogger {
+  error(message: string): void;
+  info(message: string): void;
+  warn(message: string): void;
+}
 
 const MAX_LOG_BYTES = 10 * 1024 * 1024;
 const MAX_ARCHIVED_LOG_FILES = 4;
@@ -11,7 +16,7 @@ function isMissingFileError(error: unknown): boolean {
 
 export function createDesktopLogger(args: {
   logDir: string;
-}): DesktopAutoUpdateLogger {
+}): DesktopLogger {
   const filePath = join(args.logDir, "desktop.log");
   let logDirReady = false;
   let reportedWriteFailure = false;

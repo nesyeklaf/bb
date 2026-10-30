@@ -231,10 +231,6 @@ function agentSubline(state: AgentSetupState): string {
       return "Not installed";
     case "update":
       return state.detail ?? "Update needed";
-    case "installing":
-      return "Installing…";
-    case "installFailed":
-      return state.message;
     case "unknown":
       return state.message ?? "Couldn't check this agent";
   }
@@ -242,29 +238,18 @@ function agentSubline(state: AgentSetupState): string {
 
 interface AgentRowHandlers {
   onSignIn: (id: string) => void;
-  onInstall: (id: string) => void;
-  onViewInstallLog: (id: string) => void;
   onCancelSignIn: (id: string) => void;
 }
 
 function AgentRow({
   agent,
   onSignIn,
-  onInstall,
-  onViewInstallLog,
   onCancelSignIn,
 }: AgentRowHandlers & { agent: OnboardingAgent }) {
   const { state } = agent;
   return (
     <li className="px-3 py-3" data-agent-id={agent.id}>
-      <div
-        className={cn(
-          "items-center gap-3",
-          state.status === "installFailed"
-            ? "grid grid-cols-[1.5rem_minmax(0,1fr)] @min-[36rem]/onboarding:flex"
-            : "flex",
-        )}
-      >
+      <div className="flex items-center gap-3">
         <ProviderIcon
           providerKind="agent"
           provider={agent.provider}
@@ -277,16 +262,13 @@ function AgentRow({
           <span className="text-sm font-medium">{agent.name}</span>
           <ExpandableText
             expandLabel="Show details"
-            className={cn(
-              "text-xs text-muted-foreground",
-              state.status === "installFailed" && "text-destructive-text",
-            )}
+            className="text-xs text-muted-foreground"
           >
             {agentSubline(state)}
           </ExpandableText>
         </div>
         <div className="col-start-2 flex shrink-0 items-center justify-end gap-2">
-          {state.status === "checking" || state.status === "installing" ? (
+          {state.status === "checking" ? (
             <Icon
               name="Spinner"
               aria-hidden
@@ -302,32 +284,6 @@ function AgentRow({
           {state.status === "signIn" && state.canSignIn ? (
             <Button size="sm" onClick={() => onSignIn(agent.id)}>
               Sign in
-            </Button>
-          ) : null}
-          {state.status === "installFailed" ? (
-            <Button
-              size="sm"
-              variant="ghost"
-              onClick={() => onViewInstallLog(agent.id)}
-            >
-              View log
-            </Button>
-          ) : null}
-          {(state.status === "install" ||
-            state.status === "update" ||
-            state.status === "installFailed") &&
-          state.canInstall ? (
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={() => onInstall(agent.id)}
-            >
-              <Icon name="Download" aria-hidden />
-              {state.status === "installFailed"
-                ? "Retry"
-                : state.status === "update"
-                  ? "Update"
-                  : "Install"}
             </Button>
           ) : null}
           {state.status === "signingIn" ? (
@@ -903,7 +859,6 @@ interface DevicesStepProps {
   connectSetup: ReactNode;
   connectSetupOpen: boolean;
   otherMachineCount: number;
-  mobileLinks: { ios: string; android: string };
   onToggleConnectSetup: () => void;
   onCopyConnectUrl: (url: string) => void;
   onAddMachine: () => void;
@@ -914,7 +869,6 @@ export function DevicesStep({
   connectSetup,
   connectSetupOpen,
   otherMachineCount,
-  mobileLinks,
   onToggleConnectSetup,
   onCopyConnectUrl,
   onAddMachine,
@@ -963,25 +917,6 @@ export function DevicesStep({
           <Button size="sm" variant="outline" onClick={onAddMachine}>
             Add machine
           </Button>
-        }
-      />
-      <DeviceRow
-        icon="Smartphone"
-        title="Get the mobile app"
-        description="Get a push when a thread needs you."
-        action={
-          <span className="flex items-center gap-2">
-            <Button size="sm" variant="outline" asChild>
-              <a href={mobileLinks.ios} target="_blank" rel="noreferrer">
-                iOS
-              </a>
-            </Button>
-            <Button size="sm" variant="outline" asChild>
-              <a href={mobileLinks.android} target="_blank" rel="noreferrer">
-                Android
-              </a>
-            </Button>
-          </span>
         }
       />
     </ul>

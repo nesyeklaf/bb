@@ -18,7 +18,6 @@ import {
   THREAD_DELTA_NOTIFICATION_METHOD,
   initializeParamsSchema,
   modelListParamsSchema,
-  providerInstallationRunParamsSchema,
   providerInstallationStatusParamsSchema,
   providerMaintenanceParamsSchema,
   skillsConfigureParamsSchema,
@@ -103,7 +102,6 @@ import {
 } from "./app-server-connection.js";
 import {
   getCodexProviderHealth,
-  getCodexProviderInstallationRun,
   getCodexProviderInstallationStatus,
   getCodexProviderUsage,
 } from "./provider-maintenance.js";
@@ -127,10 +125,6 @@ const codexBridgeCommandSchema = z.discriminatedUnion("method", [
   z.object({
     method: z.literal("provider/installation/status"),
     params: providerInstallationStatusParamsSchema,
-  }),
-  z.object({
-    method: z.literal("provider/installation/run"),
-    params: providerInstallationRunParamsSchema,
   }),
   z.object({
     method: z.literal("thread/start"),
@@ -2608,16 +2602,7 @@ async function handleRequest(
     case "provider/installation/status":
       sendResult(
         request.id,
-        await getCodexProviderInstallationStatus(
-          request.params.requirement,
-          request.params.checkUpdates,
-        ),
-      );
-      break;
-    case "provider/installation/run":
-      sendResult(
-        request.id,
-        await getCodexProviderInstallationRun(request.params.action),
+        await getCodexProviderInstallationStatus(request.params.requirement),
       );
       break;
     case "thread/start":
