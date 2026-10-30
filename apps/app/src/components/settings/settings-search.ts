@@ -119,7 +119,7 @@ export const SETTINGS_SEARCH_INDEX: Record<
     ],
   },
   "ai-services": {
-    keywords: ["claude", "codex", "llm"],
+    keywords: ["claude", "llm"],
     settings: [
       {
         title: "Thread titles",
