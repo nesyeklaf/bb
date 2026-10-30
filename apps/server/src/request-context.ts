@@ -32,7 +32,7 @@ export function markTunnelIngressRequest(incoming: object): void {
   tunnelIngressRequests.add(incoming);
 }
 
-function isTunnelIngressContext(context: Context): boolean {
+export function isTunnelIngressContext(context: Context): boolean {
   const env: unknown = context.env;
   if (typeof env !== "object" || env === null || !("incoming" in env)) {
     return false;

@@ -1,4 +1,5 @@
 import type { TunnelIngressLease } from "../connect-next/tunnel-ingress.js";
+import type { RequestPeerSnapshot } from "../request-peers.js";
 import type { EnvironmentRemoval } from "@bb/domain";
 import type { MachineEnrollmentService } from "../machines/machine-services.js";
 import type { AiServiceRegistry } from "../ai/ai-service-registry.js";
@@ -168,6 +169,7 @@ export interface PluginServiceDeps {
     generation: string;
   }) => Promise<void>;
   openTunnelIngress?: (audience: string) => Promise<TunnelIngressLease>;
+  requestPeers?: (after: number) => RequestPeerSnapshot;
 }
 
 export interface PluginAgentToolContribution {

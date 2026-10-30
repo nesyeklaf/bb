@@ -28,6 +28,7 @@ import {
   createTunnelIngressManager,
   type TunnelIngressManager,
 } from "./services/connect-next/tunnel-ingress.js";
+import { createRequestPeerRecorder } from "./services/request-peers.js";
 import { createHash, randomUUID } from "node:crypto";
 import { readFile, stat } from "node:fs/promises";
 import { performance } from "node:perf_hooks";
@@ -484,6 +485,7 @@ export function createApp(
     app,
   });
   wss.options.perMessageDeflate = WEB_SOCKET_COMPRESSION;
+  const requestPeers = createRequestPeerRecorder();
   const tunnelIngressNow = options?.tunnelIngressNow ?? Date.now;
   const tunnelIngress = createTunnelIngressManager({
     app,
@@ -519,6 +521,7 @@ export function createApp(
   };
   const pendingServerMove = serverMoveOptions.pending;
 
+  app.use("*", requestPeers.middleware);
   app.use("*", serverTiming());
   app.use("*", async (context, next) => {
     const signal = context.req.raw.signal;
@@ -810,6 +813,7 @@ export function createApp(
       ),
     callPluginHost: (args) => callPluginHostRpc(deps, args),
     openTunnelIngress: (audience) => tunnelIngress.open(audience),
+    requestPeers: (after) => requestPeers.snapshot(after),
     disposePluginHost: (args) => disposePluginHostWorkers(deps, args),
     onSettingsChanged: (pluginId) => {
       deps.providerNativeRoots.invalidate(pluginId);

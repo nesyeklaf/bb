@@ -136,6 +136,7 @@ import type { ServerLogger } from "../../types.js";
 import type { PluginInteractionResult } from "../interactions/pending-interactions.js";
 import { appendPluginLogLine } from "./plugin-log.js";
 import type { TunnelIngressLease } from "../connect-next/tunnel-ingress.js";
+import type { RequestPeerSnapshot } from "../request-peers.js";
 import {
   readPluginSettingsValues,
   writePluginSettingsUpdate,
@@ -498,6 +499,7 @@ export function createPluginApi(options: {
   getAppUrl: () => string | null;
   getLoopbackBaseUrl: () => string | undefined;
   openTunnelIngress: (audience: string) => Promise<TunnelIngressLease>;
+  requestPeers: (after: number) => RequestPeerSnapshot;
   /**
    * This load's rpc caller token, attached to the plugin's
    * `bb.sdk.plugins.callRpc` requests so handlers see it as the caller.
@@ -577,6 +579,7 @@ export function createPluginApi(options: {
     getAppUrl,
     getLoopbackBaseUrl,
     openTunnelIngress,
+    requestPeers,
     rpcCaller,
     publishSignal,
     invalidateRpc: optionsInvalidate,
@@ -1099,6 +1102,19 @@ export function createPluginApi(options: {
       openTunnelIngresses.add(close);
       disposeHooks.push(close);
       return { baseUrl: lease.baseUrl, close };
+    },
+    internal_DO_NOT_USE_requestPeers(peerOptions) {
+      assertLive();
+      const after: unknown = peerOptions?.after;
+      if (
+        after !== undefined &&
+        (typeof after !== "number" || !Number.isFinite(after) || after < 0)
+      ) {
+        throw new Error(
+          "bb.server.internal_DO_NOT_USE_requestPeers needs a non-negative after",
+        );
+      }
+      return requestPeers(after ?? 0);
     },
   };
 

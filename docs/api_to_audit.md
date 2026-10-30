@@ -1219,6 +1219,30 @@ Decide whether `target` (share ports) belongs here or stays refused. Confirm
 the audience should stay free-form or become a typed server id, and whether a
 plugin may open audiences for servers other than its own.
 
+## `bb.server.internal_DO_NOT_USE_requestPeers`
+
+Internal to bb's own connection overview plugin (`bb--connection-overview`): the `internal_DO_NOT_USE_` prefix marks members that are not part of the plugin API, are not offered to third-party plugins, and may change or disappear in any release.
+
+`internal_DO_NOT_USE_requestPeers({ after? })` returns
+`{ generation, capacity, oldestSeq, latestSeq, peers }` from a ring of 8192
+entries that the first middleware of the server app fills, before the host
+check, so rejected requests and WebSocket upgrades (which `@hono/node-ws`
+dispatches through the same app) are recorded too. Each peer holds `seq`,
+`at`, the socket's remote `address` and `port`, `localPort`, `method`,
+`status`, `websocket` and `tunnelIngress` (the request came through
+`internal_DO_NOT_USE_openTunnelIngress`). It never holds a URL, query, header,
+cookie, body or token, and no request header changes any field. `generation`
+changes when the server restarts; `oldestSeq` above `after + 1` means unread
+entries were overwritten. Recording observes only and changes no access
+decision.
+
+Core callers: none. The `bb--connection-overview` plugin is the only caller.
+
+**Audit before stabilizing.** Decide whether core should show incoming peers
+itself, whether the ring size should be configurable, and whether a typed
+per-request access decision (for example the host check result) belongs in
+the entry.
+
 ## `bb.hosts.internal_DO_NOT_USE_setNextTunnels`, `internal_DO_NOT_USE_nextTunnelStatuses`, `internal_DO_NOT_USE_onNextTunnelStatusChange`
 
 Internal to bb's own connect plugins (`connect`, `bb--connect-next`): the `internal_DO_NOT_USE_` prefix marks members that are not part of the plugin API, are not offered to third-party plugins, and may change or disappear in any release.

@@ -23,6 +23,7 @@ import { createHostnameBook } from "./hostnames.js";
 import { normalizeIp } from "./ip.js";
 import { nodeProcFs } from "./proc-fs.js";
 import { startSamplingLoop } from "./sampling-loop.js";
+import { createRequestPeerCollector } from "./request-peers.js";
 import { createStore } from "./store.js";
 
 export const EXTRA_ALLOWED_HOSTS = "extraAllowedHosts";
@@ -112,6 +113,13 @@ export default function connectionOverview(bb: BbPluginApi) {
       return parsed.success ? (parsed.data satisfies Cursor) : null;
     },
     saveCursor: (sourceId, cursor) => store.saveCursor(sourceId, cursor),
+  });
+
+  const requestPeers = createRequestPeerCollector({
+    store,
+    read: (after) => bb.server.internal_DO_NOT_USE_requestPeers({ after }),
+    bindSubnets: () => [],
+    serverPid: process.pid,
   });
 
   async function resolveListedHosts() {
@@ -217,6 +225,13 @@ export default function connectionOverview(bb: BbPluginApi) {
         } catch (error) {
           bb.log.warn(
             `connection overview: host list failed: ${String(error)}`,
+          );
+        }
+        try {
+          requestPeers.pull();
+        } catch (error) {
+          bb.log.warn(
+            `connection overview: request peers failed: ${String(error)}`,
           );
         }
         await Promise.all(drivers.map((driver) => collector.pull(driver)));

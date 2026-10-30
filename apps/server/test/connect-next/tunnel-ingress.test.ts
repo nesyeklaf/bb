@@ -730,6 +730,30 @@ describe("bb connect next tunnel ingress", () => {
     expect((await gated({ method: "GET", path: "/health" })).status).toBe(200);
   });
 
+  it("records a verified request as a tunnel ingress peer", async () => {
+    const peers = requireApi(server).server;
+    const before = peers.internal_DO_NOT_USE_requestPeers().latestSeq;
+    expect(
+      (
+        await gated({
+          method: "GET",
+          path: "/health",
+          headers: { "x-forwarded-for": "10.0.0.5" },
+        })
+      ).status,
+    ).toBe(200);
+    const recorded = peers.internal_DO_NOT_USE_requestPeers({
+      after: before,
+    }).peers;
+    expect(recorded).toHaveLength(1);
+    expect(recorded[0]).toMatchObject({
+      address: "127.0.0.1",
+      method: "GET",
+      status: 200,
+      tunnelIngress: true,
+    });
+  });
+
   it("shares a listener per audience and frees the port when the last handle closes", async () => {
     const api = requireApi(server);
     const first = await api.server.internal_DO_NOT_USE_openTunnelIngress({

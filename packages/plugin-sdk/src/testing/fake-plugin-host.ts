@@ -85,6 +85,7 @@ import type {
   PluginSharedPortTunnelIdentity,
   InternalDoNotUsePluginHostNextTunnelStatus,
   InternalDoNotUsePluginNextTunnelConfig,
+  InternalDoNotUsePluginRequestPeer,
   PluginInteractionRequest,
   PluginInteractionResult,
   PluginKvStorage,
@@ -360,6 +361,10 @@ export interface FakePluginInspectionState {
   readonly registrations: FakePluginRegistrations;
   /** Every `bb.server.internal_DO_NOT_USE_openTunnelIngress` handle, in order. */
   readonly internal_DO_NOT_USE_tunnelIngresses: readonly InternalDoNotUseFakeTunnelIngress[];
+  /** Append requests that `bb.server.internal_DO_NOT_USE_requestPeers` returns; seqs are assigned in order. */
+  internal_DO_NOT_USE_addRequestPeers(
+    peers: readonly Omit<InternalDoNotUsePluginRequestPeer, "seq">[],
+  ): void;
   readonly sharedPortDeclarations: Array<{
     hostId: string;
     ports: number[];
@@ -675,6 +680,8 @@ interface FakePluginPersistentState {
 }
 
 const FAKE_TUNNEL_INGRESS_FIRST_PORT = 41_000;
+const FAKE_REQUEST_PEER_CAPACITY = 8192;
+const FAKE_REQUEST_PEER_GENERATION = "fake-request-peers";
 
 const fakeHostDisposers = new WeakMap<
   FakePluginHarness,
@@ -1210,7 +1217,22 @@ function createFakePluginHostInternal(
       disposeHooks.push(close);
       return { baseUrl: entry.baseUrl, close };
     },
+    internal_DO_NOT_USE_requestPeers(peerOptions) {
+      assertLive();
+      const after = peerOptions?.after ?? 0;
+      const latestSeq = requestPeers.at(-1)?.seq ?? 0;
+      return {
+        generation: FAKE_REQUEST_PEER_GENERATION,
+        capacity: FAKE_REQUEST_PEER_CAPACITY,
+        oldestSeq: requestPeers[0]?.seq ?? 1,
+        latestSeq,
+        peers: requestPeers
+          .filter((peer) => peer.seq > after)
+          .map((peer) => ({ ...peer })),
+      };
+    },
   };
+  const requestPeers: InternalDoNotUsePluginRequestPeer[] = [];
   const tunnelIngresses: Array<{
     audience: string;
     baseUrl: string;
@@ -1740,6 +1762,16 @@ function createFakePluginHostInternal(
       return requestedDrains;
     },
     internal_DO_NOT_USE_tunnelIngresses: tunnelIngresses,
+    internal_DO_NOT_USE_addRequestPeers(peers) {
+      for (const peer of peers) {
+        requestPeers.push({
+          ...peer,
+          seq: (requestPeers.at(-1)?.seq ?? 0) + 1,
+        });
+        if (requestPeers.length > FAKE_REQUEST_PEER_CAPACITY)
+          requestPeers.shift();
+      }
+    },
     sharedPortDeclarations,
     get internal_DO_NOT_USE_nextTunnelConfig() {
       return nextTunnelConfig;

@@ -14,9 +14,11 @@ bb connections list --red --since 30m --json
 bb connections incoming --since 24h
 ```
 
+`bb connections incoming` lists two kinds of incoming rows: sockets accepted by the server and daemon trees (source `server` or the host), and every HTTP request and WebSocket upgrade the server app received, rejected ones included (source `server-http`, one count per request). For `server-http` rows only the socket peer address decides the state; no request header (`Tailscale-User-*`, `X-Forwarded-For`, `Forwarded`, `X-Real-IP`, `Host`) changes it. A request that came through the bb connect next tunnel ingress is `red` (`tunnel ingress`).
+
 `--since` takes a duration (`30m`, `24h`, `7d`) or an ISO time.
 
-States: `allowed` (local network, system resolver, or a listed host bound to the socket), `inferred` (a provider CLI or git socket whose IP only matches a fresh resolution of a listed host), `yellow` (shared by listed and unlisted names, or a stale resolution), `red` (anything else), `unverifiable` (incoming over loopback: Tailscale Serve and local processes look the same), `undetermined` (direction unknown).
+States: `allowed` (local network, system resolver, or a listed host bound to the socket), `inferred` (a provider CLI or git socket whose IP only matches a fresh resolution of a listed host), `yellow` (shared by listed and unlisted names, or a stale resolution), `red` (anything else), `unverifiable` (incoming over loopback: Tailscale Serve, the old connect tunnel and local processes look the same), `undetermined` (direction unknown).
 
 An empty red list proves nothing on its own. Check that the measurement is alive first: start a short fetch to an unlisted host from a bb child process, see it red with `bb connections list --red --since <control start>`, then evaluate a later window that starts after the control ended with `bb connections status --since <evaluation start>`, and confirm at least one provider row in it.
 

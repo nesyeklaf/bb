@@ -54,8 +54,28 @@ export function directionOf(
   return "out";
 }
 
-function isLocal(ip: string, context: ClassifyContext): boolean {
+function isLocal(
+  ip: string,
+  context: Pick<ClassifyContext, "bindSubnets">,
+): boolean {
   return inAny(LOCAL_NETWORKS, ip) || inAny(context.bindSubnets, ip);
+}
+
+export function classifyRequestPeer(
+  peer: { address: string | null; tunnelIngress: boolean },
+  context: Pick<ClassifyContext, "bindSubnets">,
+): Classification {
+  const direction = "in";
+  if (peer.tunnelIngress)
+    return { direction, state: "red", reason: "tunnel ingress" };
+  if (peer.address === null)
+    return { direction, state: "red", reason: "no socket peer" };
+  const ip = normalizeIp(peer.address);
+  if (inAny(LOOPBACK, ip))
+    return { direction, state: "unverifiable", reason: "loopback origin" };
+  if (isLocal(ip, context))
+    return { direction, state: "allowed", reason: "local network" };
+  return { direction, state: "red", reason: "external peer" };
 }
 
 export function classify(

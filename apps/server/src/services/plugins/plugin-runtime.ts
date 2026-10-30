@@ -1913,6 +1913,12 @@ export function createPluginRuntime(context: PluginRuntimeContext) {
         }
         return deps.openTunnelIngress(audience);
       },
+      requestPeers: (after) => {
+        if (!deps.requestPeers) {
+          throw new Error("request peers are unavailable in this plugin host");
+        }
+        return deps.requestPeers(after);
+      },
       registerAiService: (declaration) =>
         deps.aiServices.register({
           ...declaration,

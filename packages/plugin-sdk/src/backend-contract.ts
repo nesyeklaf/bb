@@ -1953,6 +1953,55 @@ export interface PluginServerApi {
   internal_DO_NOT_USE_openTunnelIngress(
     options: InternalDoNotUsePluginTunnelIngressOptions,
   ): Promise<InternalDoNotUsePluginTunnelIngress>;
+
+  /**
+   * Internal to bb's own connection-overview plugin. Do not use: it is not
+   * part of the plugin API and may change or disappear in any release.
+   *
+   * The newest requests this server accepted, from a bounded ring that every
+   * HTTP request and WebSocket upgrade enters before the host check. Each
+   * entry holds the socket peer, method, status and time only. Pass
+   * `after` (a `seq`) to read only newer entries; `oldestSeq` above
+   * `after + 1` means entries were overwritten before they were read.
+   */
+  internal_DO_NOT_USE_requestPeers(options?: {
+    after?: number;
+  }): InternalDoNotUsePluginRequestPeers;
+}
+
+/** One request in `bb.server.internal_DO_NOT_USE_requestPeers`. */
+export interface InternalDoNotUsePluginRequestPeer {
+  /** Position in the ring, increasing by one per request. */
+  readonly seq: number;
+  /** Epoch ms when the request entered the server. */
+  readonly at: number;
+  /** Socket remote address, or null when the request had no socket. */
+  readonly address: string | null;
+  /** Socket remote port, or null when the request had no socket. */
+  readonly port: number | null;
+  /** Socket local port, or null when the request had no socket. */
+  readonly localPort: number | null;
+  readonly method: string;
+  /** Response status the app produced; 500 when the chain threw. */
+  readonly status: number;
+  /** True for a WebSocket upgrade. */
+  readonly websocket: boolean;
+  /** True when the request arrived through the bb connect tunnel ingress. */
+  readonly tunnelIngress: boolean;
+}
+
+/** Result of `bb.server.internal_DO_NOT_USE_requestPeers`. */
+export interface InternalDoNotUsePluginRequestPeers {
+  /** Changes when the server restarts; seqs restart with it. */
+  readonly generation: string;
+  /** How many entries the ring holds. */
+  readonly capacity: number;
+  /** Seq of the oldest entry still in the ring. */
+  readonly oldestSeq: number;
+  /** Seq of the newest entry, 0 before the first request. */
+  readonly latestSeq: number;
+  /** Entries newer than `after`, oldest first. */
+  readonly peers: readonly InternalDoNotUsePluginRequestPeer[];
 }
 
 /** Options for `bb.server.internal_DO_NOT_USE_openTunnelIngress`. */
