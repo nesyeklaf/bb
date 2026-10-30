@@ -787,6 +787,33 @@ describe("ThreadTableOfContents", () => {
     expect(trigger.getAttribute("aria-expanded")).toBe("false");
   });
 
+  it("closes when a pointer goes down outside the rail, even while the pointer still counts as inside", () => {
+    render(<TocHost timelineRows={[userConversationRow(1), userConversationRow(2), userConversationRow(3)]} />);
+    const toc = document.querySelector<HTMLElement>("[data-thread-toc]");
+    if (!toc) throw new Error("Expected the thread table of contents.");
+    const trigger = screen.getByRole("button", { name: "Thread table of contents" });
+    fireEvent.mouseEnter(toc);
+    act(() => trigger.focus());
+    expect(trigger.getAttribute("aria-expanded")).toBe("true");
+    fireEvent.pointerDown(document.body);
+    expect(trigger.getAttribute("aria-expanded")).toBe("false");
+  });
+
+  it("scrolls the message list when the wheel turns over the popover padding", () => {
+    render(<TocHost timelineRows={Array.from({ length: 30 }, (_, index) => userConversationRow(index + 1))} />);
+    const toc = document.querySelector<HTMLElement>("[data-thread-toc]");
+    if (!toc) throw new Error("Expected the thread table of contents.");
+    fireEvent.mouseEnter(toc);
+    const row = screen.getByRole("button", { name: "Loaded after client-side navigation 1" });
+    const scroller = row.closest<HTMLElement>(".overflow-y-auto");
+    if (!scroller) throw new Error("Expected the list scroller.");
+    scroller.scrollTop = 0;
+    const panel = document.querySelector<HTMLElement>("[id^=thread-toc-panel-]");
+    if (!panel) throw new Error("Expected the panel.");
+    fireEvent.wheel(panel, { deltaY: 120 });
+    expect(scroller.scrollTop).toBe(120);
+  });
+
   it("tracks overflow when an initially closed panel opens and reopens", () => {
     render(
       <TocHost

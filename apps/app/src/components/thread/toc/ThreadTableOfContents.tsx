@@ -67,7 +67,7 @@ const TOC_MAX_RAIL_TICKS = 20;
 const TOC_ACTIVE_UPDATE_IDLE_MS = 120;
 const TOC_JUMP_MAX_PAGE_LOADS = 1000;
 const TOC_JUMP_RENDER_FRAMES = 6;
-const TOC_DRAG_THRESHOLD_PX = 4;
+const TOC_DRAG_THRESHOLD_PX = 8;
 const TOC_BAND_LANE_PITCH_PX = 3;
 function toPreviewLabel(text: string): string {
   return text.replace(/\s+/g, " ").trim();
@@ -609,6 +609,7 @@ export function ThreadTableOfContents({
     observers: extensionObservers,
   } = useThreadTocExtensions(extensionInput);
   const panelOpen = open || railSelection !== null;
+  const extScrollRef = useRef<HTMLDivElement | null>(null);
   const pickedBandRef = useRef<(typeof extensionBands)[number] | null>(null);
   const defaultExtensionTab = extensionTabs.find(
     (entry) => entry.slot.tab?.experimental_default === true,
@@ -795,6 +796,29 @@ export function ThreadTableOfContents({
   }, [panelOpen, clearHalfTimer, extensionInput]);
 
   useEffect(() => {
+    if (!panelOpen || !rootElement) return;
+    const onPointerDown = (event: PointerEvent) => {
+      const target = event.target;
+      if (!(target instanceof Element) || rootElement.contains(target)) return;
+      if (
+        target.closest(
+          '[role="dialog"],[role="menu"],[role="listbox"],[data-radix-popper-content-wrapper]',
+        )
+      ) {
+        return;
+      }
+      setOpen(false);
+      setRailSelection(null);
+      const focused = document.activeElement;
+      if (focused instanceof HTMLElement && rootElement.contains(focused)) {
+        focused.blur();
+      }
+    };
+    document.addEventListener("pointerdown", onPointerDown, true);
+    return () => document.removeEventListener("pointerdown", onPointerDown, true);
+  }, [panelOpen, rootElement]);
+
+  useEffect(() => {
     if (railSelection === null) return;
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape") setRailSelection(null);
@@ -948,7 +972,10 @@ export function ThreadTableOfContents({
       event.clientX,
       event.currentTarget.getBoundingClientRect(),
     );
-    if (half === "topics") pickBandAtPointer(event.clientY);
+    if (half === "topics") {
+      if (event.target instanceof Element && event.target.closest("[data-toc-band]")) return;
+      pickBandAtPointer(event.clientY);
+    }
     else setPickedBand(null);
   };
   const syncRailHalf = (event: ReactPointerEvent<HTMLElement>) => {
@@ -984,6 +1011,12 @@ export function ThreadTableOfContents({
       onKeyDownCapture={() => {
         pointerFocusRef.current = false;
       }}
+      onWheel={(event) => {
+        const scroller = extensionTab ? extScrollRef.current : scrollRef.current;
+        if (!scroller || scroller.contains(event.target as Node)) return;
+        scroller.scrollTop +=
+          event.deltaMode === 1 ? event.deltaY * 16 : event.deltaY;
+      }}
       onMouseEnter={() => setOpen(true)}
       onMouseLeave={(event) => {
         if (
@@ -996,7 +1029,10 @@ export function ThreadTableOfContents({
       }}
       onFocusCapture={() => setOpen(true)}
       onBlurCapture={(event) => {
-        if (!event.currentTarget.contains(event.relatedTarget as Node)) {
+        if (
+          !(event.relatedTarget instanceof Node) ||
+          !event.currentTarget.contains(event.relatedTarget)
+        ) {
           setOpen(false);
         }
       }}
@@ -1123,7 +1159,12 @@ export function ThreadTableOfContents({
                     onPointerEnter={() => setPickedBand(entry)}
                     onPointerLeave={(event) => {
                       const rail = event.currentTarget.closest("button");
-                      if (rail?.contains(event.relatedTarget as Node | null)) return;
+                      if (
+                        event.relatedTarget instanceof Node &&
+                        rail?.contains(event.relatedTarget)
+                      ) {
+                        return;
+                      }
                       setPickedBand(null);
                     }}
                     onPointerDown={(event) => event.stopPropagation()}
@@ -1187,6 +1228,7 @@ export function ThreadTableOfContents({
               {extensionTab ? (
                 <div
                   key={extensionTab.key}
+                  ref={extScrollRef}
                   className="max-h-64 overflow-y-auto overflow-x-hidden motion-safe:animate-in motion-safe:fade-in motion-safe:duration-150"
                 >
                   <ThreadTocTabMount
