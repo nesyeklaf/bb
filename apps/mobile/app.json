@@ -24,8 +24,7 @@
         "NSAppTransportSecurity": {
           "NSAllowsLocalNetworking": true
         }
-      },
-      "associatedDomains": ["applinks:getbb.app", "applinks:*.getbb.app"]
+      }
     },
     "android": {
       "package": "app.getbb.mobile",
@@ -36,31 +35,7 @@
         "backgroundImage": "./assets/android-icon-background.png",
         "monochromeImage": "./assets/android-icon-monochrome.png"
       },
-      "predictiveBackGestureEnabled": false,
-      "intentFilters": [
-        {
-          "action": "VIEW",
-          "autoVerify": true,
-          "data": [
-            {
-              "scheme": "https",
-              "host": "*.getbb.app",
-              "pathPrefix": "/threads/"
-            },
-            {
-              "scheme": "https",
-              "host": "*.getbb.app",
-              "pathPrefix": "/projects/"
-            },
-            {
-              "scheme": "https",
-              "host": "*.getbb.app",
-              "pathPrefix": "/settings/"
-            }
-          ],
-          "category": ["BROWSABLE", "DEFAULT"]
-        }
-      ]
+      "predictiveBackGestureEnabled": false
     },
     "web": {
       "favicon": "./assets/favicon.png"

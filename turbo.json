@@ -824,11 +824,6 @@
         "topo"
       ]
     },
-    "@bb/integration-tests#e2e:mobile-connect-stub": {
-      "cache": false,
-      "persistent": true,
-      "passThroughEnv": ["*"]
-    },
     "test:integration": {
       "dependsOn": ["//#ensure-native-modules", "topo"],
       "inputs": ["$TURBO_DEFAULT$", "$TURBO_ROOT$/vitest*.ts"],

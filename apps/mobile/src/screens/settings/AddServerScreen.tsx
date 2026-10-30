@@ -8,10 +8,9 @@ import {
   validateDirectServerUrl,
 } from "@/lib/profiles";
 import { describeError } from "@/lib/describe-error";
-import { Button, GroupedRow, Input, Text, toast } from "@/ui";
-import { connectEnrollHref, rawPathHref } from "../shell/hrefs";
+import { Button, Input, Text, toast } from "@/ui";
+import { rawPathHref } from "../shell/hrefs";
 import { GroupedScreen } from "./GroupedScreen";
-import { useBadgeColors } from "./settings-badges";
 import { SettingsSection } from "./SettingsRows";
 
 type SubmitState =
@@ -34,7 +33,6 @@ const URL_HELP =
 export function AddServerScreen() {
   const router = useRouter();
   const params = useLocalSearchParams<{ serverUrl?: string; next?: string }>();
-  const colors = useBadgeColors();
   const { profiles, addProfile, setActiveProfile } = useProfiles();
   const [url, setUrl] = useState(params.serverUrl ?? "");
   const [label, setLabel] = useState("");
@@ -91,17 +89,6 @@ export function AddServerScreen() {
         options={{ title: firstRun ? "Connect to a bb server" : "Add server" }}
       />
       <GroupedScreen testID="add-server-screen">
-        <SettingsSection footnote="Pair through getbb.app from anywhere: scan or type a pairing code from bb Settings → Mobile.">
-          <GroupedRow
-            title="Connect with bb connect"
-            badge={{ icon: "Globe", symbol: "globe", color: colors.blue }}
-            trailing="chevron"
-            onPress={() => router.push(connectEnrollHref())}
-            disabled={busy}
-            testID="add-server-connect"
-          />
-        </SettingsSection>
-
         <SettingsSection
           title="Server URL"
           footnote={

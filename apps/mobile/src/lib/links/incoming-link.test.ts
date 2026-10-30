@@ -6,7 +6,7 @@ import {
   parseIncomingLink,
 } from "./incoming-link";
 
-const sawyer = { id: "p1", serverUrl: "https://sawyer.getbb.app" };
+const sawyer = { id: "p1", serverUrl: "https://sawyer.example.test" };
 const lan = { id: "p2", serverUrl: "http://192.168.1.20:3000" };
 const prefixed = { id: "p3", serverUrl: "https://home.example.com/bb" };
 
@@ -29,10 +29,10 @@ describe("parseIncomingLink", () => {
 
   it("parses web links into origin + path + search", () => {
     expect(
-      parseIncomingLink("https://sawyer.getbb.app/threads/thr_1/?view=full"),
+      parseIncomingLink("https://sawyer.example.test/threads/thr_1/?view=full"),
     ).toEqual({
       kind: "web",
-      origin: "https://sawyer.getbb.app",
+      origin: "https://sawyer.example.test",
       pathname: "/threads/thr_1",
       search: "?view=full",
     });
@@ -53,11 +53,18 @@ describe("matchProfileForWebLink", () => {
   it("matches by origin, ignoring scheme/port differences", () => {
     const profiles = [sawyer, lan];
     expect(
-      matchProfileForWebLink(profiles, "https://sawyer.getbb.app", "/threads/x")
-        ?.profile,
+      matchProfileForWebLink(
+        profiles,
+        "https://sawyer.example.test",
+        "/threads/x",
+      )?.profile,
     ).toBe(sawyer);
     expect(
-      matchProfileForWebLink(profiles, "http://sawyer.getbb.app", "/threads/x"),
+      matchProfileForWebLink(
+        profiles,
+        "http://sawyer.example.test",
+        "/threads/x",
+      ),
     ).toBeNull();
     expect(
       matchProfileForWebLink(profiles, "http://192.168.1.20:3000", "/")
@@ -100,15 +107,18 @@ describe("isDeveloperRoutePath", () => {
 describe("addServerPathForLink", () => {
   it("prefills the add-server screen and remembers where to go next", () => {
     expect(
-      addServerPathForLink("https://bee.getbb.app", "/webview?path=%2Fthreads"),
+      addServerPathForLink(
+        "https://bee.example.test",
+        "/webview?path=%2Fthreads",
+      ),
     ).toBe(
-      "/settings/servers/add?serverUrl=https%3A%2F%2Fbee.getbb.app&next=%2Fwebview%3Fpath%3D%252Fthreads",
+      "/settings/servers/add?serverUrl=https%3A%2F%2Fbee.example.test&next=%2Fwebview%3Fpath%3D%252Fthreads",
     );
   });
 
   it("omits a follow-up path that is just the root", () => {
-    expect(addServerPathForLink("https://bee.getbb.app", "/")).toBe(
-      "/settings/servers/add?serverUrl=https%3A%2F%2Fbee.getbb.app",
+    expect(addServerPathForLink("https://bee.example.test", "/")).toBe(
+      "/settings/servers/add?serverUrl=https%3A%2F%2Fbee.example.test",
     );
   });
 });

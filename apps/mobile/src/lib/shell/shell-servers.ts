@@ -9,7 +9,7 @@ export function bridgeServersForProfiles(
     id: profile.id,
     name: profile.label,
     origin: new URL(profile.serverUrl).origin,
-    kind: profile.mode === "connect" ? "account" : "custom",
+    kind: "custom",
     active: profile.id === activeProfileId,
   }));
 }

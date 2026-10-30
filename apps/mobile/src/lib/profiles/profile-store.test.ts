@@ -21,12 +21,10 @@ const direct = {
   serverUrl: "http://127.0.0.1:20304",
   label: "Simulator",
 };
-const connect = {
-  mode: "connect" as const,
-  serverUrl: "https://bee.getbb.app",
+const remote = {
+  mode: "direct" as const,
+  serverUrl: "https://bee.example.test",
   label: "bee",
-  handle: "bee",
-  credential: "bbcm_secret",
 };
 
 describe("profile store", () => {
@@ -34,7 +32,7 @@ describe("profile store", () => {
     const { store, storage } = makeStore();
     await store.load();
     const a = await store.addProfile(direct);
-    const b = await store.addProfile(connect);
+    const b = await store.addProfile(remote);
 
     expect(store.getSnapshot()).toMatchObject({
       status: "ready",
@@ -48,7 +46,7 @@ describe("profile store", () => {
       },
     );
     expect(JSON.parse(storage.entries.get(profileStorageKey(b.id))!)).toEqual({
-      ...connect,
+      ...remote,
       id: b.id,
       createdAt: 1_700_000_000_000,
     });
@@ -57,7 +55,7 @@ describe("profile store", () => {
   it("reloads from storage in a fresh store", async () => {
     const { store, storage } = makeStore();
     const a = await store.addProfile(direct);
-    const b = await store.addProfile(connect);
+    const b = await store.addProfile(remote);
     await store.setActiveProfile(b.id);
 
     const { store: reloaded } = makeStore(storage);
@@ -70,7 +68,7 @@ describe("profile store", () => {
   it("removeProfile deletes the key, heals the active id, and notifies listeners", async () => {
     const { store, storage } = makeStore();
     const a = await store.addProfile(direct);
-    const b = await store.addProfile(connect);
+    const b = await store.addProfile(remote);
     let notified = 0;
     store.subscribe(() => notified++);
 
@@ -90,23 +88,18 @@ describe("profile store", () => {
     );
   });
 
-  it("updateProfile validates the result and keeps mode-specific fields honest", async () => {
+  it("updateProfile validates the result", async () => {
     const { store } = makeStore();
     const a = await store.addProfile(direct);
-    const c = await store.addProfile(connect);
 
     const renamed = await store.updateProfile(a.id, { label: "Mac" });
     expect(renamed).toEqual({ ...a, label: "Mac" });
-    await expect(
-      store.updateProfile(a.id, { credential: "bbcm_x" }),
-    ).rejects.toThrow(/Direct profiles/);
     await expect(store.updateProfile(a.id, { label: "" })).rejects.toThrow();
-
-    const rotated = await store.updateProfile(c.id, {
-      credential: "bbcm_new",
+    const moved = await store.updateProfile(a.id, {
+      serverUrl: "http://10.0.0.5:38886",
       label: undefined,
     });
-    expect(rotated).toEqual({ ...c, credential: "bbcm_new" });
+    expect(moved).toEqual({ ...renamed, serverUrl: "http://10.0.0.5:38886" });
     await expect(store.updateProfile("nope", { label: "x" })).rejects.toThrow(
       /Unknown/,
     );
@@ -115,7 +108,7 @@ describe("profile store", () => {
   it("setActiveProfile rejects unknown ids and persists the choice", async () => {
     const { store, storage } = makeStore();
     const a = await store.addProfile(direct);
-    const b = await store.addProfile(connect);
+    const b = await store.addProfile(remote);
     await expect(store.setActiveProfile("ghost")).rejects.toThrow(/Unknown/);
     await store.setActiveProfile(b.id);
     expect(store.getSnapshot().activeProfileId).toBe(b.id);
@@ -129,10 +122,10 @@ describe("profile store", () => {
     );
   });
 
-  it("skips corrupt or missing profile records on load and heals the index", async () => {
+  it("skips corrupt, missing or retired bb connect profile records on load and heals the index", async () => {
     const storage = createMemorySecureStorage({
       [PROFILE_INDEX_STORAGE_KEY]: JSON.stringify({
-        ids: ["good", "missing", "corrupt"],
+        ids: ["good", "missing", "corrupt", "legacy-connect"],
         activeProfileId: "missing",
       }),
       [profileStorageKey("good")]: JSON.stringify({
@@ -141,6 +134,15 @@ describe("profile store", () => {
         createdAt: 1,
       }),
       [profileStorageKey("corrupt")]: "{not json",
+      [profileStorageKey("legacy-connect")]: JSON.stringify({
+        id: "legacy-connect",
+        mode: "connect",
+        serverUrl: "https://bee.example.test",
+        label: "bee",
+        handle: "bee",
+        credential: "bbcm_secret",
+        createdAt: 1,
+      }),
     });
     const { store } = makeStore(storage);
     const state = await store.load();
@@ -158,7 +160,10 @@ describe("profile store", () => {
   it("refuses profiles that would exceed the SecureStore value limit", async () => {
     const { store } = makeStore();
     await expect(
-      store.addProfile({ ...connect, credential: "x".repeat(2100) }),
+      store.addProfile({
+        ...remote,
+        serverUrl: `https://bee.example.test/${"x".repeat(2100)}`,
+      }),
     ).rejects.toThrow(/too large/);
     expect(store.listProfiles()).toEqual([]);
   });
@@ -167,7 +172,7 @@ describe("profile store", () => {
     const { store, storage } = makeStore();
     const [a, b, c] = await Promise.all([
       store.addProfile(direct),
-      store.addProfile(connect),
+      store.addProfile(remote),
       store.addProfile({ ...direct, label: "LAN" }),
     ]);
     expect(

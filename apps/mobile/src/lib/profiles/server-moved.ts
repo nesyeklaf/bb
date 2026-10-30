@@ -23,11 +23,7 @@ export function createServerMovedProfileHandler(
     const profile = deps.store
       .listProfiles()
       .find((candidate) => candidate.id === profileId);
-    if (
-      profile === undefined ||
-      profile.mode !== "direct" ||
-      profile.serverUrl === moved.serverUrl
-    ) {
+    if (profile === undefined || profile.serverUrl === moved.serverUrl) {
       return false;
     }
     await deps.store.updateProfile(profileId, { serverUrl: moved.serverUrl });

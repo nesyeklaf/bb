@@ -34,21 +34,8 @@ env:
     visible: ".*Ask anything.*"
     timeout: 60000
 - takeScreenshot: shell-deep-link-page
-
-# There is deliberately no web-link step here. A universal link only reaches
-# the app for a domain in `associatedDomains` (`*.getbb.app`), and the harness
-# serves a loopback origin, so iOS hands `http://127.0.0.1:.../` to Safari —
-# correctly. The web-link branch of the resolver is covered by unit tests in
+# There is deliberately no web-link step here. The app claims no universal
+# link domain, so iOS hands `http://127.0.0.1:.../` to Safari — correctly.
+# The web-link branch of the resolver is covered by unit tests in
 # src/lib/shell/shell-links.test.ts.
 
-# Connect enrolment holds the Keychain credential, so it can never move into
-# the page. It stays native even while the shell is on.
-- runFlow:
-    file: ../subflows/open-bb-link.yaml
-    env:
-      LINK: "bb://connect"
-- extendedWaitUntil:
-    visible:
-      id: "connect-screen"
-    timeout: 20000
-- takeScreenshot: shell-deep-link-native
