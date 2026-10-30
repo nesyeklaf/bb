@@ -79,6 +79,10 @@ export function evaluateStatus(input: StatusInput): StatusResult {
       problems.push(
         `${source.label}: collector ${source.collector}, transport ${source.transport}`,
       );
+    if (source.supported && source.unreadablePids > 0)
+      problems.push(
+        `${source.label}: ${source.unreadablePids} unreadable ${source.unreadablePids === 1 ? "pid" : "pids"}`,
+      );
   }
   const longGaps = input.gaps.filter(
     (gap) => gap.end - gap.start > GAP_TOLERANCE_MS,

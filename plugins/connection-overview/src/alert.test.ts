@@ -83,6 +83,27 @@ describe("red destination alert", () => {
     expect(restarted.list({ since: 0, states: ["red"] })).toHaveLength(1);
   });
 
+  it("starts at most one delivery at a time and claims before the send resolves", async () => {
+    const { open } = await harness();
+    const store = open();
+    let release: () => void = () => {};
+    const send = vi.fn(
+      () => new Promise<void>((resolve) => (release = resolve)),
+    );
+    const alerter = createAlerter({ store, send });
+    store.record([observation("a.example", "red")]);
+    const first = alerter.start();
+    expect(first).not.toBeNull();
+    store.record([observation("b.example", "red", 2_000)]);
+    expect(alerter.start()).toBeNull();
+    expect(store.claimUnclaimedRed(3_000)).toEqual([
+      "server|out|tcp|443|host:b.example",
+    ]);
+    release();
+    expect(await first).toBe(1);
+    expect(send).toHaveBeenCalledTimes(1);
+  });
+
   it("retries next sweep when the notifications plugin is not running yet, then sends once", async () => {
     const { open } = await harness();
     const store = open();

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { experimental_useRpcQuery as useRpcQuery } from "@get-bb/plugin-sdk/app";
 import {
   OVERVIEW_WINDOWS,
@@ -8,6 +8,7 @@ import {
 } from "../src/contract.js";
 import {
   describeCoverage,
+  staleAt,
   formatAge,
   formatDuration,
   type BannerTone,
@@ -57,7 +58,16 @@ function Banner({
   overview: Overview | undefined;
   refreshFailed: boolean;
 }) {
-  const summary = describeCoverage(overview, refreshFailed);
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    setNow(Date.now());
+    if (overview === undefined) return;
+    const wait = staleAt(overview) - Date.now();
+    if (wait <= 0) return;
+    const timer = setTimeout(() => setNow(Date.now()), wait + 50);
+    return () => clearTimeout(timer);
+  }, [overview]);
+  const summary = describeCoverage(overview, refreshFailed, now);
   return (
     <section
       role="status"

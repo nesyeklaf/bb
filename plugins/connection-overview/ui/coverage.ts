@@ -8,9 +8,16 @@ export interface CoverageSummary {
   details: string[];
 }
 
+export const STALE_AFTER_MS = 60_000;
+
+export function staleAt(overview: Overview): number {
+  return overview.now + STALE_AFTER_MS;
+}
+
 export function describeCoverage(
   overview: Overview | undefined,
   refreshFailed: boolean,
+  now: number,
 ): CoverageSummary {
   if (overview === undefined)
     return {
@@ -21,6 +28,11 @@ export function describeCoverage(
   const details = [...overview.problems];
   if (refreshFailed)
     details.push("The last refresh failed; this is older data");
+  const expired = now >= staleAt(overview);
+  if (expired)
+    details.push(
+      `No update for ${formatDuration(now - overview.now)}; this is older data`,
+    );
   const unexplained =
     (overview.counts["yellow"] ?? 0) + (overview.counts["undetermined"] ?? 0);
   if (unexplained > 0)
@@ -40,7 +52,7 @@ export function describeCoverage(
       headline: "Not measured: no measurement source is connected",
       details,
     };
-  if (overview.exitCode !== 0 || refreshFailed)
+  if (overview.exitCode !== 0 || refreshFailed || expired)
     return {
       tone: "warning",
       headline: "Measurement incomplete: do not read an empty list as safe",

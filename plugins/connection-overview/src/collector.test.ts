@@ -422,6 +422,17 @@ describe("evaluateStatus", () => {
     ).toEqual({ exitCode: 0, problems: [] });
   });
 
+  it("exits 1 when fresh sources still have unreadable pids", () => {
+    expect(
+      evaluateStatus({
+        sources: [{ ...fresh, unreadablePids: 4 }],
+        gaps: [],
+        redCount: 0,
+        capReached: false,
+      }),
+    ).toEqual({ exitCode: 1, problems: ["ai: 4 unreadable pids"] });
+  });
+
   it("exits 1 on stale collectors, long gaps, the cap or no sources", () => {
     expect(
       evaluateStatus({

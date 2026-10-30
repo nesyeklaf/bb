@@ -272,13 +272,13 @@ export default function connectionOverview(bb: BbPluginApi) {
         }
         await Promise.all(drivers.map((driver) => collector.pull(driver)));
         bb.rpc.experimental_invalidate([OVERVIEW_TAG]);
-        try {
-          await alerter.sweep();
-        } catch (error) {
-          bb.log.warn(
-            `connection overview: alert sweep failed: ${String(error)}`,
+        alerter
+          .start()
+          ?.catch((error: unknown) =>
+            bb.log.warn(
+              `connection overview: alert sweep failed: ${String(error)}`,
+            ),
           );
-        }
         await waitFor(
           Math.max(0, PULL_INTERVAL_MS - (Date.now() - started)),
           signal,

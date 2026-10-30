@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { cleanup, fireEvent, waitFor, within } from "@testing-library/react";
 import { loadPluginApp, renderSlot } from "@get-bb/plugin-sdk/testing/app";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   connectionOverviewContract,
   type Overview,
@@ -9,12 +9,15 @@ import {
 } from "./src/contract.js";
 
 const app = await loadPluginApp(() => import("./app.js"));
+const NOW = 1_000_000_000;
+beforeEach(() => {
+  vi.useFakeTimers({ toFake: ["Date"], now: NOW });
+});
 afterEach(() => {
   cleanup();
+  vi.useRealTimers();
   vi.restoreAllMocks();
 });
-
-const NOW = 1_000_000_000;
 
 function row(
   name: string,
@@ -208,6 +211,44 @@ describe("connection overview page", () => {
     expect(banner).toContain("Measured: no red destination");
     expect(banner).toContain(
       "Not measured: unreadable pids; the clients themselves",
+    );
+  });
+
+  it("stops calling a healthy read measured once it is a minute old, without another invalidation", async () => {
+    vi.setSystemTime(NOW + 59_800);
+    const view = render(() =>
+      overview({ rows: [row("ok.example", "allowed")] }),
+    );
+    await view.findByText("ok.example");
+    expect(view.getByRole("status").textContent).toContain(
+      "Measured: no red destination",
+    );
+    vi.setSystemTime(NOW + 61_000);
+    await waitFor(() =>
+      expect(view.getByRole("status").textContent).toContain(
+        "Measurement incomplete",
+      ),
+    );
+    const banner = view.getByRole("status").textContent ?? "";
+    expect(banner).not.toMatch(/Measured:/);
+    expect(banner).toContain("No update for 1 min; this is older data");
+  });
+
+  it("calls fresh clocks with unreadable pids incomplete, like the CLI", async () => {
+    const view = render(() =>
+      overview({
+        exitCode: 1,
+        problems: ["server: 4 unreadable pids"],
+        sources: [{ ...freshSource, unreadablePids: 4 }],
+      }),
+    );
+    await waitFor(() =>
+      expect(view.getByRole("status").textContent).toContain(
+        "Measurement incomplete",
+      ),
+    );
+    expect(view.getByRole("status").textContent).toContain(
+      "server: 4 unreadable pids",
     );
   });
 

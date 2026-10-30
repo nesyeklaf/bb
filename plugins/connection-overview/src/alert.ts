@@ -26,7 +26,15 @@ export function createAlerter(options: {
   onSendDeferred?: (error: unknown) => void;
 }) {
   const now = options.now ?? Date.now;
-  return {
+  let running: Promise<number> | null = null;
+  const alerter = {
+    start(): Promise<number> | null {
+      if (running !== null) return null;
+      running = alerter.sweep().finally(() => {
+        running = null;
+      });
+      return running;
+    },
     async sweep(): Promise<number> {
       const claimed = options.store.claimUnclaimedRed(now());
       if (claimed.length === 0) return 0;
@@ -46,4 +54,5 @@ export function createAlerter(options: {
       return claimed.length;
     },
   };
+  return alerter;
 }
