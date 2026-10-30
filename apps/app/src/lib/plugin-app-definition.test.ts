@@ -1339,6 +1339,38 @@ describe("collectPluginAppRegistrations — experimental_threadTocExtension", ()
     ]);
   });
 
+  it("collects the default tab flag and the band hover handler", () => {
+    function onBandHover() {}
+    const definition = definePluginApp((app) => {
+      app.slots.experimental_threadTocExtension({
+        id: "topics",
+        title: "Topics",
+        useBands,
+        onBandHover,
+        tab: {
+          label: "Topics",
+          component: Component,
+          experimental_default: true,
+        },
+      });
+    });
+    expect(
+      collectPluginAppRegistrations(definition).threadTocExtensions,
+    ).toEqual([
+      {
+        id: "topics",
+        title: "Topics",
+        useBands,
+        onBandHover,
+        tab: {
+          label: "Topics",
+          component: Component,
+          experimental_default: true,
+        },
+      },
+    ]);
+  });
+
   it("collects an extension that only draws bands", () => {
     const definition = definePluginApp((app) => {
       app.slots.experimental_threadTocExtension({
@@ -1385,5 +1417,20 @@ describe("collectPluginAppRegistrations — experimental_threadTocExtension", ()
     expect(() =>
       collectPluginAppRegistrations(register({ ...base, onBandClick: "x" })),
     ).toThrow(/onBandClick/);
+    expect(() =>
+      collectPluginAppRegistrations(register({ ...base, onBandHover: "x" })),
+    ).toThrow(/onBandHover/);
+    expect(() =>
+      collectPluginAppRegistrations(
+        register({
+          ...base,
+          tab: {
+            label: "Topics",
+            component: Component,
+            experimental_default: "yes",
+          },
+        }),
+      ),
+    ).toThrow(/experimental_default/);
   });
 });

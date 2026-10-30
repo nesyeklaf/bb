@@ -179,6 +179,14 @@ export function ThreadTocTabMount({
   );
 }
 
+export function notifyThreadTocBandHover(
+  entry: ThreadTocBandEntry,
+  hovered: boolean,
+  input: ExperimentalThreadTocInput,
+): void {
+  entry.slot.onBandHover?.(hovered ? entry.band : null, input);
+}
+
 export function notifyThreadTocBandClick(
   entry: ThreadTocBandEntry,
   input: ExperimentalThreadTocInput,

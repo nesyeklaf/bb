@@ -1482,7 +1482,20 @@ describe("ThreadTableOfContents plugin extension", () => {
     return <div data-testid="topics-tab">Topics content</div>;
   }
 
-  function register({ withTab = true }: { withTab?: boolean } = {}) {
+  function register({
+    withTab = true,
+    isDefault,
+    onBandHover,
+  }: {
+    withTab?: boolean;
+    isDefault?: boolean;
+    onBandHover?: Mock<
+      (
+        band: ExperimentalThreadTocBand | null,
+        input: ExperimentalThreadTocInput,
+      ) => void
+    >;
+  } = {}) {
     setPluginSlotRegistrations(
       PLUGIN_ID,
       makePluginRegistrationSet({
@@ -1492,8 +1505,17 @@ describe("ThreadTableOfContents plugin extension", () => {
             title: "Topics",
             useBands: () => bands,
             onBandClick,
+            ...(onBandHover ? { onBandHover } : {}),
             ...(withTab
-              ? { tab: { label: "Topics", component: TabComponent } }
+              ? {
+                  tab: {
+                    label: "Topics",
+                    component: TabComponent,
+                    ...(isDefault === undefined
+                      ? {}
+                      : { experimental_default: isDefault }),
+                  },
+                }
               : {}),
           },
         ],
@@ -1743,6 +1765,164 @@ describe("ThreadTableOfContents plugin extension", () => {
 
     expect(tabProps).toBeNull();
     expect(document.querySelector("[data-toc-tick][data-selected]")).toBeNull();
+  });
+
+  it("opens on the Your messages tab unless a tab asks to be the default", () => {
+    register({ isDefault: false });
+    render(<TocHost timelineRows={rows([1, 2, 3, 4])} />);
+    openTocPanel();
+
+    expect(screen.queryByTestId("topics-tab")).toBeNull();
+    expect(
+      screen.getByText("Loaded after client-side navigation 1"),
+    ).not.toBeNull();
+  });
+
+  it("opens on a default extension tab and keeps the person's tab choice", () => {
+    register({ isDefault: true });
+    render(<TocHost timelineRows={rows([1, 2, 3, 4])} />);
+    openTocPanel();
+
+    expect(screen.getByTestId("topics-tab")).not.toBeNull();
+    expect(
+      screen.queryByText("Loaded after client-side navigation 1"),
+    ).toBeNull();
+
+    fireEvent.click(screen.getByText("Your messages"));
+    expect(screen.queryByTestId("topics-tab")).toBeNull();
+
+    const toc = document.querySelector<HTMLElement>("[data-thread-toc]")!;
+    fireEvent.mouseLeave(toc);
+    openTocPanel();
+    expect(screen.queryByTestId("topics-tab")).toBeNull();
+  });
+
+  it("lets the first default registration win", () => {
+    function SecondTab() {
+      return <div data-testid="second-tab">Second</div>;
+    }
+    setPluginSlotRegistrations(
+      PLUGIN_ID,
+      makePluginRegistrationSet({
+        threadTocExtensions: [
+          {
+            id: "first",
+            title: "First",
+            useBands: () => [],
+            tab: {
+              label: "First",
+              component: TabComponent,
+              experimental_default: true,
+            },
+          },
+          {
+            id: "second",
+            title: "Second",
+            useBands: () => [],
+            tab: {
+              label: "Second",
+              component: SecondTab,
+              experimental_default: true,
+            },
+          },
+        ],
+      }),
+    );
+    render(<TocHost timelineRows={rows([1, 2, 3, 4])} />);
+    openTocPanel();
+
+    expect(screen.getByTestId("topics-tab")).not.toBeNull();
+    expect(screen.queryByTestId("second-tab")).toBeNull();
+  });
+
+  it("passes the seq of the active user message as activeSeq", async () => {
+    vi.useFakeTimers();
+    register({ isDefault: true });
+    const userRows = rows([1, 2, 3, 4]);
+    const [, second] = userRows;
+    scrollElement.getBoundingClientRect = () => rect({ top: 0, bottom: 100 });
+    for (const row of userRows) {
+      const element = document.createElement("div");
+      element.dataset.timelineRowId = row.id;
+      element.getBoundingClientRect = () =>
+        row.id === second?.id
+          ? rect({ top: 10, bottom: 40 })
+          : rect({ top: 500, bottom: 530 });
+      scrollElement.appendChild(element);
+    }
+    render(<TocHost timelineRows={userRows} />);
+    openTocPanel();
+    expect(tabProps?.activeSeq).toBeNull();
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(200);
+    });
+
+    expect(tabProps?.activeSeq).toBe(2);
+  });
+
+  it("reports the bracket under the pointer to the registration and the tab", () => {
+    const band = { fromSeq: 2, toSeq: 3, hue: 120 };
+    bands = [band, { fromSeq: 1, toSeq: 1, hue: 10 }];
+    const onBandHover = vi.fn();
+    register({ isDefault: true, onBandHover });
+    render(<TocHost timelineRows={rows([1, 2, 3, 4])} />);
+    openTocPanel();
+    expect(tabProps?.hoveredBand).toBeNull();
+
+    fireEvent.pointerEnter(bandElements()[0]!);
+    expect(onBandHover).toHaveBeenLastCalledWith(band, {
+      threadId: "thr_toc_test",
+      projectId: "proj_toc_test",
+    });
+    expect(tabProps?.hoveredBand).toEqual({ fromSeq: 2, toSeq: 3 });
+    expect(bandElements()[0]?.dataset.highlighted).toBe("true");
+    expect(bandElements()[1]?.dataset.highlighted).toBeUndefined();
+
+    fireEvent.pointerLeave(bandElements()[0]!);
+    expect(onBandHover).toHaveBeenLastCalledWith(null, {
+      threadId: "thr_toc_test",
+      projectId: "proj_toc_test",
+    });
+    expect(tabProps?.hoveredBand).toBeNull();
+    expect(bandElements()[0]?.dataset.highlighted).toBeUndefined();
+  });
+
+  it("highlights the bracket and widens its ticks for a range the tab hovers", () => {
+    bands = [
+      { fromSeq: 2, toSeq: 3, hue: 120 },
+      { fromSeq: 4, toSeq: 4, hue: 10 },
+    ];
+    register({ isDefault: true });
+    render(<TocHost timelineRows={rows([1, 2, 3, 4, 5])} />);
+    openTocPanel();
+    const wide = () =>
+      Array.from(document.querySelectorAll<HTMLElement>("[data-toc-tick]"))
+        .filter((tick) => tick.classList.contains("w-5"))
+        .map((tick) => tick.dataset.tocTickId);
+
+    act(() => tabProps?.setHoveredRange({ fromSeq: 2, toSeq: 3 }));
+    expect(bandElements()[0]?.dataset.highlighted).toBe("true");
+    expect(bandElements()[1]?.dataset.highlighted).toBeUndefined();
+    expect(wide()).toEqual(["row_user_2", "row_user_3"]);
+
+    act(() => tabProps?.setHoveredRange(null));
+    expect(bandElements()[0]?.dataset.highlighted).toBeUndefined();
+    expect(wide()).toEqual([]);
+  });
+
+  it("drops a hovered range when the panel closes", () => {
+    bands = [{ fromSeq: 2, toSeq: 3, hue: 120 }];
+    register({ isDefault: true });
+    render(<TocHost timelineRows={rows([1, 2, 3, 4])} />);
+    openTocPanel();
+    act(() => tabProps?.setHoveredRange({ fromSeq: 2, toSeq: 3 }));
+    expect(bandElements()[0]?.dataset.highlighted).toBe("true");
+
+    const toc = document.querySelector<HTMLElement>("[data-thread-toc]")!;
+    fireEvent.mouseLeave(toc);
+
+    expect(bandElements()[0]?.dataset.highlighted).toBeUndefined();
   });
 
   it("marks the selected ticks and drops animation under reduced motion", () => {

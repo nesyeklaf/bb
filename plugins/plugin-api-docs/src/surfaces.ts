@@ -683,6 +683,7 @@ export const SURFACE_GROUPS: SurfaceGroup[] = [
           "ExperimentalThreadTocExtensionRegistration",
           "ExperimentalThreadTocInput",
           "ExperimentalThreadTocBand",
+          "ExperimentalThreadTocRange",
           "ExperimentalThreadTocSelection",
           "ExperimentalThreadTocTabProps",
         ],

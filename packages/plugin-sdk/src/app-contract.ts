@@ -1923,6 +1923,12 @@ export interface ExperimentalThreadTocSelection {
   toSeq: number;
 }
 
+/** A range of message seqs on the thread TOC rail, both ends inclusive. */
+export interface ExperimentalThreadTocRange {
+  fromSeq: number;
+  toSeq: number;
+}
+
 /** Props of the tab an extension adds to the thread TOC rail's panel. */
 export interface ExperimentalThreadTocTabProps extends ExperimentalThreadTocInput {
   /** Scrolls the thread to the message with this seq, loading older pages when needed. */
@@ -1931,6 +1937,19 @@ export interface ExperimentalThreadTocTabProps extends ExperimentalThreadTocInpu
   railSelection: ExperimentalThreadTocSelection | null;
   /** Drops `railSelection`; call it once the selection is used. */
   clearRailSelection(): void;
+  /**
+   * Message seq of the user message at the active position in the chat (the
+   * tick the rail marks as current), or null when none is known.
+   */
+  activeSeq: number | null;
+  /** The range of the bracket under the pointer, from any extension, or null. */
+  hoveredBand: ExperimentalThreadTocRange | null;
+  /**
+   * Highlights the bracket whose `fromSeq` and `toSeq` equal this range
+   * (thicker, glowing, with wider ticks). Pass null to clear. The host also
+   * clears it when the panel closes or the thread changes.
+   */
+  setHoveredRange(range: ExperimentalThreadTocRange | null): void;
 }
 
 /**
@@ -1951,10 +1970,23 @@ export interface ExperimentalThreadTocExtensionRegistration {
   tab?: {
     label: string;
     component: ComponentType<ExperimentalThreadTocTabProps>;
+    /**
+     * Opens the panel on this tab instead of Your messages. The first
+     * registration that sets it wins. A tab the user picks afterwards stays.
+     */
+    experimental_default?: boolean;
   };
   /** Runs when the user clicks one of this extension's brackets. */
   onBandClick?(
     band: ExperimentalThreadTocBand,
+    input: ExperimentalThreadTocInput,
+  ): void;
+  /**
+   * Runs with one of this extension's brackets when the pointer enters it, and
+   * with null when the pointer leaves it.
+   */
+  onBandHover?(
+    band: ExperimentalThreadTocBand | null,
     input: ExperimentalThreadTocInput,
   ): void;
 }

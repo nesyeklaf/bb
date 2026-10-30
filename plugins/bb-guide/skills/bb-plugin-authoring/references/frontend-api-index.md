@@ -150,6 +150,7 @@ Read the installed SDK declarations for the exact current signatures.
 - `ExperimentalThreadContextSegmentReference`
 - `ExperimentalThreadTocInput`
 - `ExperimentalThreadTocBand`
+- `ExperimentalThreadTocRange`
 - `ExperimentalThreadTocSelection`
 - `ExperimentalThreadTocTabProps`
 - `ExperimentalThreadRowMetadataProps`

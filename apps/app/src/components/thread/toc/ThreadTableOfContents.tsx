@@ -1,5 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { ExperimentalThreadTocSelection } from "@get-bb/plugin-sdk";
+import type {
+  ExperimentalThreadTocRange,
+  ExperimentalThreadTocSelection,
+} from "@get-bb/plugin-sdk";
 import type {
   ThreadConversationOutlineItem,
   ThreadConversationOutlineResponse,
@@ -19,6 +22,7 @@ import { parseAgentMessageEnvelope } from "@bb/thread-view";
 import { useThreadTitleDisplayText } from "@/components/thread/ThreadTitleMentions";
 import {
   notifyThreadTocBandClick,
+  notifyThreadTocBandHover,
   ThreadTocTabMount,
   useThreadTocExtensions,
 } from "@/components/plugin/PluginThreadTocExtensions";
@@ -528,6 +532,17 @@ function bandColor(hue: number, alpha = 1): string {
   return `oklch(0.72 0.14 ${normalized} / ${alpha})`;
 }
 
+function sameRange(
+  left: ExperimentalThreadTocRange,
+  right: ExperimentalThreadTocRange | null,
+): boolean {
+  return (
+    right !== null &&
+    left.fromSeq === right.fromSeq &&
+    left.toSeq === right.toSeq
+  );
+}
+
 function nearestTickId(
   rootElement: HTMLElement | null,
   clientY: number,
@@ -561,7 +576,11 @@ export function ThreadTableOfContents({
   const [rootElement, setRootElement] = useState<HTMLElement | null>(null);
   const tocVisible = useThreadTocVisible(rootElement);
   const [open, setOpen] = useState(false);
-  const [tab, setTab] = useState<PanelTab>("user");
+  const [chosenTab, setTab] = useState<PanelTab | null>(null);
+  const [hoveredRange, setHoveredRangeState] =
+    useState<ExperimentalThreadTocRange | null>(null);
+  const [pointerBand, setPointerBand] =
+    useState<ExperimentalThreadTocRange | null>(null);
   const [railSelection, setRailSelection] =
     useState<ExperimentalThreadTocSelection | null>(null);
   const dragRef = useRef<{
@@ -579,6 +598,12 @@ export function ThreadTableOfContents({
     observers: extensionObservers,
   } = useThreadTocExtensions(extensionInput);
   const panelOpen = open || railSelection !== null;
+  const defaultExtensionTab = extensionTabs.find(
+    (entry) => entry.slot.tab?.experimental_default === true,
+  );
+  const tab: PanelTab =
+    chosenTab ??
+    (defaultExtensionTab ? `ext:${defaultExtensionTab.key}` : "user");
   const outlineEnabled = tocVisible && timelineRows.length > 0;
   const userOutlineQuery = useThreadConversationOutline(threadId, "user", {
     enabled: outlineEnabled,
@@ -634,8 +659,39 @@ export function ThreadTableOfContents({
       return range ? [{ entry, range }] : [];
     });
     const lanes = assignBandLanes(entries.map(({ range }) => range));
-    return entries.map((item, index) => ({ ...item, lane: lanes[index] ?? 0 }));
-  }, [extensionBands, railItems]);
+    return entries.map((item, index) => ({
+      ...item,
+      lane: lanes[index] ?? 0,
+      highlighted:
+        sameRange(item.entry.band, hoveredRange) ||
+        sameRange(item.entry.band, pointerBand),
+    }));
+  }, [extensionBands, hoveredRange, pointerBand, railItems]);
+  const highlightedTicks = useMemo(() => {
+    const indexes = new Set<number>();
+    for (const { highlighted, range } of railBands) {
+      if (!highlighted) continue;
+      for (let index = range.start; index <= range.end; index += 1) {
+        indexes.add(index);
+      }
+    }
+    return indexes;
+  }, [railBands]);
+  const activeSeq = useMemo(
+    () =>
+      userItems.find((item) => item.id === activeUserId)?.messageSeq ?? null,
+    [activeUserId, userItems],
+  );
+  const setHoveredRange = useCallback(
+    (range: ExperimentalThreadTocRange | null) => {
+      setHoveredRangeState((current) =>
+        current?.fromSeq === range?.fromSeq && current?.toSeq === range?.toSeq
+          ? current
+          : range,
+      );
+    },
+    [],
+  );
   const outlineMaxSeq = userOutlineQuery.data?.maxSeq ?? 0;
 
   const hasOlderRef = useRef(hasOlderTimelineRows);
@@ -701,7 +757,14 @@ export function ThreadTableOfContents({
 
   useEffect(() => {
     setRailSelection(null);
+    setHoveredRangeState(null);
+    setPointerBand(null);
   }, [threadId]);
+
+  useEffect(() => {
+    if (panelOpen) return;
+    setHoveredRangeState(null);
+  }, [panelOpen]);
 
   useEffect(() => {
     if (railSelection === null) return;
@@ -896,7 +959,8 @@ export function ThreadTableOfContents({
               railBands.length > 0 && "pr-3",
             )}
           >
-            {railItems.map((item) => {
+            {railItems.map((item, tickIndex) => {
+              const emphasized = highlightedTicks.has(tickIndex);
               const selected =
                 railSelection !== null &&
                 item.messageSeq >= railSelection.fromSeq &&
@@ -908,12 +972,14 @@ export function ThreadTableOfContents({
                   data-toc-tick-id={item.id}
                   data-selected={selected ? "" : undefined}
                   className={cn(
-                    "h-[3px] shrink-0 rounded-full transition-all duration-150",
+                    "h-[3px] shrink-0 rounded-full transition-all duration-150 motion-reduce:transition-none",
                     selected
                       ? "w-5 bg-foreground/70"
-                      : item.id === activeUserId
-                        ? "w-5 bg-foreground/30 group-hover/toc:bg-foreground/70"
-                        : "w-3 bg-foreground/5 group-hover/toc:bg-foreground/20",
+                      : emphasized
+                        ? "w-5 bg-foreground/50"
+                        : item.id === activeUserId
+                          ? "w-5 bg-foreground/30 group-hover/toc:bg-foreground/70"
+                          : "w-3 bg-foreground/5 group-hover/toc:bg-foreground/20",
                   )}
                 />
               );
@@ -923,7 +989,7 @@ export function ThreadTableOfContents({
                 className="absolute inset-y-0 right-0 grid w-3 gap-y-2"
                 style={{ gridTemplateRows: `repeat(${railItems.length}, 3px)` }}
               >
-                {railBands.map(({ entry, range, lane }, index) => (
+                {railBands.map(({ entry, range, lane, highlighted }, index) => (
                   <span
                     key={`${entry.slot.pluginId}/${entry.slot.id}/${index}`}
                     data-toc-band=""
@@ -931,7 +997,19 @@ export function ThreadTableOfContents({
                     data-lane={lane}
                     data-dashed={entry.band.dashed ? "true" : undefined}
                     data-active={entry.band.active ? "true" : undefined}
+                    data-highlighted={highlighted ? "true" : undefined}
                     title={entry.band.label}
+                    onPointerEnter={() => {
+                      setPointerBand({
+                        fromSeq: entry.band.fromSeq,
+                        toSeq: entry.band.toSeq,
+                      });
+                      notifyThreadTocBandHover(entry, true, extensionInput);
+                    }}
+                    onPointerLeave={() => {
+                      setPointerBand(null);
+                      notifyThreadTocBandHover(entry, false, extensionInput);
+                    }}
                     onPointerDown={(event) => event.stopPropagation()}
                     onClick={(event) => {
                       event.stopPropagation();
@@ -942,13 +1020,13 @@ export function ThreadTableOfContents({
                       gridRow: `${range.start + 1} / ${range.end + 2}`,
                       gridColumn: 1,
                       marginLeft: lane * TOC_BAND_LANE_PITCH_PX,
-                      width: entry.band.active ? 3 : 2,
+                      width: entry.band.active || highlighted ? 3 : 2,
                       ...(entry.band.dashed
                         ? {
                             backgroundImage: `repeating-linear-gradient(to bottom, ${bandColor(entry.band.hue)} 0 3px, transparent 3px 6px)`,
                           }
                         : { backgroundColor: bandColor(entry.band.hue) }),
-                      ...(entry.band.active
+                      ...(entry.band.active || highlighted
                         ? {
                             boxShadow: `0 0 6px ${bandColor(entry.band.hue, 0.8)}`,
                           }
@@ -998,6 +1076,9 @@ export function ThreadTableOfContents({
                     jumpToSeq={jumpToSeq}
                     railSelection={railSelection}
                     clearRailSelection={clearRailSelection}
+                    activeSeq={activeSeq}
+                    hoveredBand={pointerBand}
+                    setHoveredRange={setHoveredRange}
                   />
                 </div>
               ) : (

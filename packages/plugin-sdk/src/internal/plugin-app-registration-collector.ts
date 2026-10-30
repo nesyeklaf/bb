@@ -980,6 +980,12 @@ export function collectPluginAppRegistrations(
         ) {
           throw new Error(`${kind}: "onBandClick" must be a function`);
         }
+        if (
+          registration.onBandHover !== undefined &&
+          typeof registration.onBandHover !== "function"
+        ) {
+          throw new Error(`${kind}: "onBandHover" must be a function`);
+        }
         const tab = registration.tab;
         if (tab !== undefined) {
           if (tab === null || typeof tab !== "object") {
@@ -990,6 +996,14 @@ export function collectPluginAppRegistrations(
               `${kind}: "tab.component" must be a React component function`,
             );
           }
+          if (
+            tab.experimental_default !== undefined &&
+            typeof tab.experimental_default !== "boolean"
+          ) {
+            throw new Error(
+              `${kind}: "tab.experimental_default" must be a boolean`,
+            );
+          }
         }
         collected.threadTocExtensions.push({
           id,
@@ -998,11 +1012,17 @@ export function collectPluginAppRegistrations(
           ...(registration.onBandClick !== undefined
             ? { onBandClick: registration.onBandClick }
             : {}),
+          ...(registration.onBandHover !== undefined
+            ? { onBandHover: registration.onBandHover }
+            : {}),
           ...(tab !== undefined
             ? {
                 tab: {
                   label: requireNonEmptyString(kind, "tab.label", tab.label),
                   component: tab.component,
+                  ...(tab.experimental_default !== undefined
+                    ? { experimental_default: tab.experimental_default }
+                    : {}),
                 },
               }
             : {}),
