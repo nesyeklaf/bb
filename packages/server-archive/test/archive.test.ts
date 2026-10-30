@@ -235,7 +235,10 @@ describe("writeServerArchive and extractServerArchive", () => {
     const toolPath = path.join(
       destinationDir,
       "files",
-      ...(tree.files[3]?.archivePath ?? "").split("/"),
+      ...(
+        tree.files.find((file) => file.archivePath.endsWith("/bin/tool"))
+          ?.archivePath ?? ""
+      ).split("/"),
     );
     if (process.platform !== "win32") {
       expect((await stat(toolPath)).mode & 0o100).toBe(0o100);

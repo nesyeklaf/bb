@@ -240,13 +240,11 @@ interface SignInSession {
 
 function AgentStepContainer({
   chrome,
-  entry,
   hostId,
   hostName,
   onContinue,
 }: {
   chrome: StepChrome;
-  entry: OnboardingEntry;
   hostId: string | null;
   hostName: string | null;
   onContinue: () => void;
@@ -270,17 +268,14 @@ function AgentStepContainer({
   const { mutate: closeTerminalMutate } = closeTerminal;
   const { mutateAsync: createTerminalAsync } = createTerminal;
 
-  const endSignIn = useCallback(
-    (outcome: "ready" | "exited" | "failed" | "cancelled" = "cancelled") => {
-      const current = signInRef.current;
-      if (current === null) return;
-      signInRef.current = null;
-      setSignIn(null);
-      closeTerminalMutate({ mode: "force", terminalId: current.session.id });
-      void refetchStates();
-    },
-    [closeTerminalMutate, entry, refetchStates],
-  );
+  const endSignIn = useCallback(() => {
+    const current = signInRef.current;
+    if (current === null) return;
+    signInRef.current = null;
+    setSignIn(null);
+    closeTerminalMutate({ mode: "force", terminalId: current.session.id });
+    void refetchStates();
+  }, [closeTerminalMutate, refetchStates]);
 
   const signInRequestRef = useRef(0);
   useEffect(
@@ -297,7 +292,7 @@ function AgentStepContainer({
       if (current !== null && exitCode !== 0) {
         setSignInFailedProviderId(current.providerId);
       }
-      endSignIn(exitCode === 0 ? "exited" : "failed");
+      endSignIn();
     },
     [endSignIn],
   );
@@ -317,7 +312,7 @@ function AgentStepContainer({
     states?.find((state) => state.providerId === signingInProviderId)
       ?.status === "ready";
   useEffect(() => {
-    if (signingInProviderReady) endSignIn("ready");
+    if (signingInProviderReady) endSignIn();
   }, [endSignIn, signingInProviderReady]);
 
   const startSignIn = async (
@@ -890,7 +885,6 @@ export function OnboardingFlow({
       return (
         <AgentStepContainer
           chrome={chrome}
-          entry={entry}
           hostId={hostId}
           hostName={primaryHost?.name ?? null}
           onContinue={advance}
