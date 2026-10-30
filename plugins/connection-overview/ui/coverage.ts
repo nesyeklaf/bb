@@ -42,10 +42,15 @@ export function describeCoverage(
       `${unexplained} yellow or undetermined rows need an explanation`,
     );
   const red = overview.counts["red"] ?? 0;
+  const incomplete =
+    overview.sources.length === 0 ||
+    details.length > 0 ||
+    refreshFailed ||
+    expired;
   if (red > 0)
     return {
       tone: "alert",
-      headline: `${red} red ${red === 1 ? "destination" : "destinations"} in this window`,
+      headline: `${red} red ${red === 1 ? "destination" : "destinations"} in this window${incomplete ? "; measurement incomplete, there may be more" : ""}`,
       details,
     };
   if (overview.sources.length === 0)

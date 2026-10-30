@@ -252,6 +252,22 @@ describe("connection overview page", () => {
     );
   });
 
+  it("says a red count is incomplete when coverage problems remain", async () => {
+    const view = render(() =>
+      overview({
+        rows: [row("bad.example", "red")],
+        exitCode: 2,
+        problems: ["1 red destination(s)", "2 gap(s) over 10 s in the window"],
+      }),
+    );
+    await view.findByText("bad.example");
+    const banner = view.getByRole("status").textContent ?? "";
+    expect(banner).toContain(
+      "1 red destination in this window; measurement incomplete",
+    );
+    expect(banner).not.toContain("1 red destination(s)");
+  });
+
   it("flags yellow and undetermined rows that need an explanation", async () => {
     const view = render(() =>
       overview({

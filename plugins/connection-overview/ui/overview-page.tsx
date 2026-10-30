@@ -137,8 +137,9 @@ function Sources({ overview }: { overview: Overview }) {
       </div>
       {overview.gaps.length > 0 ? (
         <p className="text-xs text-muted-foreground">
-          {overview.gaps.length} gap{overview.gaps.length === 1 ? "" : "s"} in
-          this window, longest {formatDuration(Math.max(...longGaps))}.
+          {overview.gaps.length} sampling gap
+          {overview.gaps.length === 1 ? "" : "s"} in this window (short ones are
+          normal), longest {formatDuration(Math.max(...longGaps))}.
         </p>
       ) : null}
     </div>
