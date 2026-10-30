@@ -15,3 +15,6 @@ export function railHalfTint(half: TocRailHalf): string {
     ? `linear-gradient(to right, transparent 50%, ${TINT} 50%)`
     : `linear-gradient(to right, ${TINT} 50%, transparent 50%)`;
 }
+
+/** Crossing the message half on the way to the panel must not flip the view. */
+export const TOC_HALF_SWITCH_DELAY_MS = 140;

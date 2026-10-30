@@ -1407,7 +1407,7 @@ describe("ThreadTableOfContents timeline item cache", () => {
     expect(screen.getByText("Image attachment")).not.toBeNull();
   });
 
-  it("re-measures the active item 120 ms after an update that only changes work rows", () => {
+  it("re-measures the active item 120 ms after an update that only changes work rows", async () => {
     vi.useFakeTimers();
     scrollElement = createScrollElement({
       clientHeight: 100,
@@ -1552,11 +1552,14 @@ describe("ThreadTableOfContents plugin extension", () => {
     return element;
   }
 
-  function hoverHalf(half: "messages" | "topics") {
+  async function hoverHalf(half: "messages" | "topics") {
     fireEvent.pointerMove(trigger(), {
       clientX: half === "topics" ? 75 : 25,
       clientY: 5,
       pointerId: 1,
+    });
+    await act(async () => {
+      await new Promise((resolve) => window.setTimeout(resolve, 200));
     });
   }
 
@@ -1648,7 +1651,7 @@ describe("ThreadTableOfContents plugin extension", () => {
     });
   });
 
-  it("shows the extension tab while the pointer is on the right half and passes it the rail props", () => {
+  it("shows the extension tab while the pointer is on the right half and passes it the rail props", async () => {
     register();
     const onNavigateToRow = vi.fn();
     render(
@@ -1659,7 +1662,7 @@ describe("ThreadTableOfContents plugin extension", () => {
     );
     openTocPanel();
 
-    hoverHalf("topics");
+    await hoverHalf("topics");
 
     expect(screen.getByTestId("topics-tab")).not.toBeNull();
     expect(
@@ -1674,12 +1677,12 @@ describe("ThreadTableOfContents plugin extension", () => {
     act(() => tabProps?.jumpToSeq(3));
     expect(onNavigateToRow).toHaveBeenCalledWith("row_user_3");
 
-    hoverHalf("messages");
+    await hoverHalf("messages");
     expect(screen.queryByTestId("topics-tab")).toBeNull();
     expect(screen.getByText("Your messages")).not.toBeNull();
   });
 
-  it("jumps to the nearest user message at or before a seq that is not loaded as a row", () => {
+  it("jumps to the nearest user message at or before a seq that is not loaded as a row", async () => {
     register();
     const onNavigateToRow = vi.fn();
     const items = [1, 3, 5].map((seq) => ({
@@ -1694,7 +1697,7 @@ describe("ThreadTableOfContents plugin extension", () => {
       <TocHost onNavigateToRow={onNavigateToRow} timelineRows={rows([5])} />,
     );
     openTocPanel();
-    hoverHalf("topics");
+    await hoverHalf("topics");
 
     act(() => tabProps?.jumpToSeq(4));
 
@@ -1791,7 +1794,7 @@ describe("ThreadTableOfContents plugin extension", () => {
     ).not.toBeNull();
   });
 
-  it("opens on a default extension tab and lets the pointer half decide the view", () => {
+  it("opens on a default extension tab and lets the pointer half decide the view", async () => {
     register({ isDefault: true });
     render(<TocHost timelineRows={rows([1, 2, 3, 4])} />);
     openTocPanel();
@@ -1801,32 +1804,51 @@ describe("ThreadTableOfContents plugin extension", () => {
       screen.queryByText("Loaded after client-side navigation 1"),
     ).toBeNull();
 
-    hoverHalf("messages");
+    await hoverHalf("messages");
     expect(screen.queryByTestId("topics-tab")).toBeNull();
-    hoverHalf("topics");
+    await hoverHalf("topics");
     expect(screen.getByTestId("topics-tab")).not.toBeNull();
 
-    hoverHalf("messages");
+    await hoverHalf("messages");
     const toc = document.querySelector<HTMLElement>("[data-thread-toc]")!;
     fireEvent.mouseLeave(toc);
     openTocPanel();
     expect(screen.getByTestId("topics-tab")).not.toBeNull();
   });
 
-  it("keeps the view while the pointer stays inside one half", () => {
+  it("keeps the view while the pointer stays inside one half", async () => {
     register({ isDefault: true });
     render(<TocHost timelineRows={rows([1, 2, 3, 4])} />);
     openTocPanel();
 
-    hoverHalf("messages");
+    await hoverHalf("messages");
     fireEvent.pointerMove(trigger(), { clientX: 10, clientY: 40, pointerId: 1 });
     fireEvent.pointerMove(trigger(), { clientX: 45, clientY: 60, pointerId: 1 });
     expect(screen.queryByTestId("topics-tab")).toBeNull();
     expect(trigger().getAttribute("data-rail-half")).toBe("messages");
 
-    hoverHalf("topics");
+    await hoverHalf("topics");
     expect(trigger().getAttribute("data-rail-half")).toBe("topics");
     expect(screen.getByTestId("topics-tab")).not.toBeNull();
+  });
+
+  it("keeps the topic view when the pointer only crosses the message half on its way to the panel", async () => {
+    register({ isDefault: true });
+    render(<TocHost timelineRows={rows([1, 2, 3, 4])} />);
+    openTocPanel();
+    await hoverHalf("topics");
+
+    fireEvent.pointerMove(trigger(), { clientX: 25, clientY: 5, pointerId: 1 });
+    const panel = document.querySelector<HTMLElement>(
+      '[id^="thread-toc-panel-"]',
+    )!;
+    fireEvent.pointerEnter(panel);
+    await act(async () => {
+      await new Promise((resolve) => window.setTimeout(resolve, 250));
+    });
+
+    expect(screen.getByTestId("topics-tab")).not.toBeNull();
+    expect(trigger().getAttribute("data-rail-half")).toBe("topics");
   });
 
   it("lets the first default registration win", () => {
@@ -1899,7 +1921,7 @@ describe("ThreadTableOfContents plugin extension", () => {
     );
   }
 
-  it("shows no tab strip in the topic view and draws every registration's brackets", () => {
+  it("shows no tab strip in the topic view and draws every registration's brackets", async () => {
     bands = [{ fromSeq: 2, toSeq: 3, hue: 120 }];
     registerTopicsAndManage();
     render(<TocHost timelineRows={rows([1, 2, 3, 4])} />);
@@ -1911,7 +1933,7 @@ describe("ThreadTableOfContents plugin extension", () => {
       ).map((button) => button.textContent);
     expect(tabButtons()).toEqual([]);
     expect(screen.getByTestId("topics-tab")).not.toBeNull();
-    hoverHalf("messages");
+    await hoverHalf("messages");
     expect(tabButtons()).toEqual(["Your messages"]);
     expect(bandElements()).toHaveLength(1);
   });

@@ -32,7 +32,7 @@ import {
   bandTickRange,
   selectionFromTicks,
 } from "./toc-rail-bands";
-import { railHalfAt, railHalfTint, type TocRailHalf } from "./toc-rail-half";
+import { TOC_HALF_SWITCH_DELAY_MS, railHalfAt, railHalfTint, type TocRailHalf } from "./toc-rail-half";
 
 export interface TocItem {
   id: string;
@@ -580,6 +580,12 @@ export function ThreadTableOfContents({
   const [open, setOpen] = useState(false);
   const [chosenTab, setTab] = useState<PanelTab | null>(null);
   const [railHalf, setRailHalf] = useState<TocRailHalf | null>(null);
+  const halfTimerRef = useRef<number | null>(null);
+  const clearHalfTimer = useCallback(() => {
+    if (halfTimerRef.current === null) return;
+    window.clearTimeout(halfTimerRef.current);
+    halfTimerRef.current = null;
+  }, []);
   const [hoveredRange, setHoveredRangeState] =
     useState<ExperimentalThreadTocRange | null>(null);
   const [pointerBand, setPointerBand] =
@@ -778,7 +784,8 @@ export function ThreadTableOfContents({
     setHoveredRangeState(null);
     setRailHalf(null);
     setTab(null);
-  }, [panelOpen]);
+    clearHalfTimer();
+  }, [panelOpen, clearHalfTimer]);
 
   useEffect(() => {
     if (railSelection === null) return;
@@ -899,16 +906,27 @@ export function ThreadTableOfContents({
   };
 
   const canSelect = extensionTabs.length > 0;
+  const applyRailHalf = (half: TocRailHalf) => {
+    setRailHalf(half);
+    const target = defaultExtensionTab ?? extensionTabs[0];
+    setTab(half === "topics" && target ? `ext:${target.key}` : "user");
+  };
   const syncRailHalf = (event: ReactPointerEvent<HTMLElement>) => {
     if (!canSelect || dragRef.current?.moved) return;
     const half = railHalfAt(
       event.clientX,
       event.currentTarget.getBoundingClientRect(),
     );
-    if (half === railHalf) return;
-    setRailHalf(half);
-    const target = defaultExtensionTab ?? extensionTabs[0];
-    setTab(half === "topics" && target ? `ext:${target.key}` : "user");
+    if (half === "topics" || railHalf !== "topics") {
+      clearHalfTimer();
+      if (half !== railHalf) applyRailHalf(half);
+      return;
+    }
+    if (halfTimerRef.current !== null) return;
+    halfTimerRef.current = window.setTimeout(() => {
+      halfTimerRef.current = null;
+      applyRailHalf("messages");
+    }, TOC_HALF_SWITCH_DELAY_MS);
   };
 
   if (userItems.length < TOC_MIN_USER_MESSAGES) {
@@ -1080,6 +1098,7 @@ export function ThreadTableOfContents({
         {panelOpen ? (
           <div
             id={`thread-toc-panel-${threadId}`}
+            onPointerEnter={clearHalfTimer}
             className="pointer-events-auto absolute right-full top-0 w-[18.25rem] max-w-[calc(100vw-3rem)] pr-1"
           >
             <div

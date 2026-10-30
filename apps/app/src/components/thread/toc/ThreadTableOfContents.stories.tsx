@@ -2,6 +2,9 @@ import type {
   TimelineConversationAttachments,
   TimelineRow,
 } from "@bb/server-contract";
+import { useEffect } from "react";
+import { setPluginSlotRegistrations, removePluginSlotRegistrations } from "@/lib/plugin-slots";
+import { makePluginRegistrationSet } from "@/test/fixtures/plugins";
 import { ThreadTimelineSurface } from "@/components/thread/timeline/ThreadTimelineSurface";
 import { ThreadTableOfContents } from "@/components/thread/toc/ThreadTableOfContents";
 import { BottomAnchoredScrollBody } from "@/components/ui/bottom-anchored-scroll-body";
@@ -128,4 +131,31 @@ export function Default() {
       </BottomAnchoredScrollBody>
     </div>
   );
+}
+
+function TopicsTab() {
+  return <div data-testid="topics-tab">Topics list</div>;
+}
+
+export function WithTopics() {
+  useEffect(() => {
+    setPluginSlotRegistrations(
+      "story-topics",
+      makePluginRegistrationSet({
+        threadTocExtensions: [
+          {
+            id: "topics",
+            title: "Topics",
+            useBands: () => [
+              { fromSeq: 1, toSeq: 8, hue: 200, label: "One" },
+              { fromSeq: 9, toSeq: 20, hue: 20, label: "Two" },
+            ],
+            tab: { label: "Topics", component: TopicsTab, experimental_default: true },
+          },
+        ],
+      }),
+    );
+    return () => removePluginSlotRegistrations("story-topics");
+  }, []);
+  return <Default />;
 }
