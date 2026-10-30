@@ -16,7 +16,7 @@ const REDIRECT_STATUS = 302;
 const REQUEST_URL_BASE = "http://moved.invalid";
 
 export interface StartMovedResponderArgs {
-  bindHost: string;
+  bindAddresses: readonly string[];
   movedFile: ServerMovedFile;
   onError: (error: Error) => void;
   port: number;
@@ -143,6 +143,40 @@ function closeServer(server: Server): Promise<void> {
 export function startMovedResponder(
   args: StartMovedResponderArgs,
 ): Promise<MovedResponder | null> {
+  return listenOnAll(args, args.bindAddresses, args.port, []);
+}
+
+async function listenOnAll(
+  args: StartMovedResponderArgs,
+  remaining: readonly string[],
+  port: number,
+  started: Server[],
+): Promise<MovedResponder | null> {
+  const [bindAddress, ...rest] = remaining;
+  if (bindAddress === undefined) {
+    return {
+      close: async () => {
+        await Promise.all(started.map(closeServer));
+      },
+      port,
+    };
+  }
+  const server = await listenOn(args, bindAddress, port);
+  if (server === null) {
+    await Promise.all(started.map(closeServer));
+    return null;
+  }
+  const address = server.address();
+  const boundPort =
+    address !== null && typeof address === "object" ? address.port : port;
+  return listenOnAll(args, rest, boundPort, [...started, server]);
+}
+
+function listenOn(
+  args: StartMovedResponderArgs,
+  bindAddress: string,
+  port: number,
+): Promise<Server | null> {
   const server = createServer(createMovedRequestHandler(args.movedFile));
   return new Promise((resolvePromise) => {
     const onListenError = (error: Error): void => {
@@ -150,17 +184,10 @@ export function startMovedResponder(
       resolvePromise(null);
     };
     server.once("error", onListenError);
-    server.listen(args.port, args.bindHost, () => {
+    server.listen(port, bindAddress, () => {
       server.off("error", onListenError);
       server.on("error", args.onError);
-      const address = server.address();
-      resolvePromise({
-        close: () => closeServer(server),
-        port:
-          address !== null && typeof address === "object"
-            ? address.port
-            : args.port,
-      });
+      resolvePromise(server);
     });
   });
 }

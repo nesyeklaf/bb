@@ -1,6 +1,5 @@
 import { statfs } from "node:fs/promises";
 import type { AppSurface } from "@bb/config/app-surface";
-import type { ServerBindHost } from "@bb/config/server";
 import type {
   AppDeps,
   LoggedPendingInteractionWorkSessionDeps,
@@ -37,7 +36,6 @@ export const SERVER_MOVE_TIMINGS: ServerMoveTimings = {
 
 export interface CreateDefaultServerMoveEnvironmentArgs {
   appSurface: AppSurface;
-  bindHost: ServerBindHost | null;
   deps: AppDeps;
   env: NodeJS.ProcessEnv;
   pluginService: PluginService;
@@ -105,7 +103,6 @@ export function createDefaultServerMoveEnvironment(
   const targetPortOverride = parseServerMoveTargetPort(args.env);
   return {
     allowLoopbackServerUrl: allowsLoopbackServerMoveUrl(args.env),
-    bindHost: args.bindHost,
     deps,
     exportArchive: (exportArgs) =>
       exportServerArchive({

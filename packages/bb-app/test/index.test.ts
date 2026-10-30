@@ -749,8 +749,8 @@ describe("bb-app launcher", () => {
     }
   });
 
-  it("reports the server bind host separately from the loopback connection URL", async () => {
-    const parsedArgs = parseLauncherArgs(["--server-bind-host", "0.0.0.0"]);
+  it("keeps the connection URL on loopback when extra bind addresses are set", async () => {
+    const parsedArgs = parseLauncherArgs(["--server-bind-host", "100.64.0.7"]);
     const dataDir = mkdtempSync(join(tmpdir(), "bb-app-bind-host-"));
     const runtime = await resolveBbAppRuntimeState({
       entrypointUrl: pathToFileURL("/repo/packages/bb-app/dist/bb-app.js").href,
@@ -760,14 +760,13 @@ describe("bb-app launcher", () => {
       serverUrlMode: "local",
     });
 
-    expect(parsedArgs.options.serverBindHost).toBe("0.0.0.0");
-    expect(runtime.serverEnv.BB_SERVER_BIND_HOST).toBe("0.0.0.0");
+    expect(parsedArgs.options.serverBindHost).toBe("100.64.0.7");
+    expect(runtime.serverEnv.BB_SERVER_BIND_HOST).toBe("100.64.0.7");
     expect(
       resolveServerListenerUrl({
-        bindHost: runtime.serverEnv.BB_SERVER_BIND_HOST,
         port: runtime.context.serverPort,
       }),
-    ).toBe("http://0.0.0.0:38886");
+    ).toBe("http://127.0.0.1:38886");
     expect(runtime.context.serverUrl).toBe("http://127.0.0.1:38886");
   });
 
@@ -828,7 +827,9 @@ describe("bb-app launcher", () => {
 
     await expect(
       runBbApp(["--data-dir", dataDir, "--server-bind-host", "localhost"]),
-    ).rejects.toThrow('BB_SERVER_BIND_HOST must be "127.0.0.1" or "0.0.0.0"');
+    ).rejects.toThrow(
+      'BB_SERVER_BIND_HOST entry "localhost" is not an IP address',
+    );
   });
 
   it("tells the bundled CLI where the server's machine installer is", async () => {
@@ -1047,7 +1048,7 @@ describe("bb-app launcher", () => {
           BB_DEV_APP_PORT: "4173",
           BB_HOST_DAEMON_PORT: "48887",
           BB_INHERITED_SKILLS_ROOTS: "/stored/skills",
-          BB_SERVER_BIND_HOST: "0.0.0.0",
+          BB_SERVER_BIND_HOST: "100.64.0.7",
           BB_SERVER_PORT: "48886",
           OPENAI_API_KEY: "stored-openai-key",
         },
@@ -1084,10 +1085,10 @@ describe("bb-app launcher", () => {
         BB_DATA_DIR: dataDir,
         BB_HOST_DAEMON_PORT: "47887",
         BB_INHERITED_SKILLS_ROOTS: "/worktree/skills",
-        BB_SERVER_BIND_HOST: "127.0.0.1",
         BB_SERVER_PORT: "47886",
         OPENAI_API_KEY: "stored-openai-key",
       });
+      expect(env.BB_SERVER_BIND_HOST).toBeUndefined();
       expect(env.BB_DEV_APP_PORT).toBeUndefined();
     }
   });
@@ -1336,7 +1337,19 @@ describe("bb-app launcher", () => {
         "BB_SERVER_BIND_HOST",
         "localhost",
       ]),
-    ).rejects.toThrow('BB_SERVER_BIND_HOST must be "127.0.0.1" or "0.0.0.0"');
+    ).rejects.toThrow(
+      'BB_SERVER_BIND_HOST entry "localhost" is not an IP address',
+    );
+    await expect(
+      runBbApp([
+        "--data-dir",
+        dataDir,
+        "env",
+        "set",
+        "BB_SERVER_BIND_HOST",
+        "0.0.0.0",
+      ]),
+    ).rejects.toThrow("must not contain the wildcard address 0.0.0.0");
 
     expect(JSON.parse(readFileSync(envPath, "utf8"))).toEqual(initialEnvFile);
   });
@@ -1406,7 +1419,7 @@ describe("bb-app launcher", () => {
     const dataDir = mkdtempSync(join(tmpdir(), "bb-app-bind-host-env-"));
     writeFileSync(
       join(dataDir, "env.json"),
-      JSON.stringify({ env: { BB_SERVER_BIND_HOST: "0.0.0.0" } }),
+      JSON.stringify({ env: { BB_SERVER_BIND_HOST: "100.64.0.7" } }),
       "utf8",
     );
     const parsedArgs = parseLauncherArgs(["--server-bind-host", "127.0.0.1"]);
@@ -1523,11 +1536,11 @@ describe("bb-app launcher", () => {
     }
   });
 
-  it("warns that wildcard exposure remains after unsetting the server bind host", async () => {
+  it("warns that the previous listen addresses remain after unsetting the server bind host", async () => {
     const dataDir = mkdtempSync(join(tmpdir(), "bb-app-startup-bind-unset-"));
     writeFileSync(
       join(dataDir, "env.json"),
-      JSON.stringify({ env: { BB_SERVER_BIND_HOST: "0.0.0.0" } }),
+      JSON.stringify({ env: { BB_SERVER_BIND_HOST: "100.64.0.7" } }),
       "utf8",
     );
     const server = await startConfigReloadTestServer();
@@ -1549,7 +1562,7 @@ describe("bb-app launcher", () => {
         "BB_SERVER_BIND_HOST is startup-only. The running process keeps its current value; a full bb-app restart is required to apply this change. Run `bb-app stop && bb-app start`, or restart the desktop app.",
       );
       expect(output).toContain(
-        "Until then, the server keeps its previous bind address. If it was bound to 0.0.0.0, that network exposure remains open.",
+        "Until then, the server keeps listening on its previous addresses.",
       );
       expect(output).not.toContain("Reloaded running bb server config.");
       expect(server.reloadRequests()).toEqual([
@@ -1600,7 +1613,7 @@ describe("bb-app launcher", () => {
         "env",
         "set",
         "BB_SERVER_BIND_HOST",
-        "0.0.0.0",
+        "100.64.0.7",
       ]),
     );
 
@@ -1620,7 +1633,7 @@ describe("bb-app launcher", () => {
       JSON.stringify({
         env: {
           BB_FF_PLACEHOLDER: "true",
-          BB_SERVER_BIND_HOST: "0.0.0.0",
+          BB_SERVER_BIND_HOST: "100.64.0.7",
           BB_SERVER_PORT: "48886",
         },
       }),

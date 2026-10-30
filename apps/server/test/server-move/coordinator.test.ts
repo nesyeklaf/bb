@@ -32,10 +32,7 @@ import {
   type FakeDaemonReply,
 } from "../helpers/server-move.js";
 import { seedHost, seedPrimaryHost } from "../helpers/seed.js";
-import {
-  withTestHarness,
-  type TestAppHarness,
-} from "../helpers/test-app.js";
+import { withTestHarness, type TestAppHarness } from "../helpers/test-app.js";
 
 const OLD = "host-old";
 const NEW = "host-new";
@@ -332,7 +329,6 @@ describe("server move coordinator", () => {
         },
         bbApp: null,
         serverPort: 39_101,
-        bindHost: null,
         sourceDataDir: harness.config.dataDir,
         sourceServerHostId: OLD,
         serverUrl: DIRECT_URL,

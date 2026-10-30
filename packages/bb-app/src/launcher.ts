@@ -68,7 +68,7 @@ import {
 } from "@bb/config/client-config";
 import { validateLogLevel } from "@bb/config/log-level";
 import { validateOptionalUrl } from "@bb/config/public-url";
-import { parseServerBindHost, type ServerBindHost } from "@bb/config/server";
+import { parseServerBindAddressesOnThisHost } from "@bb/config/server";
 import { toOptionalString } from "@bb/config/strings";
 import {
   BB_PROD_HOST_DAEMON_PORT,
@@ -254,7 +254,7 @@ interface WorktreeRuntimePolicy {
   dataDir: string;
   hostDaemonPort: number;
   inheritedSkillsRoots: string;
-  serverBindHost: ServerBindHost;
+  serverBindAddresses: string[];
   serverPort: number;
 }
 
@@ -477,7 +477,7 @@ interface SuperviseMovedDaemonProcessArgs {
 }
 
 interface RunMovedModeArgs {
-  bindHost: ServerBindHost;
+  bindAddresses: readonly string[];
   context: BbAppStartContext;
   delayMilliseconds: DelayMillisecondsFn;
   findMachineService: () => Promise<string | null>;
@@ -506,7 +506,7 @@ interface SuperviseBbAppStartArgs {
   processes: ManagedFullStackProcesses;
   readServerMoveMarkers: ReadServerMoveMarkersFn;
   readServerMovedFile: ReadServerMovedFileFn;
-  serverBindHost: ServerBindHost;
+  serverBindAddresses: readonly string[];
   serverListenerUrl: string;
   shutdown: (signal: NodeJS.Signals) => Promise<void>;
   startMovedDaemon: (movedFile: ServerMovedFile) => Promise<ManagedProcessRun>;
@@ -668,7 +668,6 @@ interface ResolveServerUrlArgs {
 }
 
 interface ResolveServerListenerUrlArgs {
-  bindHost: string | undefined;
   port: number;
 }
 
@@ -924,8 +923,8 @@ export function resolveWorktreeRuntimePolicy(
       rawPort: rawHostDaemonPort,
     }),
     inheritedSkillsRoots,
-    serverBindHost: parseServerBindHost(
-      args.env.BB_SERVER_BIND_HOST ?? BB_LOOPBACK_HOST,
+    serverBindAddresses: parseServerBindAddressesOnThisHost(
+      args.env.BB_SERVER_BIND_HOST ?? "",
     ),
     serverPort: parsePortValue({
       name: "BB_SERVER_PORT",
@@ -943,9 +942,12 @@ function applyWorktreeRuntimePolicy(
     BB_DATA_DIR: policy.dataDir,
     BB_HOST_DAEMON_PORT: String(policy.hostDaemonPort),
     BB_INHERITED_SKILLS_ROOTS: policy.inheritedSkillsRoots,
-    BB_SERVER_BIND_HOST: policy.serverBindHost,
+    BB_SERVER_BIND_HOST: policy.serverBindAddresses.join(","),
     BB_SERVER_PORT: String(policy.serverPort),
   };
+  if (policy.serverBindAddresses.length === 0) {
+    delete nextEnv.BB_SERVER_BIND_HOST;
+  }
   delete nextEnv.BB_DEV_APP_PORT;
   return nextEnv;
 }
@@ -1002,8 +1004,7 @@ function resolveServerUrl(args: ResolveServerUrlArgs): string {
 export function resolveServerListenerUrl(
   args: ResolveServerListenerUrlArgs,
 ): string {
-  const bindHost = parseServerBindHost(args.bindHost ?? BB_LOOPBACK_HOST);
-  return `http://${bindHost}:${String(args.port)}`;
+  return `http://${BB_LOOPBACK_HOST}:${String(args.port)}`;
 }
 
 function applyManagedConfigEnv(
@@ -1808,7 +1809,7 @@ function printStartupOnlyChangeNotice(key: string): void {
   );
   if (key === "BB_SERVER_BIND_HOST") {
     process.stdout.write(
-      "Until then, the server keeps its previous bind address. If it was bound to 0.0.0.0, that network exposure remains open.\n",
+      "Until then, the server keeps listening on its previous addresses.\n",
     );
   }
 }
@@ -1959,7 +1960,7 @@ async function runEnvCommand(args: RunEnvCommandArgs): Promise<void> {
     throw new Error("Env value must not be empty. Use unset to remove it.");
   }
   if (key === "BB_SERVER_BIND_HOST") {
-    parseServerBindHost(value);
+    parseServerBindAddressesOnThisHost(value);
   }
   const patch = createManagedEnvPatch(key, value);
   await mutateManagedEnv(args.dataDir, (current) =>
@@ -2709,7 +2710,7 @@ async function assertConfiguredServerBindHost(
     return;
   }
   try {
-    parseServerBindHost(configuredServerBindHost);
+    parseServerBindAddressesOnThisHost(configuredServerBindHost);
   } catch (error) {
     const envFile = await readManagedEnvFile({
       dataDir: args.runtime.context.dataDir,
@@ -2735,7 +2736,7 @@ export async function runBbServer(
     process.stdout.write(`bb-server
 
 Usage:
-  bb-server [--data-dir <path>] [--server-bind-host <host>] [--server-port <port>]
+  bb-server [--data-dir <path>] [--server-bind-host <addresses>] [--server-port <port>]
 
 Logs rotate in <data-dir>/logs/server.N.log. Startup errors and crashes append to <data-dir>/logs/server-stdio.log.
 Exits with code 3 without starting when the server on this data directory moved to another machine, unless a move back to this computer is in progress.
@@ -3014,7 +3015,7 @@ function printBbAppHelp(): void {
   process.stdout.write(`bb-app
 
 Usage:
-  bb-app [--data-dir <path>] [--server-bind-host <host>] [--server-port <port>] [--host-daemon-port <port>]
+  bb-app [--data-dir <path>] [--server-bind-host <addresses>] [--server-port <port>] [--host-daemon-port <port>]
   bb-app start
 
   --perf-diagnostics permits CPU profiles and detailed logs when the performanceDiagnostics experiment is also on.
@@ -3410,7 +3411,6 @@ export async function runMovedMode(
   args.processes.daemonRun = null;
 
   const responderUrl = resolveServerListenerUrl({
-    bindHost: args.bindHost,
     port: args.context.serverPort,
   });
   let responder: MovedResponder | null = null;
@@ -3479,7 +3479,7 @@ export async function runMovedMode(
       return;
     }
     responder = await args.startResponder({
-      bindHost: args.bindHost,
+      bindAddresses: args.bindAddresses,
       movedFile: markers.movedFile,
       onError: (error) => {
         reportProblem(
@@ -3650,7 +3650,7 @@ export async function superviseBbAppStart(
     movedFile: ServerMovedFile,
   ): Promise<FullStackSupervisionResult> => {
     const movedModeResult = await runMovedMode({
-      bindHost: args.serverBindHost,
+      bindAddresses: args.serverBindAddresses,
       context: args.context,
       delayMilliseconds: args.delayMilliseconds,
       findMachineService: args.findMachineService,
@@ -3796,8 +3796,12 @@ export async function runBbApp(
         {
           dryRun: true,
           ...runtime.context,
-          serverBindHost:
-            runtime.serverEnv.BB_SERVER_BIND_HOST ?? BB_LOOPBACK_HOST,
+          serverBindAddresses: [
+            BB_LOOPBACK_HOST,
+            ...parseServerBindAddressesOnThisHost(
+              runtime.serverEnv.BB_SERVER_BIND_HOST ?? "",
+            ),
+          ],
         },
         null,
         2,
@@ -3855,11 +3859,13 @@ export async function runBbApp(
   assertBbAppArtifacts(runtime.context);
 
   const context = runtime.context;
-  const serverBindHost = parseServerBindHost(
-    runtime.serverEnv.BB_SERVER_BIND_HOST ?? BB_LOOPBACK_HOST,
-  );
+  const serverBindAddresses = [
+    BB_LOOPBACK_HOST,
+    ...parseServerBindAddressesOnThisHost(
+      runtime.serverEnv.BB_SERVER_BIND_HOST ?? "",
+    ),
+  ];
   const serverListenerUrl = resolveServerListenerUrl({
-    bindHost: serverBindHost,
     port: context.serverPort,
   });
   const resolveFullStackRuntime = async (
@@ -4007,7 +4013,7 @@ export async function runBbApp(
       readServerMoveMarkers: () =>
         readServerMoveMarkers({ dataDir: context.dataDir }),
       readServerMovedFile: () => readServerMovedFile(context.dataDir),
-      serverBindHost,
+      serverBindAddresses,
       serverListenerUrl,
       shutdown,
       startMovedDaemon: async (movedFile) => {

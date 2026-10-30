@@ -138,9 +138,10 @@ function manualMarker(): ServerImportFile {
 
 function rootDirOf(db: DbConnection, pluginId: string): string | undefined {
   return db.$client
-    .prepare<[string], { root_dir: string }>(
-      "SELECT root_dir FROM plugins WHERE id = ?",
-    )
+    .prepare<
+      [string],
+      { root_dir: string }
+    >("SELECT root_dir FROM plugins WHERE id = ?")
     .get(pluginId)?.root_dir;
 }
 
@@ -697,7 +698,6 @@ describe("manual import completion", () => {
       const app = createApp(harness.deps, {
         serverMove: {
           appSurface: "web",
-          bindHost: null,
           manualImportPending: true,
           pending: null,
           restoredRun: null,
@@ -736,7 +736,6 @@ describe("pending server mode", () => {
       const pendingApp = createApp(harness.deps, {
         serverMove: {
           appSurface: "web",
-          bindHost: null,
           manualImportPending: false,
           pending: {
             moveId: "move-1",
@@ -845,7 +844,6 @@ describe("pending server mode", () => {
       const pendingApp = createApp(harness.deps, {
         serverMove: {
           appSurface: "web",
-          bindHost: null,
           manualImportPending: false,
           pending: {
             moveId: "move-1",

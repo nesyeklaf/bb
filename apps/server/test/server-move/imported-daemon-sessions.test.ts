@@ -180,7 +180,7 @@ describe("daemon sessions in an imported server snapshot", () => {
     const disconnect = source.indexOf("disconnectImportedDaemonSessions(");
 
     expect(disconnect).toBeGreaterThan(source.indexOf("createApp("));
-    expect(disconnect).toBeLessThan(source.indexOf("startHttpListener({"));
+    expect(disconnect).toBeLessThan(source.indexOf("startHttpListeners({"));
     expect(source.slice(disconnect)).toContain(
       "sessions: serverImport.importedDaemonSessions",
     );

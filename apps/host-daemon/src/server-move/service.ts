@@ -745,7 +745,6 @@ export class ServerMoveService {
             dataDir,
             serverPort: state.serverPort,
             hostDaemonPort,
-            bindHost: state.bindHost,
           },
         );
         formatServiceDefinitionContent(definition, programArguments);
@@ -787,9 +786,6 @@ export class ServerMoveService {
         String(state.serverPort),
         "--host-daemon-port",
         String(this.options.hostDaemonPort),
-        ...(state.bindHost === null
-          ? []
-          : ["--server-bind-host", state.bindHost]),
       ],
     };
   }
@@ -1200,7 +1196,6 @@ export class ServerMoveService {
       moveId: command.moveId,
       activationToken: command.activationToken,
       serverPort: command.serverPort,
-      bindHost: command.bindHost,
       importedEntries: null,
       archivedServerData: null,
       pendingServer: null,
@@ -1310,7 +1305,6 @@ export class ServerMoveService {
         bbServerEntry: serverEntry,
         dataDir,
         serverPort: command.serverPort,
-        bindHost: command.bindHost,
         hostDaemonPort: this.options.hostDaemonPort,
         env: createPendingServerEnv(
           this.options.env,

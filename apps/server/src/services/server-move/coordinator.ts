@@ -3,7 +3,6 @@ import { rm, rmdir } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { setTimeout as sleep } from "node:timers/promises";
 import type { AppSurface } from "@bb/config/app-surface";
-import type { ServerBindHost } from "@bb/config/server";
 import { listNonDestroyedHostsByIds } from "@bb/db";
 import {
   formatServerDataSize,
@@ -96,7 +95,6 @@ export interface ServerMoveStopWorkArgs {
 
 export interface ServerMoveEnvironment {
   allowLoopbackServerUrl: boolean;
-  bindHost: ServerBindHost | null;
   deps: AppDeps;
   exportArchive(args: ServerMoveExportArgs): Promise<ServerArchiveExport>;
   fullArtifact: FullBbAppArtifactService;
@@ -668,7 +666,6 @@ export function createServerMoveCoordinator(
                   version: move.bbApp.version,
                 },
           serverPort: environment.targetServerPort(),
-          bindHost: environment.bindHost === "0.0.0.0" ? "0.0.0.0" : null,
           sourceDataDir: deps.config.dataDir,
           sourceServerHostId: move.sourceServerHost.id,
           serverUrl: move.status.serverUrl,
@@ -904,7 +901,7 @@ export function createServerMoveCoordinator(
         toHostId: move.status.targetHostId,
         toHostName: targetName,
         serverUrl: move.status.serverUrl,
-          oldCopyEntries: archive.oldCopyEntries,
+        oldCopyEntries: archive.oldCopyEntries,
       });
       await validateOldServerDaemonConfig({
         dataDir: deps.config.dataDir,

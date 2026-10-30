@@ -1,9 +1,7 @@
 import { readFile, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { setTimeout as sleep } from "node:timers/promises";
-import {
-  readLastServerMoveFile,
-} from "@bb/server-archive";
+import { readLastServerMoveFile } from "@bb/server-archive";
 import { describe, expect, it } from "vitest";
 import { createDeferredPromise } from "@bb/test-helpers";
 import { readIncomingMoveState, writeIncomingMoveState } from "./move-state.js";
@@ -250,7 +248,7 @@ describe("server_move.activate sequencing", () => {
       join(fixture.dataDir, "install-daemon.pid"),
       `${PARENT_PID}\n`,
     );
-    const command = await prepareCommand(fixture, { bindHost: "0.0.0.0" });
+    const command = await prepareCommand(fixture);
     const prepared = await service.prepare(command);
 
     await service.activate(activateCommand);
@@ -270,8 +268,6 @@ describe("server_move.activate sequencing", () => {
           String(command.serverPort),
           "--host-daemon-port",
           "38887",
-          "--server-bind-host",
-          "0.0.0.0",
         ],
         env: expect.objectContaining({
           BB_DATA_DIR: fixture.dataDir,
@@ -414,7 +410,6 @@ describe("activation resume", () => {
       moveId: MOVE_ID,
       activationToken: "activation-token-0123456789",
       serverPort,
-      bindHost: null,
       importedEntries: ["bb.db"],
       archivedServerData: null,
       pendingServer: { pid: 999_998, localServerUrl: "http://127.0.0.1:1" },

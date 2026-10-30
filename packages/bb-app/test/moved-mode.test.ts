@@ -312,8 +312,8 @@ describe("bb-app start after the server moved", () => {
           pendingMoveImport: false,
         }),
         readServerMovedFile: async () => movedFile,
-        serverBindHost: "0.0.0.0",
-        serverListenerUrl: "http://0.0.0.0:39886",
+        serverBindAddresses: ["127.0.0.1", "100.64.0.7"],
+        serverListenerUrl: "http://127.0.0.1:39886",
         shutdown: async () => {
           throw new Error("Unexpected startup failure");
         },
@@ -344,7 +344,7 @@ describe("bb-app start after the server moved", () => {
     expect(movedDaemonFiles).toEqual([movedFile, movedFile]);
     expect(responders.opens).toHaveLength(1);
     expect(responders.opens[0]).toMatchObject({
-      bindHost: "0.0.0.0",
+      bindAddresses: ["127.0.0.1", "100.64.0.7"],
       movedFile,
       port: 39886,
     });
@@ -372,7 +372,7 @@ describe("bb-app start after the server moved", () => {
 
     const output = await captureOutput(process.stdout, async () => {
       const movedMode = runMovedMode({
-        bindHost: "127.0.0.1",
+        bindAddresses: ["127.0.0.1"],
         context: { ...createTestStartContext(), serverPort: port },
         delayMilliseconds: async () => {
           throw new Error("Unexpected daemon restart");
@@ -437,7 +437,7 @@ describe("bb-app start after the server moved", () => {
 
     const output = await captureOutput(process.stdout, async () => {
       const movedMode = runMovedMode({
-        bindHost: "127.0.0.1",
+        bindAddresses: ["127.0.0.1"],
         context: createTestStartContext(),
         delayMilliseconds: (args) => delay.delayMilliseconds(args),
         findMachineService: async () =>
@@ -491,7 +491,7 @@ describe("bb-app start after the server moved", () => {
 
     await captureOutput(process.stdout, async () => {
       const movedMode = runMovedMode({
-        bindHost: "127.0.0.1",
+        bindAddresses: ["127.0.0.1"],
         context: createTestStartContext(),
         delayMilliseconds: async (args) => {
           restartDelays.push(args.ms);
@@ -574,7 +574,7 @@ describe("bb-app start after the server moved", () => {
         processes,
         readServerMoveMarkers: async () => markers,
         readServerMovedFile: async () => markers.movedFile,
-        serverBindHost: "127.0.0.1",
+        serverBindAddresses: ["127.0.0.1"],
         serverListenerUrl: "http://127.0.0.1:39886",
         shutdown: async () => {
           throw new Error("Unexpected startup failure");
@@ -895,7 +895,7 @@ describe("bb-app start after the server moved", () => {
 
     const output = await captureOutput(process.stdout, async () => {
       const supervision = runMovedMode({
-        bindHost: "127.0.0.1",
+        bindAddresses: ["127.0.0.1"],
         context: createTestStartContext(),
         delayMilliseconds: (args) => delay.delayMilliseconds(args),
         findMachineService: async () => null,
@@ -1000,7 +1000,7 @@ describe("bb-server after the server moved", () => {
 
     try {
       await expect(runBbServer(args)).rejects.toThrow(
-        'BB_SERVER_BIND_HOST must be "127.0.0.1" or "0.0.0.0"',
+        "BB_SERVER_BIND_HOST entry 192.0.2.1 is neither a tailnet address",
       );
       expect(process.exitCode).toBe(previousExitCode);
     } finally {

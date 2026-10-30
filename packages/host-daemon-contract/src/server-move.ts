@@ -7,8 +7,6 @@ const activationTokenSchema = z.string().min(16);
 const sha256HexSchema = z.string().regex(/^[0-9a-f]{64}$/u);
 const portSchema = z.number().int().min(1).max(65535);
 
-export const serverMoveBindHostSchema = z.enum(["127.0.0.1", "0.0.0.0"]);
-
 export const serverMoveHealthStateSchema = z.enum([
   "pending",
   "activating",
@@ -63,7 +61,6 @@ export const serverMoveCommandSchemas = {
         .strict()
         .nullable(),
       serverPort: portSchema,
-      bindHost: serverMoveBindHostSchema.nullable(),
       sourceDataDir: z.string().min(1),
       sourceServerHostId: z.string().min(1).nullable(),
       serverUrl: z.string().min(1),

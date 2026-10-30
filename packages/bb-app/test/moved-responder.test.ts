@@ -61,7 +61,7 @@ function createMovedFile(overrides: Partial<ServerMovedFile>): ServerMovedFile {
 async function listen(movedFile: ServerMovedFile): Promise<number> {
   const errors: Error[] = [];
   const responder = await startMovedResponder({
-    bindHost: "127.0.0.1",
+    bindAddresses: ["127.0.0.1"],
     movedFile,
     onError: (error) => {
       errors.push(error);
@@ -231,7 +231,7 @@ describe("moved responder", () => {
     const errors: Error[] = [];
     try {
       const responder = await startMovedResponder({
-        bindHost: "127.0.0.1",
+        bindAddresses: ["127.0.0.1"],
         movedFile: createMovedFile({}),
         onError: (error) => {
           errors.push(error);
@@ -247,5 +247,43 @@ describe("moved responder", () => {
         occupied.close((error) => (error ? reject(error) : resolvePromise()));
       });
     }
+  });
+  it.runIf(process.platform === "linux")(
+    "answers on every bind address with the loopback port",
+    async () => {
+      const responder = await startMovedResponder({
+        bindAddresses: ["127.0.0.1", "127.0.0.2"],
+        movedFile: createMovedFile({}),
+        onError: () => undefined,
+        port: 0,
+      });
+      if (responder === null) {
+        throw new Error("Responder did not listen");
+      }
+      responders.push(responder);
+
+      const response = await sendRequest({
+        method: "GET",
+        path: "/api/v1/threads",
+        port: responder.port,
+      });
+      expect(response.status).toBe(410);
+    },
+  );
+
+  it("releases already bound addresses when a later address fails", async () => {
+    const errors: Error[] = [];
+    const responder = await startMovedResponder({
+      bindAddresses: ["127.0.0.1", "192.0.2.123"],
+      movedFile: createMovedFile({}),
+      onError: (error) => {
+        errors.push(error);
+      },
+      port: 0,
+    });
+
+    expect(responder).toBeNull();
+    expect(errors).toHaveLength(1);
+    expect(errors[0]).toMatchObject({ code: "EADDRNOTAVAIL" });
   });
 });

@@ -1,7 +1,6 @@
 import { readdir, readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { lastServerMoveSchema } from "@bb/domain";
-import { serverMoveBindHostSchema } from "@bb/host-daemon-contract";
 import { z } from "zod";
 import { ExpectedCommandDispatchError } from "../command-dispatch-support.js";
 import { isFileNotFoundError, writeFileAtomically } from "./fs.js";
@@ -23,7 +22,6 @@ const incomingMoveStateSchema = z
     moveId: z.string().regex(MOVE_ID_SEGMENT_PATTERN),
     activationToken: z.string().min(16),
     serverPort: z.number().int().min(1).max(65_535),
-    bindHost: serverMoveBindHostSchema.nullable(),
     importedEntries: z.array(z.string().min(1)).nullable(),
     archivedServerData: z
       .object({
@@ -50,6 +48,10 @@ const incomingMoveStateSchema = z
       .nullable(),
   })
   .strict();
+
+const legacyIncomingMoveStateSchema = incomingMoveStateSchema
+  .extend({ bindHost: z.unknown().optional() })
+  .transform(({ bindHost: _legacyBindHost, ...state }) => state);
 
 export type IncomingMoveState = z.infer<typeof incomingMoveStateSchema>;
 
@@ -87,7 +89,7 @@ export async function readIncomingMoveState(
     }
     throw error;
   }
-  return incomingMoveStateSchema.parse(JSON.parse(raw));
+  return legacyIncomingMoveStateSchema.parse(JSON.parse(raw));
 }
 
 export async function writeIncomingMoveState(

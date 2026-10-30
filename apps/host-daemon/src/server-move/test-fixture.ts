@@ -571,7 +571,6 @@ export async function prepareCommand(
     },
     bbApp: null,
     serverPort: overrides.serverPort ?? (await fixture.reserveServerPort()),
-    bindHost: null,
     sourceDataDir: "/Users/me/.bb",
     sourceServerHostId: "host-source",
     serverUrl: "https://bb.example.test",

@@ -125,7 +125,6 @@ import { rankAcceptedAssetEncodings } from "./asset-content-encoding.js";
 import { apiJsonCompression } from "./api-response-compression.js";
 import { serverTiming } from "./server-timing.js";
 import { APP_SURFACE_WEB, type AppSurface } from "@bb/config/app-surface";
-import type { ServerBindHost } from "@bb/config/server";
 import { registerServerMoveRoutes } from "./routes/server-move.js";
 import {
   INTERNAL_SERVER_MOVE_PENDING_PATH,
@@ -186,7 +185,6 @@ function normalizeInternalAuthPath(path: string): string {
 
 export interface ServerMoveAppOptions {
   appSurface: AppSurface;
-  bindHost: ServerBindHost | null;
   manualImportPending: boolean;
   pending: PendingServerMove | null;
   restoredRun: RestoredServerMoveRun | null;
@@ -482,7 +480,6 @@ export function createApp(
     });
   const serverMoveOptions: ServerMoveAppOptions = options?.serverMove ?? {
     appSurface: APP_SURFACE_WEB,
-    bindHost: null,
     manualImportPending: false,
     pending: null,
     restoredRun: null,
@@ -834,7 +831,6 @@ export function createApp(
   const serverMove = createServerMoveCoordinator(
     createDefaultServerMoveEnvironment({
       appSurface: serverMoveOptions.appSurface,
-      bindHost: serverMoveOptions.bindHost,
       deps,
       env: process.env,
       pluginService,

@@ -112,7 +112,6 @@ describe("ServerMoveService.prepare", () => {
         bbServerEntry: join(fixture.packageRoot, "dist", "bb-server.js"),
         dataDir: fixture.dataDir,
         serverPort: command.serverPort,
-        bindHost: null,
         hostDaemonPort: 38_887,
         env: expect.objectContaining({ BB_HOST_DAEMON_PORT: "38887" }),
         logPath: join(
@@ -500,7 +499,6 @@ describe("ServerMoveService own data dir guards", () => {
       moveId: "move-crashed",
       activationToken: ACTIVATION_TOKEN,
       serverPort: 39_999,
-      bindHost: null,
       importedEntries: null,
       archivedServerData: null,
       pendingServer: null,

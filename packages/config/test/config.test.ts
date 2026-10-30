@@ -346,25 +346,39 @@ describe("consumer-specific config", () => {
     ).toBe("launch-123");
   });
 
-  it("defaults the server bind host to loopback", () => {
+  it("defaults to no bind addresses beyond loopback", () => {
     const serverConfig = loadServerConfig({
       env: createServerRuntimeEnv({
         BB_SERVER_BIND_HOST: undefined,
       }),
     });
 
-    expect(serverConfig.BB_SERVER_BIND_HOST).toBe("127.0.0.1");
+    expect(serverConfig.BB_SERVER_BIND_HOST).toEqual([]);
   });
 
-  it("honors an explicit wildcard server bind host", () => {
+  it("loads a list of additional tailnet bind addresses", () => {
     const serverConfig = loadServerConfig({
       env: createServerRuntimeEnv({
-        BB_SERVER_BIND_HOST: "0.0.0.0",
+        BB_SERVER_BIND_HOST: "127.0.0.1,100.64.1.2 fd7a:115c:a1e0::2",
       }),
     });
 
-    expect(serverConfig.BB_SERVER_BIND_HOST).toBe("0.0.0.0");
+    expect(serverConfig.BB_SERVER_BIND_HOST).toEqual([
+      "100.64.1.2",
+      "fd7a:115c:a1e0::2",
+    ]);
   });
+
+  it.each(["0.0.0.0", "::", "203.0.113.9"])(
+    "refuses to load with the bind address %s",
+    (bindHost) => {
+      expect(() =>
+        loadServerConfig({
+          env: createServerRuntimeEnv({ BB_SERVER_BIND_HOST: bindHost }),
+        }),
+      ).toThrow(/BB_SERVER_BIND_HOST/u);
+    },
+  );
 
   it("rejects an unsupported server bind host", () => {
     expect(() =>

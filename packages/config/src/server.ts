@@ -28,8 +28,6 @@ import {
   DEFAULT_BB_APP_VERSION,
   DEFAULT_BB_EXTERNAL_URL,
   DEFAULT_BB_SERVER_BIND_HOST,
-  parseServerBindHost,
-  type ServerBindHost,
 } from "./env-vars.js";
 import { loadFeatureFlags } from "./feature-flags.js";
 import { assignIfDefined } from "./objects.js";
@@ -45,7 +43,7 @@ export interface ServerConfig
   BB_EXTERNAL_URL: string;
   BB_HOST_DAEMON_PORT: number;
   BB_INHERITED_SKILLS_ROOTS: string[];
-  BB_SERVER_BIND_HOST: ServerBindHost;
+  BB_SERVER_BIND_HOST: string[];
   BB_SERVER_LAUNCH_ID?: string;
   BB_CLI_LAUNCHER?: string;
   BB_PERF_DIAGNOSTICS: boolean;
@@ -55,8 +53,11 @@ export interface ServerConfig
 
 type LoadServerConfigArgs = LoadCommonConfigArgs;
 
-export { parseServerBindHost };
-export type { ServerBindHost };
+export {
+  parseServerBindAddresses,
+  parseServerBindAddressesOnThisHost,
+  readWireguardAddresses,
+} from "./bind-addresses.js";
 
 export function loadServerConfig(
   args: LoadServerConfigArgs = {},
