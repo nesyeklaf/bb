@@ -723,15 +723,12 @@ describe("plugin update service and routes", () => {
       sourceGitRef: null,
       sourceGitSubdirectory: null,
       sourceGitCommit: null,
-      statsJson: null,
       manifestJson: JSON.stringify({
         schemaVersion: 1,
         name: "acme-plugins",
         displayName: "Acme Plugins",
         plugins: [],
       }),
-      etag: null,
-      lastModified: null,
       lastSuccessfulRefreshAt: Date.now(),
       lastAttemptedRefreshAt: Date.now(),
       lastError: null,
@@ -739,7 +736,6 @@ describe("plugin update service and routes", () => {
     const catalog = createPluginCatalogService({
       db,
       appVersion: "1.0.0",
-      marketplaceUrl: "https://marketplace.test/marketplace.json",
       dataDir: join(workDir, "data"),
       plugins: service,
     });

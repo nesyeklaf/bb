@@ -1,7 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { mkdir, readFile, rm, stat } from "node:fs/promises";
 import { join, resolve } from "node:path";
-import type { PluginMarketplaceSourceKind } from "@bb/db";
 import {
   normalizePluginSubdirectory,
   parsePluginSource,
@@ -9,11 +8,8 @@ import {
   realPathInside,
   runInstallCommand,
 } from "../plugins/install-sources.js";
-import type { MarketplaceFetch } from "./marketplace-http.js";
 import {
-  entryScreenshotUrls,
   parseMarketplaceManifest,
-  parseMarketplaceManifestJson,
   type MarketplaceIconBase,
   type MarketplaceManifest,
 } from "./marketplace-manifest.js";
@@ -21,14 +17,12 @@ import {
 const MARKETPLACE_MANIFEST_FILENAME = "marketplace.json";
 
 type MarketplaceSource =
-  | { kind: "https"; manifestUrl: string }
   | { kind: "git"; url: string; ref: string; subdirectory: string | null }
   | { kind: "path"; directory: string };
 
 const GIT_CLONE_ARGS = ["-c", "core.hooksPath=/dev/null"] as const;
 
-const SOURCE_FORMS =
-  'expected "https://<manifest-url>", "git:<url>[@<ref>]", or "path:<directory>"';
+const SOURCE_FORMS = 'expected "git:<url>[@<ref>]" or "path:<directory>"';
 
 function assertNoSubdirectory(
   source: string,
@@ -80,35 +74,25 @@ export function parseMarketplaceSource(
             ),
     };
   }
-  if (/^https:\/\//iu.test(source)) {
-    assertNoSubdirectory(source, subdirectory);
-    return { kind: "https", manifestUrl: source };
-  }
-  if (/^http:\/\//iu.test(source)) {
-    throw new Error(
-      `invalid marketplace source "${source}": plain http is refused, use https`,
-    );
-  }
   throw new Error(`invalid marketplace source "${source}": ${SOURCE_FORMS}`);
 }
 
 export function marketplaceSourceDisplay(source: MarketplaceSource): string {
-  if (source.kind === "https") return source.manifestUrl;
   if (source.kind === "path") return `path:${source.directory}`;
   return `git:${source.url}@${source.ref}`;
 }
 
 export function marketplaceSourceFromRow(row: {
-  sourceKind: PluginMarketplaceSourceKind;
+  sourceKind: string;
   manifestUrl: string;
   sourceGitRef: string | null;
   sourceGitSubdirectory: string | null;
 }): MarketplaceSource {
-  if (row.sourceKind === "https") {
-    return { kind: "https", manifestUrl: row.manifestUrl };
-  }
   if (row.sourceKind === "path") {
     return { kind: "path", directory: row.manifestUrl };
+  }
+  if (row.sourceKind !== "git") {
+    throw new Error(`unsupported marketplace source kind "${row.sourceKind}"`);
   }
   if (row.sourceGitRef === null) {
     throw new Error("git marketplace row has no ref");
@@ -122,19 +106,11 @@ export function marketplaceSourceFromRow(row: {
 }
 
 export function marketplaceSourceColumns(source: MarketplaceSource): {
-  sourceKind: PluginMarketplaceSourceKind;
+  sourceKind: "git" | "path";
   manifestUrl: string;
   sourceGitRef: string | null;
   sourceGitSubdirectory: string | null;
 } {
-  if (source.kind === "https") {
-    return {
-      sourceKind: "https",
-      manifestUrl: source.manifestUrl,
-      sourceGitRef: null,
-      sourceGitSubdirectory: null,
-    };
-  }
   if (source.kind === "path") {
     return {
       sourceKind: "path",
@@ -154,9 +130,6 @@ export function marketplaceSourceColumns(source: MarketplaceSource): {
 interface MaterializedMarketplace {
   catalog: MarketplaceManifest;
   manifestJson: string;
-  unchanged: boolean;
-  etag: string | null;
-  lastModified: string | null;
   commit: string | null;
   iconBase: MarketplaceIconBase;
   dispose(): Promise<void>;
@@ -164,25 +137,9 @@ interface MaterializedMarketplace {
 
 export async function materializeMarketplace(args: {
   source: MarketplaceSource;
-  cached: {
-    manifestJson: string;
-    etag: string | null;
-    lastModified: string | null;
-  } | null;
   stagingDir: string;
-  fetch: MarketplaceFetch;
-  fallbackManifestUrl?: string;
   warn?: (message: string) => void;
 }): Promise<MaterializedMarketplace> {
-  if (args.source.kind === "https") {
-    return materializeHttps(
-      args.source,
-      args.cached,
-      args.fetch,
-      args.fallbackManifestUrl,
-      args.warn,
-    );
-  }
   if (args.source.kind === "path") {
     return materializeLocal(
       args.source.directory,
@@ -192,125 +149,6 @@ export async function materializeMarketplace(args: {
     );
   }
   return materializeGit(args.source, args.stagingDir, args.warn);
-}
-
-async function materializeHttps(
-  source: Extract<MarketplaceSource, { kind: "https" }>,
-  cached: {
-    manifestJson: string;
-    etag: string | null;
-    lastModified: string | null;
-  } | null,
-  fetchMarketplace: MarketplaceFetch,
-  fallbackManifestUrl: string | undefined,
-  warn: ((message: string) => void) | undefined,
-): Promise<MaterializedMarketplace> {
-  const cachedCatalog =
-    cached === null
-      ? null
-      : parseMarketplaceManifestJson(
-          cached.manifestJson,
-          "stored marketplace catalog",
-          warn,
-        );
-
-  async function requestManifest(
-    manifestUrl: string,
-    useCache: boolean,
-    preferJson: boolean,
-  ): Promise<Response> {
-    const headers = new Headers(
-      preferJson ? { accept: "application/json" } : undefined,
-    );
-    if (useCache && cached?.etag != null) {
-      headers.set("if-none-match", cached.etag);
-    }
-    if (useCache && cached?.lastModified != null) {
-      headers.set("if-modified-since", cached.lastModified);
-    }
-    return fetchMarketplace(manifestUrl, {
-      method: "GET",
-      headers,
-      redirect: "error",
-    });
-  }
-
-  let manifestUrl = source.manifestUrl;
-  let response = await requestManifest(
-    manifestUrl,
-    fallbackManifestUrl === undefined || cachedCatalog?.schemaVersion === 2,
-    fallbackManifestUrl === undefined,
-  );
-  if (response.status === 404 && fallbackManifestUrl !== undefined) {
-    if (cachedCatalog?.schemaVersion === 2 && cached !== null) {
-      await response.body?.cancel();
-      warn?.(
-        "the marketplace v2 manifest returned HTTP 404; BB kept the stored v2 catalog and did not request v1",
-      );
-      const iconBase = {
-        kind: "url",
-        manifestUrl: source.manifestUrl,
-      } as const;
-      for (const entry of cachedCatalog.plugins) {
-        entryScreenshotUrls(entry, iconBase, warn);
-      }
-      return {
-        catalog: cachedCatalog,
-        manifestJson: cached.manifestJson,
-        unchanged: true,
-        etag: cached.etag,
-        lastModified: cached.lastModified,
-        commit: null,
-        iconBase,
-        dispose: async () => {},
-      };
-    }
-    await response.body?.cancel();
-    manifestUrl = fallbackManifestUrl;
-    response = await requestManifest(
-      manifestUrl,
-      cachedCatalog?.schemaVersion === 1,
-      true,
-    );
-  }
-  const unchanged = response.status === 304 && cached !== null;
-  if (!unchanged && !response.ok) {
-    await response.body?.cancel();
-    throw new Error(`request failed with HTTP ${response.status}`);
-  }
-  let manifestJson: string;
-  let catalog: MarketplaceManifest;
-  if (unchanged) {
-    await response.body?.cancel();
-    manifestJson = cached.manifestJson;
-    catalog =
-      cachedCatalog ??
-      parseMarketplaceManifestJson(
-        manifestJson,
-        "stored marketplace catalog",
-        warn,
-      );
-  } else {
-    const raw = await response.text();
-    catalog = parseMarketplaceManifestJson(raw, "marketplace manifest", warn);
-    manifestJson = JSON.stringify(catalog);
-  }
-  const iconBase = { kind: "url", manifestUrl } as const;
-  for (const entry of catalog.plugins) {
-    entryScreenshotUrls(entry, iconBase, warn);
-  }
-  return {
-    catalog,
-    manifestJson,
-    unchanged,
-    etag: response.headers.get("etag") ?? (unchanged ? cached.etag : null),
-    lastModified:
-      response.headers.get("last-modified") ??
-      (unchanged ? cached.lastModified : null),
-    commit: null,
-    iconBase,
-    dispose: async () => {},
-  };
 }
 
 async function materializeLocal(
@@ -338,15 +176,9 @@ async function materializeLocal(
       warn,
     );
     const iconBase = { kind: "dir", root } as const;
-    for (const entry of catalog.plugins) {
-      entryScreenshotUrls(entry, iconBase, warn);
-    }
     return {
       catalog,
       manifestJson: JSON.stringify(catalog),
-      unchanged: false,
-      etag: null,
-      lastModified: null,
       commit,
       iconBase,
       dispose,

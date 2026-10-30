@@ -26,33 +26,12 @@ const categoryIds: ReadonlySet<string> = new Set(
   PLUGIN_CATALOG_CATEGORIES.map((category) => category.id),
 );
 
-const screenshotSchema = z.string().superRefine((value, ctx) => {
-  try {
-    const url = new URL(value);
-    if (url.protocol !== "https:" || url.hostname !== "getbb.app") {
-      ctx.addIssue({
-        code: "custom",
-        message: "must be an https URL on getbb.app",
-      });
-    }
-    if (!/\.(?:jpe?g|png|webp)$/iu.test(url.pathname)) {
-      ctx.addIssue({
-        code: "custom",
-        message: "must use a jpg, jpeg, png, or webp file",
-      });
-    }
-  } catch {
-    ctx.addIssue({ code: "custom", message: "must be a valid URL" });
-  }
-});
-
 const catalogBlockSchema = z
   .object({
     category: pluginCatalogCategoryIdSchema.refine(
       (category) => categoryIds.has(category),
       "must be a built-in category id",
     ),
-    screenshots: z.array(screenshotSchema).max(6),
   })
   .strict();
 
@@ -295,7 +274,6 @@ export async function generateBbOfficialMarketplace(args: {
         author: { name: "BB" },
         source: { bundled: { plugin: plugin.name } },
         category: catalog.category,
-        screenshots: catalog.screenshots,
         ...(overview === undefined ? {} : { overview }),
         ...(gitDates === undefined ? {} : gitDates),
       };

@@ -34,11 +34,6 @@ export const MARKETPLACE_V1_SCHEMA_URL =
 export const MARKETPLACE_V2_SCHEMA_URL =
   "https://getbb.app/schemas/marketplace-v2.schema.json";
 
-export const CURATED_MARKETPLACE_V1_URL =
-  "https://getbb.app/marketplace/v1/marketplace.json";
-export const CURATED_MARKETPLACE_V2_URL =
-  "https://getbb.app/marketplace/v2/marketplace.json";
-
 export const BUILTIN_PUBLISHER_LABEL = "BB Official";
 
 const NAME_PATTERN = /^[a-z0-9][a-z0-9-]*$/u;
@@ -338,26 +333,6 @@ function marketplaceManifestIndex(
   return index;
 }
 
-export function curatedMarketplaceManifestUrls(configuredUrl: string): {
-  primary: string;
-  fallback: string | null;
-} {
-  const url = new URL(configuredUrl);
-  if (url.toString() === CURATED_MARKETPLACE_V1_URL) {
-    return {
-      primary: CURATED_MARKETPLACE_V2_URL,
-      fallback: CURATED_MARKETPLACE_V1_URL,
-    };
-  }
-  if (url.toString() === CURATED_MARKETPLACE_V2_URL) {
-    return {
-      primary: CURATED_MARKETPLACE_V2_URL,
-      fallback: CURATED_MARKETPLACE_V1_URL,
-    };
-  }
-  return { primary: url.toString(), fallback: null };
-}
-
 export function parseMarketplaceManifest(
   input: unknown,
   location: string,
@@ -523,33 +498,6 @@ export function entryIconName(entry: MarketplaceEntry): string | null {
   return typeof entry.icon === "string" ? entry.icon : null;
 }
 
-export function entryScreenshotUrls(
-  entry: MarketplaceEntry,
-  base: MarketplaceIconBase,
-  warn?: (message: string) => void,
-): string[] {
-  if (!("screenshots" in entry) || entry.screenshots === undefined) return [];
-  return entry.screenshots.flatMap((declared) => {
-    const absolute = /^[A-Za-z][A-Za-z0-9+.-]*:/u.test(declared);
-    if (!absolute && base.kind !== "url") {
-      warn?.(
-        `marketplace entry "${entry.id}" screenshot ${JSON.stringify(declared)} was skipped because relative screenshots require an https marketplace manifest`,
-      );
-      return [];
-    }
-    const resolved = new URL(
-      declared,
-      base.kind === "url" ? base.manifestUrl : "https://marketplace.invalid/",
-    );
-    if (resolved.protocol !== "https:") {
-      throw new Error(
-        `screenshot URL ${JSON.stringify(declared)} resolves to a non-https URL`,
-      );
-    }
-    return [resolved.toString()];
-  });
-}
-
 export function entryOverview(
   entry: MarketplaceEntry,
   warn?: (message: string) => void,
@@ -596,7 +544,7 @@ export function catalogEntryMetadata(args: {
       : category === undefined
         ? {}
         : { categoryId: category.id, category: category.displayName }),
-    screenshots: entryScreenshotUrls(entry, args.base, args.warn),
+    screenshots: [],
     ...("publishedAt" in entry && typeof entry.publishedAt === "string"
       ? { publishedAt: entry.publishedAt }
       : {}),
@@ -610,22 +558,21 @@ export function entryIconTinted(contentType: string): boolean {
   return contentType === "image/svg+xml";
 }
 
-export type MarketplaceIconBase =
-  | { kind: "url"; manifestUrl: string }
-  | { kind: "dir"; root: string };
-
-export function marketplaceRowIconBase(row: {
-  sourceKind: string;
-  manifestUrl: string;
-}): MarketplaceIconBase {
-  return row.sourceKind === "https"
-    ? { kind: "url", manifestUrl: row.manifestUrl }
-    : { kind: "dir", root: row.manifestUrl };
+export interface MarketplaceIconBase {
+  kind: "dir";
+  root: string;
 }
 
-export type MarketplaceIconLocation =
-  | { kind: "remote"; url: string }
-  | { kind: "local"; path: string; relativePath: string };
+export function marketplaceRowIconBase(row: {
+  manifestUrl: string;
+}): MarketplaceIconBase {
+  return { kind: "dir", root: row.manifestUrl };
+}
+
+export interface MarketplaceIconLocation {
+  path: string;
+  relativePath: string;
+}
 
 export function resolveEntryIcon(
   entry: MarketplaceEntry,
@@ -633,25 +580,16 @@ export function resolveEntryIcon(
 ): MarketplaceIconLocation | null {
   if (typeof entry.icon === "string") return null;
   const declared = entry.icon.url;
-  const absolute = /^[A-Za-z][A-Za-z0-9+.-]*:/u.test(declared);
-  if (base.kind === "url" || absolute) {
-    const resolved = new URL(
-      declared,
-      base.kind === "url" ? base.manifestUrl : "https://marketplace.invalid/",
+  if (/^[A-Za-z][A-Za-z0-9+.-]*:/u.test(declared)) {
+    throw new Error(
+      `icon URL ${JSON.stringify(declared)} must be a path inside the marketplace`,
     );
-    if (resolved.protocol !== "https:") {
-      throw new Error(
-        `icon URL ${JSON.stringify(declared)} resolves to a non-https URL`,
-      );
-    }
-    return { kind: "remote", url: resolved.toString() };
   }
   const resolved = new URL(declared, "https://marketplace.invalid/");
   const relativePath = normalizePluginSubdirectory(
     decodeURIComponent(resolved.pathname).replace(/^\/+/u, ""),
   );
   return {
-    kind: "local",
     path: join(base.root, ...relativePath.split("/")),
     relativePath,
   };

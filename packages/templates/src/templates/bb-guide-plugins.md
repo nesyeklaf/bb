@@ -96,8 +96,8 @@ under `<bb-data-dir>/plugins/<id>/` (SQLite database, secrets, logs).
                                  version or a local path source. Also in the
                                  command palette
 
-  bb marketplace add <source>    Add a marketplace from an https manifest URL,
-                                 git:<url>[@<ref>], or path:<directory>.
+  bb marketplace add <source>    Add a marketplace from git:<url>[@<ref>] or
+                                 path:<directory>.
                                  Adding a marketplace installs nothing. For a
                                  git: source, --subdirectory <path> reads
                                  marketplace.json from that directory of the
@@ -111,8 +111,7 @@ under `<bb-data-dir>/plugins/<id>/` (SQLite database, secrets, logs).
   bb marketplace remove <name>   Forget a marketplace. Plugins installed from
                                  it keep running as direct installs and keep
                                  updating from their recorded source.
-                                 bb-official and bb-community cannot be
-                                 removed
+                                 bb-official cannot be removed
 
 Installed plugins and their settings also appear under Settings → Installed
 plugins.
@@ -227,19 +226,14 @@ and never uses the network; install its entries by bare name or qualified name
 (`bb plugin install docs` or `bb plugin install docs@bb-official`). An app
 update also updates the bundled copy.
 
-`bb-community` lists reviewed plugins that live outside the app bundle, read
-from https://getbb.app/marketplace/v2/marketplace.json at startup and every two
-hours. Set BB_MARKETPLACE_URL (read at startup) to override the URL. An invalid
-manifest keeps the last valid catalog. `bb plugin search` shows install counts
-from the marketplace feed; third-party marketplaces have none. Builtins
-show "Built in", and a plugin under 25 installs
-that was published in the last 30 days shows "New".
-`bb plugin search --json` returns the raw `installs`, `installedByDefault`,
-and long-form `overview` fields.
+bb makes no network request to list a marketplace: only `path:` and `git:`
+marketplaces are supported, and bb reads them from disk or a git checkout. An
+invalid manifest keeps the last valid catalog. Builtins show "Built in".
+`bb plugin search --json` returns the `installedByDefault` and long-form
+`overview` fields.
 
 Anyone can host a third-party marketplace:
 
-  bb marketplace add https://plugins.acme.dev/marketplace.json
   bb marketplace add git:github.com/acme/bb-marketplace@main
   bb marketplace add git:github.com/acme/agent-plugins@main --subdirectory bb
   bb marketplace add path:/work/acme-marketplace

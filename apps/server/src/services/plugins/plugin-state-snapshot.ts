@@ -11,7 +11,7 @@ import {
 } from "node:fs/promises";
 import { join } from "node:path";
 import { z } from "zod";
-import { CURATED_PLUGIN_MARKETPLACE_NAME } from "@bb/server-contract";
+import { LEGACY_COMMUNITY_MARKETPLACE_NAME } from "../plugin-catalog/remote-marketplaces.js";
 import {
   createPluginStateSnapshot,
   getInstalledPlugin,
@@ -270,7 +270,7 @@ export async function readPluginSnapshotRegistration(args: {
   const installed = getInstalledPlugin(args.db, legacy.id);
   if (
     legacy.provenance === "marketplace" &&
-    marketplaceId === CURATED_PLUGIN_MARKETPLACE_NAME &&
+    marketplaceId === LEGACY_COMMUNITY_MARKETPLACE_NAME &&
     marketplaceEntryId !== null &&
     installed?.provenance === "catalog" &&
     installed.catalogEntryId === marketplaceEntryId
@@ -279,7 +279,7 @@ export async function readPluginSnapshotRegistration(args: {
       ...registration,
       provenance: "catalog",
       catalogEntryId: marketplaceEntryId,
-      catalogMarketplaceName: CURATED_PLUGIN_MARKETPLACE_NAME,
+      catalogMarketplaceName: LEGACY_COMMUNITY_MARKETPLACE_NAME,
     };
   }
   return {

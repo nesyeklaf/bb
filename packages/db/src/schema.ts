@@ -365,17 +365,12 @@ export const pluginArtifacts = sqliteTable(
 
 export const pluginMarketplaces = sqliteTable("plugin_marketplaces", {
   name: text("name").primaryKey(),
-  sourceKind: text("source_kind", { enum: ["https", "git", "path"] })
-    .notNull()
-    .default("https"),
+  sourceKind: text("source_kind", { enum: ["https", "git", "path"] }).notNull(),
   manifestUrl: text("manifest_url").notNull(),
   sourceGitRef: text("source_git_ref"),
   sourceGitSubdirectory: text("source_git_subdirectory"),
   sourceGitCommit: text("source_git_commit"),
   manifestJson: text("manifest_json").notNull(),
-  statsJson: text("stats_json"),
-  etag: text("etag"),
-  lastModified: text("last_modified"),
   lastSuccessfulRefreshAt: integer("last_successful_refresh_at"),
   lastAttemptedRefreshAt: integer("last_attempted_refresh_at"),
   lastError: text("last_error"),

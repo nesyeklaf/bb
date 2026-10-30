@@ -131,9 +131,6 @@ function seedPluginPaths(db: DbConnection): void {
       sourceGitSubdirectory: null,
       sourceGitCommit: null,
       manifestJson: "{}",
-      statsJson: null,
-      etag: null,
-      lastModified: null,
       lastSuccessfulRefreshAt: null,
       lastAttemptedRefreshAt: null,
       lastError: null,
@@ -286,7 +283,10 @@ describe("server move data helpers", () => {
         sourceServerHostId: "old-server",
         now,
       }),
-    ).toEqual({ targetHostBecameServer: true, sourceServerHostBecameManual: true });
+    ).toEqual({
+      targetHostBecameServer: true,
+      sourceServerHostBecameManual: true,
+    });
     expect(getHost(db, "target")).toMatchObject({
       machineProviderId: null,
       resource: null,

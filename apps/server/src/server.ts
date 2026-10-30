@@ -87,9 +87,7 @@ import {
   setAuthenticatedDaemon,
   verifyAuthenticatedDaemon,
 } from "./internal/auth.js";
-import {
-  captureTrustedRemoteAddress,
-} from "./request-context.js";
+import { captureTrustedRemoteAddress } from "./request-context.js";
 import { runEventLoopWork } from "./services/system/event-loop-work.js";
 import {
   onClientSocketClose,
@@ -911,7 +909,6 @@ export function createApp(
   const pluginCatalogService = createPluginCatalogService({
     db: deps.db,
     appVersion: deps.config.appVersion,
-    marketplaceUrl: deps.config.marketplaceUrl,
     dataDir: deps.config.dataDir,
     plugins: pluginService,
     notifyCatalogChanged: () => deps.hub.notifySystem(["plugins-changed"]),

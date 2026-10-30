@@ -909,7 +909,7 @@ export function registerPluginCommands(
   plugin
     .command("search <query>")
     .description(
-      "Search every plugin the store lists: the plugins bundled with the app, the reserved bb-community marketplace catalog BB reviews, and any third-party marketplace added on this host. The Marketplace column names the source; only bb-community is reviewed by BB",
+      "Search every plugin the store lists: the plugins bundled with the app, and any third-party marketplace added on this host. The Marketplace column names the source",
     )
     .option("--json", "Output JSON")
     .action(

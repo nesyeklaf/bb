@@ -13,8 +13,8 @@ const acme = {
   displayName: "Acme Plugins",
   description: "Plugins the Acme team maintains.",
   official: false,
-  sourceKind: "https" as const,
-  source: "https://acme.test/marketplace.json",
+  sourceKind: "path" as const,
+  source: "path:/work/acme-marketplace",
   resolvedCommit: null,
   entryCount: 2,
   lastRefreshAt: 1_700_000_000_000,
@@ -22,20 +22,11 @@ const acme = {
   lastError: null,
 };
 
-const official = {
-  ...acme,
-  name: "bb-community",
-  displayName: "BB Community",
-  official: true,
-  source: "https://getbb.app/marketplace/v1/marketplace.json",
-  entryCount: 5,
-};
-
 const bundled = {
-  ...official,
+  ...acme,
   name: "bb-official",
   displayName: "BB Official",
-  sourceKind: "path" as const,
+  official: true,
   source: "/app/builtin-plugins",
   entryCount: 25,
 };
@@ -58,7 +49,7 @@ describe("bb marketplace", () => {
     );
 
     await runCommand(
-      ["marketplace", "add", "https://acme.test/marketplace.json"],
+      ["marketplace", "add", "path:/work/acme-marketplace"],
       register,
     );
 
@@ -67,7 +58,7 @@ describe("bb marketplace", () => {
     );
     expect(
       JSON.parse(String(vi.mocked(fetch).mock.calls[0]?.[1]?.body)),
-    ).toEqual({ source: "https://acme.test/marketplace.json" });
+    ).toEqual({ source: "path:/work/acme-marketplace" });
     const output = collectLogPayloads(vi.mocked(console.log)).join("\n");
     expect(output).toContain("Added marketplace acme-plugins");
     expect(output).toContain("Adding a marketplace installs nothing");
@@ -129,16 +120,15 @@ describe("bb marketplace", () => {
 
   it("lists marketplaces with their source and entry count", async () => {
     vi.mocked(fetch).mockResolvedValueOnce(
-      json({ marketplaces: [bundled, official, acme] }),
+      json({ marketplaces: [bundled, acme] }),
     );
 
     await runCommand(["marketplace", "list"], register);
 
     const output = collectLogPayloads(vi.mocked(console.log)).join("\n");
     expect(output).toContain("bb-official (official)");
-    expect(output).toContain("bb-community (official)");
     expect(output).toContain("acme-plugins");
-    expect(output).toContain("https://acme.test/marketplace.json");
+    expect(output).toContain("path:/work/acme-marketplace");
     expect(output).not.toContain("Subdirectory");
   });
 
@@ -170,10 +160,10 @@ describe("bb marketplace", () => {
       json({
         results: [
           {
-            name: "bb-community",
+            name: "bb-official",
             ok: true,
             error: null,
-            marketplace: official,
+            marketplace: bundled,
           },
           {
             name: "acme-plugins",
@@ -190,7 +180,7 @@ describe("bb marketplace", () => {
     ).rejects.toThrow("process.exit:1");
 
     const output = collectLogPayloads(vi.mocked(console.log)).join("\n");
-    expect(output).toContain("bb-community: 5 entries");
+    expect(output).toContain("bb-official: 25 entries");
     expect(output).toContain("acme-plugins: refresh failed");
     expect(output).toContain("keeping the last catalog");
   });

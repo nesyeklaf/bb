@@ -19,7 +19,6 @@ import {
   BB_CONNECT_GATE_KEYS_URL_ENV,
   BB_EXTERNAL_URL_ENV,
   BB_INHERITED_SKILLS_ROOTS_ENV,
-  BB_MARKETPLACE_URL_ENV,
   BB_SERVER_BIND_HOST_ENV,
   BB_SERVER_LAUNCH_ID_ENV,
   BB_CLI_LAUNCHER_ENV,
@@ -30,7 +29,6 @@ import {
   DEFAULT_BB_APP_VERSION,
   DEFAULT_BB_CONNECT_GATE_KEYS_URL,
   DEFAULT_BB_EXTERNAL_URL,
-  DEFAULT_BB_MARKETPLACE_URL,
   DEFAULT_BB_SERVER_BIND_HOST,
   parseServerBindHost,
   type ServerBindHost,
@@ -50,7 +48,6 @@ export interface ServerConfig
   BB_EXTERNAL_URL: string;
   BB_HOST_DAEMON_PORT: number;
   BB_INHERITED_SKILLS_ROOTS: string[];
-  BB_MARKETPLACE_URL: string;
   BB_SERVER_BIND_HOST: ServerBindHost;
   BB_SERVER_LAUNCH_ID?: string;
   BB_CLI_LAUNCHER?: string;
@@ -136,12 +133,6 @@ export function loadServerConfig(
       context: loader.context,
       defaultValue: [],
       definition: BB_INHERITED_SKILLS_ROOTS_ENV,
-      env: loader.env,
-    }),
-    BB_MARKETPLACE_URL: readEnvVarWithDefault({
-      context: loader.context,
-      defaultValue: DEFAULT_BB_MARKETPLACE_URL,
-      definition: BB_MARKETPLACE_URL_ENV,
       env: loader.env,
     }),
     BB_SERVER_BIND_HOST: readEnvVarWithDefault({

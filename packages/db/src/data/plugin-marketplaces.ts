@@ -12,9 +12,6 @@ export interface PluginMarketplaceRow {
   sourceGitSubdirectory: string | null;
   sourceGitCommit: string | null;
   manifestJson: string;
-  statsJson: string | null;
-  etag: string | null;
-  lastModified: string | null;
   lastSuccessfulRefreshAt: number | null;
   lastAttemptedRefreshAt: number | null;
   lastError: string | null;

@@ -5,7 +5,6 @@ import { z } from "zod";
 import {
   BUNDLED_MARKETPLACE_NAME,
   entryOverview,
-  entryScreenshotUrls,
   entryRepositoryUrl,
   entrySourceDisplay,
   marketplaceEntryCategory,
@@ -17,9 +16,6 @@ import {
   resolvedEntrySource,
   type MarketplaceEntry,
 } from "../../../src/services/plugin-catalog/marketplace-manifest.js";
-
-const MANIFEST_URL = "https://getbb.app/marketplace/v1/marketplace.json";
-const MANIFEST_V2_URL = "https://getbb.app/marketplace/v2/marketplace.json";
 
 const publishedSchemaShape = z.object({
   $defs: z.object({
@@ -169,14 +165,6 @@ describe("marketplace manifest schema", () => {
           pluginIds: ["widgets"],
         },
       ]);
-      expect(
-        entryScreenshotUrls(parsedEntry, {
-          kind: "url",
-          manifestUrl: MANIFEST_V2_URL,
-        }),
-      ).toEqual([
-        "https://getbb.app/marketplace/v2/screenshots/widgets/widgets.png",
-      ]);
     });
 
     it("keeps an overview text at the cap and drops a longer one with a warning", () => {
@@ -266,31 +254,6 @@ describe("marketplace manifest schema", () => {
       ]);
     });
 
-    it("skips a relative screenshot for a git or path marketplace", () => {
-      const warnings: string[] = [];
-      const parsed = parseMarketplaceManifest(
-        manifestV2([
-          entry({
-            screenshots: ["./screenshots/widgets/widgets.png"],
-          }),
-        ]),
-        "manifest",
-      );
-      const parsedEntry = parsed.plugins[0];
-      if (parsedEntry === undefined) throw new Error("entry missing");
-
-      expect(
-        entryScreenshotUrls(
-          parsedEntry,
-          { kind: "dir", root: "/tmp/marketplace" },
-          (message) => warnings.push(message),
-        ),
-      ).toEqual([]);
-      expect(warnings).toEqual([
-        expect.stringContaining("relative screenshots require an https"),
-      ]);
-    });
-
     it("leaves an unknown category uncategorized", () => {
       const parsed = parseMarketplaceManifest(
         manifestV2([entry({ category: "unknown-category" })]),
@@ -374,24 +337,6 @@ describe("marketplace manifest schema", () => {
       expect(() => parse([entry({ icon: "./icons/widgets.svg" })])).toThrow();
     });
 
-    it("resolves a relative URL against the manifest URL", () => {
-      expect(
-        resolveEntryIcon(
-          firstEntry([entry({ icon: { url: "./icons/widgets.svg" } })]),
-          { kind: "url", manifestUrl: MANIFEST_URL },
-        ),
-      ).toEqual({
-        kind: "remote",
-        url: "https://getbb.app/marketplace/v1/icons/widgets.svg",
-      });
-      expect(
-        resolveEntryIcon(firstEntry([entry()]), {
-          kind: "url",
-          manifestUrl: MANIFEST_URL,
-        }),
-      ).toBe(null);
-    });
-
     it("reads a relative URL beside the manifest for a local marketplace", () => {
       expect(
         resolveEntryIcon(
@@ -399,18 +344,17 @@ describe("marketplace manifest schema", () => {
           { kind: "dir", root: "/checkout" },
         ),
       ).toEqual({
-        kind: "local",
         path: join("/checkout", "icons", "widgets.svg"),
         relativePath: "icons/widgets.svg",
       });
-      expect(
+      expect(() =>
         resolveEntryIcon(
           firstEntry([
             entry({ icon: { url: "https://cdn.example/widgets.svg" } }),
           ]),
           { kind: "dir", root: "/checkout" },
         ),
-      ).toEqual({ kind: "remote", url: "https://cdn.example/widgets.svg" });
+      ).toThrow(/must be a path inside the marketplace/u);
     });
   });
 

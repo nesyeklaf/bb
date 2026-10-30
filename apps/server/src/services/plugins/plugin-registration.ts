@@ -23,8 +23,8 @@ import {
   type BundledPluginRegistration,
 } from "./builtin-registry.js";
 import { BUNDLED_MARKETPLACE_NAME } from "../plugin-catalog/marketplace-manifest.js";
+import { LEGACY_COMMUNITY_MARKETPLACE_NAME } from "../plugin-catalog/remote-marketplaces.js";
 import {
-  CURATED_PLUGIN_MARKETPLACE_NAME,
   type InstalledPlugin,
   type PluginRuntimeStatus,
   type PluginSourceSelection,
@@ -508,7 +508,7 @@ export function createPluginRegistration(context: PluginRegistrationContext) {
   }
 
   function catalogMarketplaceOf(row: InstalledPluginRow): string {
-    return row.catalogMarketplaceName ?? CURATED_PLUGIN_MARKETPLACE_NAME;
+    return row.catalogMarketplaceName ?? BUNDLED_MARKETPLACE_NAME;
   }
 
   function provenanceForRow(row: InstalledPluginRow): PluginProvenance {
@@ -602,7 +602,7 @@ export function createPluginRegistration(context: PluginRegistrationContext) {
   ): PluginProvenance {
     if (
       existing?.provenance === "catalog" &&
-      (catalogMarketplaceOf(existing) === CURATED_PLUGIN_MARKETPLACE_NAME ||
+      (catalogMarketplaceOf(existing) === LEGACY_COMMUNITY_MARKETPLACE_NAME ||
         catalogMarketplaceOf(existing) === BUNDLED_MARKETPLACE_NAME)
     ) {
       return {

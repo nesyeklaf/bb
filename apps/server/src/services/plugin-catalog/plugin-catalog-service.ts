@@ -22,7 +22,6 @@ import {
   type PluginMarketplaceRow,
 } from "@bb/db";
 import {
-  CURATED_PLUGIN_MARKETPLACE_NAME,
   type InstalledPlugin,
   type PluginCatalogAuthor,
   type PluginCatalogCollection,
@@ -55,16 +54,9 @@ import {
   resolveGitRef,
   selectGitSemverTag,
 } from "../plugins/update-resolver.js";
-import { fetchMarketplaceIcons } from "./marketplace-icons.js";
-import {
-  fetchMarketplaceStats,
-  installCountsFromStatsJson,
-} from "./marketplace-stats.js";
-import {
-  marketplaceErrorMessage,
-  publicMarketplaceFetch,
-  type MarketplaceFetch,
-} from "./marketplace-http.js";
+import { readMarketplaceIcons } from "./marketplace-icons.js";
+import { marketplaceErrorMessage } from "./marketplace-http.js";
+import { removeRemoteMarketplaces } from "./remote-marketplaces.js";
 import {
   BUNDLED_MARKETPLACE_NAME,
   catalogEntryMetadata,
@@ -73,12 +65,9 @@ import {
   entryRepositoryUrl,
   entryOverview,
   entrySourceDisplay,
-  curatedMarketplaceManifestUrls,
   isBundledMarketplaceEntry,
-  marketplaceCategories,
   marketplaceCollections,
   marketplaceRowIconBase,
-  parseMarketplaceManifestJson,
   parseStoredMarketplaceManifest,
   resolvedEntrySource,
   type MarketplaceEntry,
@@ -91,7 +80,6 @@ import {
   materializeMarketplace,
   parseMarketplaceSource,
 } from "./marketplace-source.js";
-import { BUNDLED_CURATED_MARKETPLACE } from "./curated-marketplace.js";
 import { loadBundledMarketplace } from "./bundled-marketplace.js";
 import { marketplacePublisherLabel } from "./marketplace-publishers.js";
 import { createKeyedLock } from "../lib/async-deduper.js";
@@ -165,23 +153,17 @@ interface ReservedCollectionIndex {
 export function createPluginCatalogService(deps: {
   db: DbConnection;
   appVersion: string;
-  marketplaceUrl: string;
   dataDir: string;
   plugins: Pick<
     PluginService,
     "installOfficialPlugin" | "installCatalogPlugin" | "resolveCatalogNpmSource"
   >;
   bundledPlugins?: readonly BundledPluginRegistration[];
-  fetch?: MarketplaceFetch;
   notifyCatalogChanged?: () => void;
   warn?: (message: string) => void;
 }): PluginCatalogService {
   const bundledPlugins =
     deps.bundledPlugins ?? listBundledPluginRegistrations();
-  const curatedManifestUrls = curatedMarketplaceManifestUrls(
-    deps.marketplaceUrl,
-  );
-  const fetchMarketplace = deps.fetch ?? publicMarketplaceFetch;
   const stagingDir = join(deps.dataDir, "marketplaces", "staging");
   let stagingReady: Promise<void> | null = null;
 
@@ -197,7 +179,7 @@ export function createPluginCatalogService(deps: {
   }
 
   seedBundledMarketplace(Date.now());
-  seedCuratedMarketplace();
+  removeRemoteMarketplaces(deps.db);
   let reservedCollections = buildReservedCollectionIndex();
 
   const withLock = createKeyedLock<string>();
@@ -215,71 +197,8 @@ export function createPluginCatalogService(deps: {
       sourceGitSubdirectory: null,
       sourceGitCommit: null,
       manifestJson: bundled.manifestJson,
-      statsJson: null,
-      etag: null,
-      lastModified: null,
       lastSuccessfulRefreshAt: refreshedAt,
       lastAttemptedRefreshAt: refreshedAt,
-      lastError: null,
-    });
-  }
-
-  function seedCuratedMarketplace(): void {
-    const existing = getPluginMarketplace(
-      deps.db,
-      CURATED_PLUGIN_MARKETPLACE_NAME,
-    );
-    const isCurrentSource =
-      existing?.sourceKind === "https" &&
-      existing.manifestUrl === curatedManifestUrls.primary;
-    const isFallbackSource =
-      existing?.sourceKind === "https" &&
-      curatedManifestUrls.fallback !== null &&
-      existing.manifestUrl === curatedManifestUrls.fallback;
-    if (existing !== undefined && (isCurrentSource || isFallbackSource)) {
-      try {
-        parseMarketplaceManifestJson(
-          existing.manifestJson,
-          "stored marketplace catalog",
-          deps.warn,
-        );
-        if (isFallbackSource) {
-          upsertPluginMarketplace(deps.db, {
-            name: CURATED_PLUGIN_MARKETPLACE_NAME,
-            sourceKind: "https",
-            manifestUrl: curatedManifestUrls.primary,
-            sourceGitRef: null,
-            sourceGitSubdirectory: null,
-            sourceGitCommit: null,
-            manifestJson: existing.manifestJson,
-            statsJson: existing.statsJson,
-            etag: null,
-            lastModified: null,
-            lastSuccessfulRefreshAt: existing.lastSuccessfulRefreshAt,
-            lastAttemptedRefreshAt: existing.lastAttemptedRefreshAt,
-            lastError: existing.lastError,
-          });
-        }
-        return;
-      } catch (error) {
-        deps.warn?.(
-          `stored ${CURATED_PLUGIN_MARKETPLACE_NAME} catalog was rejected; using the bundled snapshot: ${marketplaceErrorMessage(error)}`,
-        );
-      }
-    }
-    upsertPluginMarketplace(deps.db, {
-      name: CURATED_PLUGIN_MARKETPLACE_NAME,
-      sourceKind: "https",
-      manifestUrl: curatedManifestUrls.primary,
-      sourceGitRef: null,
-      sourceGitSubdirectory: null,
-      sourceGitCommit: null,
-      manifestJson: JSON.stringify(BUNDLED_CURATED_MARKETPLACE),
-      statsJson: existing?.statsJson ?? null,
-      etag: null,
-      lastModified: null,
-      lastSuccessfulRefreshAt: null,
-      lastAttemptedRefreshAt: existing?.lastAttemptedRefreshAt ?? null,
       lastError: null,
     });
   }
@@ -309,13 +228,14 @@ export function createPluginCatalogService(deps: {
 
   function marketplaceView(row: PluginMarketplaceRow): PluginMarketplace {
     const catalog = catalogOf(row);
+    const source = marketplaceSourceFromRow(row);
     return {
       name: row.name,
       displayName: catalog?.displayName ?? row.name,
       description: catalog?.description ?? null,
       official: isReservedMarketplace(row.name),
-      sourceKind: row.sourceKind,
-      source: marketplaceSourceDisplay(marketplaceSourceFromRow(row)),
+      sourceKind: source.kind,
+      source: marketplaceSourceDisplay(source),
       subdirectory: row.sourceGitSubdirectory,
       resolvedCommit: row.sourceGitCommit,
       entryCount: catalog?.plugins.length ?? 0,
@@ -358,12 +278,8 @@ export function createPluginCatalogService(deps: {
         });
       }
     }
-    const curated = catalogsByMarketplace.get(CURATED_PLUGIN_MARKETPLACE_NAME);
     const categoriesById = new Map<string, PluginMarketplaceCategory>();
-    for (const category of [
-      ...(curated === undefined ? [] : marketplaceCategories(curated)),
-      ...BUILTIN_DISCOVERY_CATEGORIES,
-    ]) {
+    for (const category of BUILTIN_DISCOVERY_CATEGORIES) {
       if (!categoriesById.has(category.id)) {
         categoriesById.set(category.id, category);
       }
@@ -465,7 +381,6 @@ export function createPluginCatalogService(deps: {
     row: PluginMarketplaceRow;
     catalog: MarketplaceManifest;
     installedEntryIds: ReadonlySet<string>;
-    installs: number | null;
     collections: readonly PluginCatalogCollectionMembership[];
   }): Promise<PluginCatalogSearchResult | null> {
     const { entry, row, catalog } = args;
@@ -517,6 +432,7 @@ export function createPluginCatalogService(deps: {
       icon: manifest?.branding.icon ?? entryIconName(entry),
       ...iconAsset,
       ...metadata,
+      installs: null,
       ...(overview === undefined ? {} : { overview }),
       collections: [...args.collections],
       source: entrySourceDisplay(entry),
@@ -536,7 +452,6 @@ export function createPluginCatalogService(deps: {
         installed || installedPlugin === undefined
           ? null
           : installedPlugin.source,
-      installs: args.installs,
       compatible: compatibility === null,
       incompatibleReason: compatibility,
     };
@@ -574,29 +489,6 @@ export function createPluginCatalogService(deps: {
     };
   }
 
-  async function refreshedStatsJson(
-    row: PluginMarketplaceRow,
-  ): Promise<string | null> {
-    if (
-      row.name !== CURATED_PLUGIN_MARKETPLACE_NAME ||
-      row.sourceKind !== "https"
-    ) {
-      return null;
-    }
-    try {
-      const stats = await fetchMarketplaceStats({
-        manifestUrl: curatedManifestUrls.fallback ?? row.manifestUrl,
-        fetch: fetchMarketplace,
-      });
-      return stats === null ? null : JSON.stringify(stats);
-    } catch (error) {
-      deps.warn?.(
-        `${row.name} install counts were not refreshed: ${marketplaceErrorMessage(error)}`,
-      );
-      return row.statsJson;
-    }
-  }
-
   async function performRefresh(
     row: PluginMarketplaceRow,
     attemptedAt: number,
@@ -612,19 +504,8 @@ export function createPluginCatalogService(deps: {
     if (source.kind === "git") await prepareMarketplaceStaging();
     const materialized = await materializeMarketplace({
       source,
-      cached: {
-        manifestJson: row.manifestJson,
-        etag: row.etag,
-        lastModified: row.lastModified,
-      },
       stagingDir,
-      fetch: fetchMarketplace,
       ...(deps.warn === undefined ? {} : { warn: deps.warn }),
-      ...(row.name === CURATED_PLUGIN_MARKETPLACE_NAME &&
-      row.sourceKind === "https" &&
-      curatedManifestUrls.fallback !== null
-        ? { fallbackManifestUrl: curatedManifestUrls.fallback }
-        : {}),
     });
     try {
       if (materialized.catalog.name !== row.name) {
@@ -645,25 +526,19 @@ export function createPluginCatalogService(deps: {
         collisionError === null
           ? materialized.manifestJson
           : JSON.stringify(catalog);
-      const icons = await fetchMarketplaceIcons({
+      const icons = await readMarketplaceIcons({
         db: deps.db,
         marketplaceName: row.name,
         base: materialized.iconBase,
         entries: catalog.plugins,
-        onlyMissing: materialized.unchanged,
-        fetch: fetchMarketplace,
         ...(deps.warn === undefined ? {} : { warn: deps.warn }),
       });
-      const statsJson = await refreshedStatsJson(row);
       deps.db.transaction((tx) => {
         upsertPluginMarketplace(tx, {
           name: row.name,
           ...marketplaceSourceColumns(source),
           sourceGitCommit: materialized.commit,
           manifestJson,
-          statsJson,
-          etag: materialized.etag,
-          lastModified: materialized.lastModified,
           lastSuccessfulRefreshAt: attemptedAt,
           lastAttemptedRefreshAt: attemptedAt,
           lastError: collisionError,
@@ -731,7 +606,7 @@ export function createPluginCatalogService(deps: {
     if (periodicStopped) return;
     cancelPeriodic?.();
     const lastAttempt = requireRow(
-      CURATED_PLUGIN_MARKETPLACE_NAME,
+      BUNDLED_MARKETPLACE_NAME,
     ).lastAttemptedRefreshAt;
     const delay =
       lastAttempt === null
@@ -1031,9 +906,7 @@ export function createPluginCatalogService(deps: {
         if (source.kind === "git") await prepareMarketplaceStaging();
         const materialized = await materializeMarketplace({
           source,
-          cached: null,
           stagingDir,
-          fetch: fetchMarketplace,
           ...(deps.warn === undefined ? {} : { warn: deps.warn }),
         });
         try {
@@ -1046,13 +919,11 @@ export function createPluginCatalogService(deps: {
           if (getPluginMarketplace(deps.db, name) !== undefined) {
             throw new Error(`marketplace "${name}" is already added`);
           }
-          const icons = await fetchMarketplaceIcons({
+          const icons = await readMarketplaceIcons({
             db: deps.db,
             marketplaceName: name,
             base: materialized.iconBase,
             entries: materialized.catalog.plugins,
-            onlyMissing: false,
-            fetch: fetchMarketplace,
             ...(deps.warn === undefined ? {} : { warn: deps.warn }),
           });
           const addedAt = Date.now();
@@ -1062,9 +933,6 @@ export function createPluginCatalogService(deps: {
               ...marketplaceSourceColumns(source),
               sourceGitCommit: materialized.commit,
               manifestJson: materialized.manifestJson,
-              statsJson: null,
-              etag: materialized.etag,
-              lastModified: materialized.lastModified,
               lastSuccessfulRefreshAt: addedAt,
               lastAttemptedRefreshAt: addedAt,
               lastError: null,
@@ -1112,14 +980,6 @@ export function createPluginCatalogService(deps: {
           index,
         ]),
       );
-      const curatedRow = getPluginMarketplace(
-        deps.db,
-        CURATED_PLUGIN_MARKETPLACE_NAME,
-      );
-      const curatedInstalls = installCountsFromStatsJson(
-        curatedRow?.statsJson ?? null,
-        (message) => deps.warn?.(message),
-      );
       const installedEntryIds = new Set(
         listInstalledPlugins(deps.db)
           .filter(
@@ -1150,9 +1010,6 @@ export function createPluginCatalogService(deps: {
               row,
               catalog,
               installedEntryIds,
-              installs: isReservedMarketplace(row.name)
-                ? (curatedInstalls.get(pluginId) ?? null)
-                : null,
               collections:
                 collectionIndex.membershipsByEntry.get(
                   catalogEntryKey(row.name, entry.id),
@@ -1365,16 +1222,12 @@ function catalogEntryKey(marketplace: string, entryId: string): string {
 }
 
 function isReservedMarketplace(name: string): boolean {
-  return (
-    name === BUNDLED_MARKETPLACE_NAME ||
-    name === CURATED_PLUGIN_MARKETPLACE_NAME
-  );
+  return name === BUNDLED_MARKETPLACE_NAME;
 }
 
 function marketplaceRank(name: string): number {
   if (name === BUNDLED_MARKETPLACE_NAME) return 0;
-  if (name === CURATED_PLUGIN_MARKETPLACE_NAME) return 1;
-  return 2;
+  return 1;
 }
 
 function entryAuthor(entry: MarketplaceEntry): PluginCatalogAuthor {

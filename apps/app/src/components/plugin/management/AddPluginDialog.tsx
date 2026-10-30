@@ -1,7 +1,6 @@
 import { useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import {
-  CURATED_PLUGIN_MARKETPLACE_NAME,
   type PluginCatalogInstallPlan,
   type PluginCatalogResolvedSource,
   type PluginInstallJob,
@@ -37,19 +36,6 @@ export type AddPluginInitial = {
   iconTinted: boolean;
   source: string;
 };
-
-function catalogInstallDescription(
-  source: string,
-  publisherLabel: string,
-): string {
-  if (source.startsWith("builtin:")) {
-    return "Install this plugin, bundled with BB.";
-  }
-  if (source.startsWith("npm:")) {
-    return `Install this ${publisherLabel} plugin from its listed npm package.`;
-  }
-  return `Install this ${publisherLabel} plugin from its listed source repository.`;
-}
 
 interface AddPluginDialogProps {
   open: boolean;
@@ -270,10 +256,7 @@ function AddPluginDialogContent({
   const queryClient = useQueryClient();
   const [sourceText, setSourceText] = useState("");
   const request = buildRequest(initial, sourceText);
-  const thirdParty =
-    initial !== null &&
-    initial.marketplace !== CURATED_PLUGIN_MARKETPLACE_NAME &&
-    !initial.source.startsWith("builtin:");
+  const thirdParty = initial !== null && !initial.source.startsWith("builtin:");
   const planQuery = useCatalogInstallPlan(
     thirdParty && initial !== null
       ? { entryId: initial.entryId, marketplace: initial.marketplace }
@@ -311,10 +294,7 @@ function AddPluginDialogContent({
             ? "Install from npm, a Git repository, or a local path."
             : thirdParty
               ? "Install this plugin from the source its marketplace lists."
-              : catalogInstallDescription(
-                  initial.source,
-                  initial.publisherLabel,
-                )}
+              : "Install this plugin, bundled with BB."}
         </DialogDescription>
       </DialogHeader>
       <div className="space-y-3">

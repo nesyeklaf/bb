@@ -288,8 +288,6 @@ export const pluginInstallRequestSchema = z
 
 export const PLUGIN_MARKETPLACE_NAME_PATTERN = /^[a-z0-9][a-z0-9-]*$/u;
 
-export const CURATED_PLUGIN_MARKETPLACE_NAME = "bb-community";
-
 export const pluginMarketplaceNameSchema = z
   .string()
   .min(1)
@@ -628,11 +626,7 @@ export const pluginCatalogInstallPlanResponseSchema = z.object({
   plan: pluginCatalogInstallPlanSchema,
 });
 
-export const pluginMarketplaceSourceKindSchema = z.enum([
-  "https",
-  "git",
-  "path",
-]);
+export const pluginMarketplaceSourceKindSchema = z.enum(["git", "path"]);
 
 export const pluginMarketplaceSchema = z.object({
   name: z.string(),
