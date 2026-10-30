@@ -7,7 +7,7 @@ import {
   MACHINE_SERVER_ACCESS_TITLE,
   machineServerAccessBlockedReason,
 } from "@/components/machines/machine-server-access";
-import { CONNECT_UNPAIRED } from "../../../../.ladle/machine-story-fixtures";
+import { TAILNET_SETUP_REQUIRED } from "../../../../.ladle/machine-story-fixtures";
 
 export default {
   title: "promptbox/banner/Provider Requirement",
@@ -50,7 +50,7 @@ export function Requirements() {
         <ResponsiveStage>
           <ProviderRequirementBanner
             title={MACHINE_SERVER_ACCESS_TITLE}
-            description={machineServerAccessBlockedReason(CONNECT_UNPAIRED)}
+            description={machineServerAccessBlockedReason(TAILNET_SETUP_REQUIRED)}
             action={
               <Button
                 type="button"

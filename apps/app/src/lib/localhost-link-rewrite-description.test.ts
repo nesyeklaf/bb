@@ -8,10 +8,6 @@ describe("localhostLinkRewriteDescription", () => {
     );
   });
 
-  it("hides the setting on getbb.app hosts", () => {
-    expect(localhostLinkRewriteDescription("asdf.getbb.app")).toBeNull();
-  });
-
   it("shows the destination on .localhost hosts", () => {
     expect(localhostLinkRewriteDescription("sawyer.localhost")).toBe(
       "When enabled, localhost URLs are rewritten to use the same host or IP address you use to open BB. For example: http://localhost:3000/ → http://sawyer.localhost:3000/",

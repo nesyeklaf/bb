@@ -283,17 +283,20 @@ vi.mock("@/hooks/queries/system-queries", () => ({
       serverAccess: {
         providers: [
           {
-            id: "connect",
-            displayName: "bb connect",
-            description: "Use a private getbb.app address.",
-            pluginId: "connect",
+            id: "tailnet",
+            displayName: "Tailnet",
+            description: "Use this computer's tailnet address.",
+            pluginId: "tailnet-access",
             availability: mocks.serverAccessReady
-              ? { status: "available", serverUrl: "https://sawyer.getbb.app" }
-              : { status: "setup-required", message: "Pair with bb connect" },
+              ? {
+                  status: "available",
+                  serverUrl: "https://sawyer.example.test",
+                }
+              : { status: "setup-required", message: "Sign in to Tailscale" },
           },
         ],
-        defaultProviderId: "connect",
-        effectiveUrl: "https://sawyer.getbb.app",
+        defaultProviderId: "tailnet",
+        effectiveUrl: "https://sawyer.example.test",
         urlSource: null,
       },
     },
@@ -2513,7 +2516,7 @@ describe("NewThreadComposer environment providers", () => {
         null,
       );
     });
-    await screen.findByText("Pair with bb connect");
+    await screen.findByText("Sign in to Tailscale");
     expect(latestPromptBoxProps().disabled).toBe(true);
     mocks.serverAccessReady = true;
     rendered.rerender(
@@ -2527,7 +2530,7 @@ describe("NewThreadComposer environment providers", () => {
       </MemoryRouter>,
     );
     await waitFor(() =>
-      expect(screen.queryByText("Pair with bb connect")).toBeNull(),
+      expect(screen.queryByText("Sign in to Tailscale")).toBeNull(),
     );
     expect(latestPromptBoxProps().disabled).toBe(false);
     mocks.serverAccessReady = false;
@@ -2541,7 +2544,7 @@ describe("NewThreadComposer environment providers", () => {
         />
       </MemoryRouter>,
     );
-    await screen.findByText("Pair with bb connect");
+    await screen.findByText("Sign in to Tailscale");
     expect(latestPromptBoxProps().disabled).toBe(true);
   });
 

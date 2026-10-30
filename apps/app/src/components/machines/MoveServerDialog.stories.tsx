@@ -92,10 +92,13 @@ export function Checklist() {
         <Stage result={null} checking startAllowed={false} />
       </StoryRow>
       <StoryRow
-        label="bb connect, ready"
-        hint="machines keep using the same connect address, so there is no address step; warnings never block"
+        label="ready"
+        hint="the checked address is set; warnings never block"
       >
-        <Stage />
+        <Stage
+          addressDraft="https://desk.example.com"
+          result={checkResult({ serverUrl: "https://desk.example.com" })}
+        />
       </StoryRow>
       <StoryRow
         label="nothing to report"
