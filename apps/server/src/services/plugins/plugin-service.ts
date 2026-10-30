@@ -74,6 +74,7 @@ import {
   getLatestThreadSequence,
   listDuePluginSchedules,
   listInstalledPlugins,
+  listNpmSourcedPluginRegistrations,
   listPendingGitPluginArtifacts,
   listPluginMarketplaces,
   listPluginSchedules,
@@ -1308,8 +1309,7 @@ export function createPluginService(deps: PluginServiceDeps): PluginService {
   }
 
   async function removeNpmSourcedPlugins(): Promise<void> {
-    for (const row of listInstalledPlugins(deps.db)) {
-      if (row.sourceKind !== "npm" && !row.source.startsWith("npm:")) continue;
+    for (const row of listNpmSourcedPluginRegistrations(deps.db)) {
       await deleteRemovedPluginData(row, pluginProviderIds(row));
       deleteAllPluginKvValues(deps.db, row.id);
       deleteInstalledPlugin(deps.db, row.id);

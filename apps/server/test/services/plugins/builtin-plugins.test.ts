@@ -545,6 +545,14 @@ describe("builtin plugin reconciliation", () => {
          VALUES (?, ?, ?, '1.0.0', 1, 10, 20)`,
       )
       .run("from-path", `path:${fixtureRoot}`, legacyRoot);
+    db.$client
+      .prepare(
+        `INSERT INTO plugins
+         (id, source, root_dir, version, enabled, installed_at, updated_at, removed_at)
+         VALUES (?, ?, ?, '1.0.0', 0, 10, 20, 30)`,
+      )
+      .run("removed-npm", "npm:bb-plugin-removed@1.0.0", legacyRoot);
+    setPluginKvValue(db, "removed-npm", "state", "1");
     setPluginKvValue(db, "from-npm", "state", "1");
     setPluginSettingsValues(db, "from-npm", { mode: "fast" });
 
@@ -557,6 +565,10 @@ describe("builtin plugin reconciliation", () => {
     expect(getInstalledPluginRegistration(db, "from-path")).toMatchObject({
       sourceKind: "path",
     });
+    expect(
+      db.$client.prepare("SELECT id FROM plugins WHERE id = 'removed-npm'").all(),
+    ).toEqual([]);
+    expect(listPluginKvKeys(db, "removed-npm")).toEqual([]);
   });
 
   it("keeps an offline legacy git ref unclassified", async () => {

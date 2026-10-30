@@ -155,6 +155,7 @@ export {
   getInstalledPluginRegistration,
   listInstalledPlugins,
   listInstalledPluginsFromMarketplace,
+  listNpmSourcedPluginRegistrations,
   listUnnormalizedPluginRegistrations,
   markInstalledPluginRemoved,
   normalizeInstalledPluginRegistration,
