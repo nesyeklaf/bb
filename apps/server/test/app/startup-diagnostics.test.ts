@@ -4,7 +4,11 @@ import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { loadServerConfig } from "@bb/config/server";
 import { describe, expect, it } from "vitest";
-import { startHttpListeners } from "../../src/start-server.js";
+import { vi } from "vitest";
+import {
+  closeHttpListener,
+  startHttpListeners,
+} from "../../src/start-server.js";
 
 const testDir = dirname(fileURLToPath(import.meta.url));
 
@@ -39,21 +43,10 @@ describe("server startup diagnostics", () => {
   async function closeAll(
     servers: ReturnType<typeof startHttpListeners>,
   ): Promise<void> {
-    await Promise.all(
-      servers.map(
-        (server) =>
-          new Promise<void>((resolveClose, rejectClose) => {
-            server.close((error) => {
-              if (error) {
-                rejectClose(error);
-                return;
-              }
-              resolveClose();
-            });
-          }),
-      ),
-    );
+    await Promise.all(servers.map(closeHttpListener));
   }
+
+  const logger = { warn: vi.fn() };
 
   async function listeningAddresses(
     servers: ReturnType<typeof startHttpListeners>,
@@ -80,6 +73,7 @@ describe("server startup diagnostics", () => {
     const servers = startHttpListeners({
       fetch: () => new Response("ok"),
       serverConfig: { ...serverConfig, BB_SERVER_PORT: 0 },
+      logger,
     });
 
     try {
@@ -97,6 +91,7 @@ describe("server startup diagnostics", () => {
       const servers = startHttpListeners({
         fetch: () => new Response("ok"),
         serverConfig: { BB_SERVER_BIND_HOST: ["127.0.0.2"], BB_SERVER_PORT: 0 },
+        logger,
       });
 
       try {
@@ -104,6 +99,42 @@ describe("server startup diagnostics", () => {
           expect.objectContaining({ address: "127.0.0.1", family: "IPv4" }),
           expect.objectContaining({ address: "127.0.0.2", family: "IPv4" }),
         ]);
+      } finally {
+        await closeAll(servers);
+      }
+    },
+  );
+
+  it.runIf(process.platform === "linux")(
+    "keeps loopback serving and retries when a listed address is not up yet",
+    async () => {
+      const warn = vi.fn();
+      const servers = startHttpListeners({
+        fetch: () => new Response("ok"),
+        serverConfig: {
+          BB_SERVER_BIND_HOST: ["100.64.0.99"],
+          BB_SERVER_PORT: 0,
+        },
+        logger: { warn },
+        extraListenerRetryMs: 20,
+      });
+
+      try {
+        const [loopback] = servers;
+        if (!loopback.listening) await once(loopback, "listening");
+        const address = loopback.address();
+        if (address === null || typeof address === "string")
+          throw new Error("loopback has no port");
+        const response = await fetch(`http://127.0.0.1:${address.port}/`);
+        expect(await response.text()).toBe("ok");
+        await vi.waitFor(() =>
+          expect(warn.mock.calls.length).toBeGreaterThan(1),
+        );
+        expect(warn).toHaveBeenCalledWith(
+          expect.objectContaining({ hostname: "100.64.0.99" }),
+          expect.stringContaining("loopback keeps serving"),
+        );
+        expect(servers[1]?.listening).toBe(false);
       } finally {
         await closeAll(servers);
       }

@@ -57,6 +57,18 @@ describe("parseServerBindAddresses", () => {
     expect(() => parse(value)).toThrow(/is not an IP address/u);
   });
 
+  it("treats an IPv4-mapped IPv6 address as its IPv4 address", () => {
+    expect(parse("::ffff:100.64.0.1")).toEqual(["100.64.0.1"]);
+    expect(() => parse("100.64.0.1 ::ffff:100.64.0.1")).toThrow(
+      /more than once/u,
+    );
+    expect(() => parse("::ffff:8.8.8.8")).toThrow();
+  });
+
+  it("refuses zone ids with the variable's own message", () => {
+    expect(() => parse("fe80::1%wg0")).toThrow(/is not an IP address/u);
+  });
+
   it("rejects duplicates, also in different spellings", () => {
     expect(() => parse("100.64.0.1,100.64.0.1")).toThrow(/more than once/u);
     expect(() => parse("fd7a:115c:a1e0::1 fd7a:115c:a1e0:0:0:0:0:1")).toThrow(

@@ -63,10 +63,17 @@ export function readWireguardAddresses(
 }
 
 function canonicalAddress(address: string): string {
-  if (isIP(address) === 6) {
-    return new URL("http://[" + address + "]").hostname.slice(1, -1);
+  if (isIP(address) !== 6) {
+    return address;
   }
-  return address;
+  const canonical = new URL("http://[" + address + "]").hostname.slice(1, -1);
+  const mapped = /^::ffff:([0-9a-f]{1,4}):([0-9a-f]{1,4})$/u.exec(canonical);
+  if (mapped === null) {
+    return canonical;
+  }
+  const high = Number.parseInt(mapped[1] ?? "0", 16);
+  const low = Number.parseInt(mapped[2] ?? "0", 16);
+  return [high >> 8, high & 255, low >> 8, low & 255].join(".");
 }
 
 function ipFamily(address: string): "ipv4" | "ipv6" {
@@ -90,7 +97,7 @@ export function parseServerBindAddresses(
   const seen = new Set<string>();
   const result: string[] = [];
   for (const entry of entries) {
-    if (isIP(entry) === 0) {
+    if (isIP(entry) === 0 || entry.includes("%")) {
       throw new Error(
         SERVER_BIND_HOST_ENV_NAME +
           " entry " +

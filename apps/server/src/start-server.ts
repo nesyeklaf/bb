@@ -61,17 +61,56 @@ import {
 interface StartHttpListenerArgs {
   fetch: Parameters<typeof serve>[0]["fetch"];
   serverConfig: Pick<ServerConfig, "BB_SERVER_BIND_HOST" | "BB_SERVER_PORT">;
+  logger: Pick<ServerLogger, "warn">;
+  extraListenerRetryMs?: number;
 }
 
+export const EXTRA_LISTENER_RETRY_MS = 10_000;
+
 export function startHttpListeners(args: StartHttpListenerArgs) {
-  return [BB_LOOPBACK_HOST, ...args.serverConfig.BB_SERVER_BIND_HOST].map(
-    (hostname) =>
-      serve({
-        hostname,
-        port: args.serverConfig.BB_SERVER_PORT,
-        fetch: args.fetch,
-      }),
-  );
+  const port = args.serverConfig.BB_SERVER_PORT;
+  const loopback = serve({
+    hostname: BB_LOOPBACK_HOST,
+    port,
+    fetch: args.fetch,
+  });
+  const extras = args.serverConfig.BB_SERVER_BIND_HOST.map((hostname) => {
+    const server = serve({ hostname, port, fetch: args.fetch });
+    let retry: ReturnType<typeof setTimeout> | null = null;
+    server.on("error", (error: unknown) => {
+      args.logger.warn(
+        { err: error, hostname, port },
+        "Bind address unavailable; loopback keeps serving, retrying",
+      );
+      retry = setTimeout(() => {
+        retry = null;
+        server.listen(port, hostname);
+      }, args.extraListenerRetryMs ?? EXTRA_LISTENER_RETRY_MS);
+      retry.unref();
+    });
+    server.on("close", () => {
+      if (retry !== null) clearTimeout(retry);
+    });
+    return server;
+  });
+  return [loopback, ...extras];
+}
+
+export function closeHttpListener(
+  server: ReturnType<typeof startHttpListeners>[number],
+): Promise<void> {
+  return new Promise<void>((resolveClose, rejectClose) => {
+    server.close((error) => {
+      if (
+        error &&
+        (error as NodeJS.ErrnoException).code !== "ERR_SERVER_NOT_RUNNING"
+      ) {
+        rejectClose(error);
+        return;
+      }
+      resolveClose();
+    });
+  });
 }
 
 export interface StartServerPluginsArgs {
@@ -347,6 +386,7 @@ export async function runServer(serverConfig: ServerConfig): Promise<void> {
   const servers = startHttpListeners({
     fetch: app.fetch,
     serverConfig,
+    logger,
   });
   for (const server of servers) {
     injectWebSocket(server);
@@ -416,20 +456,7 @@ export async function runServer(serverConfig: ServerConfig): Promise<void> {
           logger.warn({ err: error }, "Plugin shutdown failed");
         });
       }
-      const closeServers = Promise.all(
-        servers.map(
-          (server) =>
-            new Promise<void>((resolve, reject) => {
-              server.close((error) => {
-                if (error) {
-                  reject(error);
-                  return;
-                }
-                resolve();
-              });
-            }),
-        ),
-      );
+      const closeServers = Promise.all(servers.map(closeHttpListener));
       await closeWebSockets();
       await closeServers;
     })();
