@@ -22,4 +22,6 @@ States: `allowed` (outgoing: local network, system resolver, or a listed host bo
 
 An empty red list proves nothing on its own. Check that the measurement is alive first: start a short fetch to an unlisted host from a bb child process, see it red with `bb connections list --red --since <control start>`, then evaluate a later window that starts after the control ended with `bb connections status --since <evaluation start>`, and confirm at least one provider row in it.
 
+The same data is on the **Connections** page in the navigation (outgoing and incoming tables, a banner for what is not measured, both freshness clocks per host). The server sends one push notification the first time a destination turns red; it names no host, and editing `extraAllowedHosts` never sends it again. See the plugin README for the live verification steps.
+
 Allowed hosts beyond the built-in list go into the plugin setting `extraAllowedHosts` (one exact host per line).
