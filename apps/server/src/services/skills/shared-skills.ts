@@ -62,7 +62,6 @@ function toSharedSkill(
       pluginId: null,
       filePath: skill.filePath,
       manageable: false,
-      registrySkillId: null,
     },
   };
 }

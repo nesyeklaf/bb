@@ -102,11 +102,6 @@ describe("legacy resource redirects", () => {
       "/extensions/skills/installed/skill_abc123",
       "/skills/library/skill_abc123",
     ],
-    ["/extensions/skills/registry", "/skills/registry"],
-    [
-      "/extensions/skills/registry/moss-skills%2Fmoss-notes",
-      "/skills/registry/moss-skills%2Fmoss-notes",
-    ],
     ["/tools", "/plugins"],
     ["/tools/plugins/browse", "/plugins"],
     ["/tools/plugins/browse/?sort=name#catalog", "/plugins?sort=name#catalog"],

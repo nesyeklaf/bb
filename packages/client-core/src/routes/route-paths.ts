@@ -12,18 +12,12 @@ export const PLUGINS_ROUTE_PATH = "/plugins";
 export const PLUGIN_DETAIL_ROUTE_PATH = "/plugins/:pluginId";
 export const SKILLS_ROUTE_PATH = "/skills";
 export const SKILL_DETAIL_ROUTE_PATH = "/skills/library/:skillId";
-export const REGISTRY_SKILLS_ROUTE_PATH = "/skills/registry";
-export const REGISTRY_SKILL_DETAIL_ROUTE_PATH =
-  "/skills/registry/:registrySkillId";
 export const TOOLS_ROUTE_PATH = "/extensions";
 export const TOOLS_SKILLS_ROUTE_PATH = "/extensions/skills";
 export const TOOLS_SKILL_DETAIL_ROUTE_PATH =
   "/extensions/skills/library/:skillId";
 export const LEGACY_TOOLS_SKILL_DETAIL_ROUTE_PATH =
   "/extensions/skills/installed/:skillId";
-export const TOOLS_REGISTRY_SKILLS_ROUTE_PATH = "/extensions/skills/registry";
-export const TOOLS_REGISTRY_SKILL_DETAIL_ROUTE_PATH =
-  "/extensions/skills/registry/:registrySkillId";
 export const TOOLS_PLUGINS_ROUTE_PATH = "/extensions/plugins";
 export const TOOLS_PLUGIN_BROWSE_ROUTE_PATH = "/extensions/plugins/browse";
 export const TOOLS_PLUGIN_DETAIL_ROUTE_PATH = "/extensions/plugins/:pluginId";
@@ -100,10 +94,6 @@ export function getSkillsRoutePath(): string {
   return SKILLS_ROUTE_PATH;
 }
 
-export function getRegistrySkillsRoutePath(): string {
-  return REGISTRY_SKILLS_ROUTE_PATH;
-}
-
 interface SkillDetailRoutePathArgs {
   skillId: string;
 }
@@ -112,16 +102,6 @@ export function getSkillDetailRoutePath({
   skillId,
 }: SkillDetailRoutePathArgs): string {
   return `${SKILLS_ROUTE_PATH}/library/${encodeURIComponent(skillId)}`;
-}
-
-interface RegistrySkillDetailRoutePathArgs {
-  registrySkillId: string;
-}
-
-export function getRegistrySkillDetailRoutePath({
-  registrySkillId,
-}: RegistrySkillDetailRoutePathArgs): string {
-  return `${SKILLS_ROUTE_PATH}/registry/${encodeURIComponent(registrySkillId)}`;
 }
 
 export function getPluginsRoutePath(): string {
@@ -256,14 +236,10 @@ export const ROUTE_PATTERNS: readonly string[] = [
   PLUGIN_DETAIL_ROUTE_PATH,
   SKILLS_ROUTE_PATH,
   SKILL_DETAIL_ROUTE_PATH,
-  REGISTRY_SKILLS_ROUTE_PATH,
-  REGISTRY_SKILL_DETAIL_ROUTE_PATH,
   TOOLS_ROUTE_PATH,
   TOOLS_SKILLS_ROUTE_PATH,
   TOOLS_SKILL_DETAIL_ROUTE_PATH,
   LEGACY_TOOLS_SKILL_DETAIL_ROUTE_PATH,
-  TOOLS_REGISTRY_SKILLS_ROUTE_PATH,
-  TOOLS_REGISTRY_SKILL_DETAIL_ROUTE_PATH,
   TOOLS_PLUGINS_ROUTE_PATH,
   TOOLS_PLUGIN_BROWSE_ROUTE_PATH,
   TOOLS_PLUGIN_DETAIL_ROUTE_PATH,

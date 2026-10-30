@@ -295,7 +295,7 @@ export function SkillDetailStates() {
 
       <State
         name="Before ownership"
-        note="A registry skill has no ownership badge. Fork is the acquisition action at the trailing edge of the detail header."
+        note="A skill without an owner has no ownership badge. Fork is the acquisition action at the trailing edge of the detail header."
       >
         <Skill
           headerActions={
@@ -334,7 +334,7 @@ export function SkillDetailStates() {
       >
         <ResourceListState
           state="error"
-          message="This registry skill is no longer available from its source."
+          message="This skill is no longer available from its source."
           layout="detail"
           onRetry={noop}
         />

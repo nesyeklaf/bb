@@ -55,7 +55,6 @@ import { registerPluginCatalogRoutes } from "./routes/plugin-catalog.js";
 import { registerPluginInstallJobRoutes } from "./routes/plugin-install-jobs.js";
 import { createPluginInstallJobs } from "./services/plugins/plugin-install-jobs.js";
 import { registerPromptHistoryRoutes } from "./routes/prompt-history.js";
-import { registerSkillsRegistryRoutes } from "./routes/skills-registry.js";
 import {
   createPluginService,
   type PluginService,
@@ -953,7 +952,6 @@ export function createApp(
     pluginUpdateJobs,
     upgradeWebSocket,
   );
-  registerSkillsRegistryRoutes(publicApi, deps);
   registerServerMoveRoutes(publicApi, deps, serverMove);
   app.route("/api/v1", publicApi);
   app.use("/api/v1/*", () => {

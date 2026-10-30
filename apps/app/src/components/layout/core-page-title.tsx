@@ -8,12 +8,10 @@ import { usePluginList } from "@/hooks/queries/plugin-settings-queries";
 import { usePluginCatalogSearch } from "@/hooks/queries/plugin-catalog-queries";
 import { projectSkillsQueryKey } from "@/hooks/queries/query-keys";
 import { sdk } from "@/lib/sdk";
-import { fetchRegistrySkillEntry } from "@/lib/skills-registry";
 import { PERSONAL_PROJECT_ID } from "@bb/domain";
 import {
   PLUGIN_DETAIL_ROUTE_PATH,
   SKILL_DETAIL_ROUTE_PATH,
-  REGISTRY_SKILL_DETAIL_ROUTE_PATH,
 } from "@/lib/route-paths";
 import { resolveToolsBreadcrumbs } from "@/components/tools/tools-navigation";
 import { pluginDetailKeyFromRoute } from "@/components/plugin/plugin-detail-key";
@@ -40,11 +38,6 @@ export function useCorePageTitle({
     pathname,
   );
   const skillId = routeParameter(SKILL_DETAIL_ROUTE_PATH, "skillId", pathname);
-  const registrySkillId = routeParameter(
-    REGISTRY_SKILL_DETAIL_ROUTE_PATH,
-    "registrySkillId",
-    pathname,
-  );
   const plugins = usePluginList({ enabled: pluginId !== undefined });
   const shelfKey = new URLSearchParams(search).get("shelf");
   const catalog = usePluginCatalogSearch("", {
@@ -60,11 +53,6 @@ export function useCorePageTitle({
       }),
     enabled: skillId !== undefined,
   });
-  const registryEntry = useQuery({
-    queryKey: ["skills-registry-entry", registrySkillId ?? "none"],
-    queryFn: ({ signal }) => fetchRegistrySkillEntry(registrySkillId!, signal),
-    enabled: registrySkillId !== undefined,
-  });
   const detail = pluginId
     ? resolvePluginDetailKey(
         pluginDetailKeyFromRoute(pluginId, search),
@@ -77,8 +65,7 @@ export function useCorePageTitle({
     detail?.plugin?.name ??
     detail?.plugin?.id ??
     detail?.entry?.displayName ??
-    skills.data?.skills.find((skill) => skill.id === skillId)?.name ??
-    registryEntry.data?.name;
+    skills.data?.skills.find((skill) => skill.id === skillId)?.name;
   const breadcrumbs = resolveToolsBreadcrumbs(pathname, search, label);
   if (!breadcrumbs) return null;
   const shelf =

@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { ReactNode } from "react";
 import type { SkillProvider, SkillSummary } from "@bb/server-contract";
 import {
   ResourceInfiniteScrollSentinel,
@@ -223,20 +222,6 @@ function skillMutationDisabledReason(
   return `Bundled with ${providerLabel(skill.provider, providerRoster)}`;
 }
 
-const SKILLS_BROWSE_DESCRIPTION = (
-  <>
-    Trending agent skills from{" "}
-    <a
-      href="https://skills.sh"
-      target="_blank"
-      rel="noreferrer"
-      className="rounded-sm underline underline-offset-2 hover:text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-    >
-      skills.sh
-    </a>
-    . Install one and every agent you use in bb can run it.
-  </>
-);
 const SKILLS_LIBRARY_DESCRIPTION =
   "The skills on this bb host — yours, your providers', and those bundled with plugins. They work with every agent you use in bb.";
 
@@ -314,8 +299,6 @@ interface SkillsOverviewProps {
   isLoading: boolean;
   hasError: boolean;
   query?: string;
-  activeMode?: SkillsCollectionMode;
-  browseContent?: ReactNode;
   onCreateSkill: (prompt?: string) => void;
   onSelectSkill: (skill: SkillSummary) => void;
   onPrefetchSkill?: (skill: SkillSummary) => void;
@@ -323,16 +306,12 @@ interface SkillsOverviewProps {
   onRetry?: () => void;
 }
 
-type SkillsCollectionMode = "library" | "browse";
-
 export function SkillsOverview({
   skills,
   providerRoster,
   isLoading,
   hasError,
   query = "",
-  activeMode = "library",
-  browseContent,
   onCreateSkill,
   onSelectSkill,
   onPrefetchSkill,
@@ -517,81 +496,73 @@ export function SkillsOverview({
   return (
     <ResourceCollectionPage
       id="skills-collection"
-      description={
-        activeMode === "browse"
-          ? SKILLS_BROWSE_DESCRIPTION
-          : SKILLS_LIBRARY_DESCRIPTION
-      }
+      description={SKILLS_LIBRARY_DESCRIPTION}
       bandClassName={TOOLS_PAGE_BAND_CLASSES}
     >
-      {activeMode === "browse" ? (
-        browseContent
-      ) : (
-        <ResourceCollectionViewport
-          scrollId="skills-library-results"
-          viewportRef={setLibraryViewport}
-          bandClassName={TOOLS_PAGE_BAND_CLASSES}
-          toolbar={
-            <ResourceToolbar
-              searchValue={query}
-              searchPlaceholder="Search skills"
-              onSearchChange={onQueryChange}
-              action={
-                <CreateWithTemplatesButton
-                  kind="skill"
-                  label="New bb skill"
-                  onCreate={onCreateSkill}
+      <ResourceCollectionViewport
+        scrollId="skills-library-results"
+        viewportRef={setLibraryViewport}
+        bandClassName={TOOLS_PAGE_BAND_CLASSES}
+        toolbar={
+          <ResourceToolbar
+            searchValue={query}
+            searchPlaceholder="Search skills"
+            onSearchChange={onQueryChange}
+            action={
+              <CreateWithTemplatesButton
+                kind="skill"
+                label="New bb skill"
+                onCreate={onCreateSkill}
+              />
+            }
+            controls={
+              <>
+                <ResourceFilterMenu
+                  compact
+                  groups={[
+                    {
+                      id: "type",
+                      label: "Type",
+                      options: SOURCE_FILTER_OPTIONS,
+                      selectedValues: sourceFilters,
+                      onChange: (values) =>
+                        setSourceFilters(
+                          values.filter(isResourceSkillSourceFilter),
+                        ),
+                    },
+                    {
+                      id: "provider",
+                      label: "Provider",
+                      options: providerOptions,
+                      selectedValues: providerFilters,
+                      onChange: (values) =>
+                        setProviderFilters(
+                          values.filter(isResourceProviderFilter),
+                        ),
+                    },
+                  ]}
                 />
-              }
-              controls={
-                <>
-                  <ResourceFilterMenu
-                    compact
-                    groups={[
-                      {
-                        id: "type",
-                        label: "Type",
-                        options: SOURCE_FILTER_OPTIONS,
-                        selectedValues: sourceFilters,
-                        onChange: (values) =>
-                          setSourceFilters(
-                            values.filter(isResourceSkillSourceFilter),
-                          ),
-                      },
-                      {
-                        id: "provider",
-                        label: "Provider",
-                        options: providerOptions,
-                        selectedValues: providerFilters,
-                        onChange: (values) =>
-                          setProviderFilters(
-                            values.filter(isResourceProviderFilter),
-                          ),
-                      },
-                    ]}
-                  />
-                  <ResourceSortMenu
-                    value={sortMode}
-                    direction={sortDirection}
-                    compact
-                    options={[
-                      {
-                        id: "provider",
-                        label: "Provider",
-                        disabled: providerBucketCount <= 1,
-                      },
-                      { id: "alpha", label: "Skill name" },
-                    ]}
-                    onChange={handleSortChange}
-                  />
-                </>
-              }
-            />
-          }
-        >
-          <div className={TOOLS_PAGE_BAND_CLASSES}>{libraryBody}</div>
-        </ResourceCollectionViewport>
-      )}
+                <ResourceSortMenu
+                  value={sortMode}
+                  direction={sortDirection}
+                  compact
+                  options={[
+                    {
+                      id: "provider",
+                      label: "Provider",
+                      disabled: providerBucketCount <= 1,
+                    },
+                    { id: "alpha", label: "Skill name" },
+                  ]}
+                  onChange={handleSortChange}
+                />
+              </>
+            }
+          />
+        }
+      >
+        <div className={TOOLS_PAGE_BAND_CLASSES}>{libraryBody}</div>
+      </ResourceCollectionViewport>
     </ResourceCollectionPage>
   );
 }

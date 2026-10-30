@@ -1,1 +1,0 @@
-export const REGISTRY_ENTRY_BATCH_LIMIT = 200;
