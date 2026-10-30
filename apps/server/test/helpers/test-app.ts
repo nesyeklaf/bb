@@ -43,7 +43,6 @@ import {
   type AppVersionService,
 } from "../../src/services/system/app-version.js";
 import { createBbAppManagedConfigReloader } from "../../src/services/system/bb-app-managed-config.js";
-import { createNoopTelemetryService } from "../../src/services/system/telemetry.js";
 import { TerminalSessionLifecycle } from "../../src/services/terminals/terminal-session-lifecycle.js";
 import { createLifecycleDedupers } from "../../src/lifecycle-dedupers.js";
 import type { ServerAppDeps, ServerRuntimeConfig } from "../../src/types.js";
@@ -268,7 +267,6 @@ export async function createTestAppHarness(
     hub,
     logger,
   });
-  const telemetry = createNoopTelemetryService();
   const skillTreeRegistry = new SkillTreeRegistry();
   const aiServices = createAiServiceRegistry();
   const pendingInteractions = new PendingInteractionLifecycle({
@@ -282,7 +280,6 @@ export async function createTestAppHarness(
     pluginHostArtifacts,
     aiServices,
     skillTreeRegistry,
-    telemetry,
     terminalSessions,
   });
   pendingInteractions.start();
@@ -339,7 +336,6 @@ export async function createTestAppHarness(
     ),
     aiServices,
     skillTreeRegistry,
-    telemetry,
     terminalSessions,
     watchInterests,
     sharedPorts,

@@ -8,7 +8,6 @@ import type { AppUpdateService } from "./services/system/app-update.js";
 import type { CliCommandService } from "./services/system/cli-command.js";
 import type { AppVersionService } from "./services/system/app-version.js";
 import type { BbAppManagedConfigReloader } from "./services/system/bb-app-managed-config.js";
-import type { TelemetryService } from "./services/system/telemetry.js";
 import type { TerminalSessionLifecycle } from "./services/terminals/terminal-session-lifecycle.js";
 import type { LifecycleDedupers } from "./lifecycle-dedupers.js";
 import type { NotificationHub } from "./ws/hub.js";
@@ -56,7 +55,6 @@ export interface AppDeps {
   providerLiveCommands: ProviderLiveCommandsCache;
   aiServices: AiServiceRegistry;
   skillTreeRegistry: SkillTreeRegistry;
-  telemetry: TelemetryService;
   terminalSessions: TerminalSessionLifecycle;
   watchInterests: WatchInterestCoordinator;
   sharedPorts: HostSharedPortCoordinator;
@@ -81,7 +79,6 @@ export type WorkSessionDeps = Pick<
   | "pluginHostArtifacts"
   | "aiServices"
   | "skillTreeRegistry"
-  | "telemetry"
 >;
 
 export type LoggedWorkSessionDeps = WorkSessionDeps & Pick<AppDeps, "logger">;

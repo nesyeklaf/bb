@@ -8,7 +8,6 @@ export const SERVER_OWNED_TOP_LEVEL_FILES: readonly string[] = [
   "auth-secret",
   "machine-environment-key",
   "AGENTS.md",
-  "telemetry-id",
 ];
 export const SERVER_OWNED_TOP_LEVEL_DIRECTORIES: readonly string[] = [
   "attachments",

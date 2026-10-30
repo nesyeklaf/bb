@@ -370,7 +370,6 @@ type ExpectedSystemKey =
   | "installCliSkills"
   | "experimental_cliCommand"
   | "experimental_installCliCommand"
-  | "experimental_recordTelemetryEvent"
   | "experimental_removeCliCommand"
   | "reloadConfig"
   | "setAiServiceSelection"

@@ -3816,19 +3816,6 @@ be cancelled during activation or rollback.
 Stabilization requires exercising reconnect/reload, concurrent deduplication,
 rollback delivery, missing jobs after restart, and CLI/SDK parity.
 
-## `PluginBbSdk.system.experimental_recordTelemetryEvent`
-
-Posts one anonymous product event to `POST /api/v1/system/telemetry/events`,
-which forwards it to usage telemetry under the install's anonymous id and
-drops it when usage data sharing is off. The schema is a strict allow-list of
-setup-guide and new-thread-submit events; anything else is a 400. Core
-callers, all through `recordTelemetryEvent` in
-`apps/app/src/components/onboarding/onboarding-telemetry.ts`: the setup guide
-(`OnboardingFlow`) and `NewThreadComposer`'s `new_thread_submit` outcomes.
-
-Stabilize after deciding whether third-party plugins may emit product events
-at all and, if so, how they are namespaced and rate limited.
-
 ## `PluginBbSdk.system.experimental_cliCommand`, `experimental_installCliCommand`, and `experimental_removeCliCommand`
 
 `experimental_cliCommand()` reports whether `bb` is on PATH on the server's

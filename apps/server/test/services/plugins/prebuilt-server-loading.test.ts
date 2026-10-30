@@ -23,7 +23,6 @@ import {
   type PluginService,
 } from "../../../src/services/plugins/plugin-service.js";
 import { testLogger } from "../../helpers/test-app.js";
-import { createNoopTelemetryService } from "../../../src/services/system/telemetry.js";
 
 vi.mock("@bb/plugin-build", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@bb/plugin-build")>();
@@ -76,7 +75,6 @@ describe("prebuilt server bundle loading", () => {
   function createService() {
     return createPluginService({
       aiServices: createAiServiceRegistry(),
-      telemetry: createNoopTelemetryService(),
       db,
       hub: {
         getDaemonSessionIdForHost: () => null,
@@ -252,7 +250,6 @@ export default function plugin() {
     const linkedDb = createMigratedConnection();
     const linkedService = createPluginService({
       aiServices: createAiServiceRegistry(),
-      telemetry: createNoopTelemetryService(),
       db: linkedDb,
       hub: {
         getDaemonSessionIdForHost: () => null,

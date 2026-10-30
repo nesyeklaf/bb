@@ -50,7 +50,6 @@ async function createSourceTree(): Promise<SourceTree> {
       body: Buffer.from(JSON.stringify({ config: { BB_LOG_LEVEL: "debug" } })),
       mode: 0o600,
     },
-    { archivePath: "telemetry-id", body: Buffer.alloc(0), mode: 0o644 },
     {
       archivePath: `plugins/npm/${longSegment}/${longSegment}/${longSegment}/bin/tool`,
       body: Buffer.from("#!/bin/sh\necho hi\n"),

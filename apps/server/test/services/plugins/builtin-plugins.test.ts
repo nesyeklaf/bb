@@ -39,7 +39,6 @@ import {
 } from "../../../src/services/plugins/builtin-registry.js";
 import { copyPluginRuntime } from "@bb/plugin-build";
 import { testLogger } from "../../helpers/test-app.js";
-import { createNoopTelemetryService } from "../../../src/services/system/telemetry.js";
 
 vi.mock("node:fs/promises", async (importOriginal) => {
   const actual = await importOriginal<typeof import("node:fs/promises")>();
@@ -184,7 +183,6 @@ function createService(args: {
 }): PluginService {
   return createPluginService({
     aiServices: createAiServiceRegistry(),
-    telemetry: createNoopTelemetryService(),
     db: args.db,
     hub: {
       getDaemonSessionIdForHost: () => null,

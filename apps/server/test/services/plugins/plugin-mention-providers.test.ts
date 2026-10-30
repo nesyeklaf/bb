@@ -30,7 +30,6 @@ import {
   testLogger,
   type TestAppHarness,
 } from "../../helpers/test-app.js";
-import { createNoopTelemetryService } from "../../../src/services/system/telemetry.js";
 
 const BASE = "http://127.0.0.1:3334";
 const EVIL_ORIGIN = "https://evil.example";
@@ -671,7 +670,6 @@ describe("mention search time box", () => {
     workDir = await mkdtemp(join(tmpdir(), "bb-plugin-mention-timeout-"));
     service = createPluginService({
       aiServices: createAiServiceRegistry(),
-      telemetry: createNoopTelemetryService(),
       db,
       hub: {
         getDaemonSessionIdForHost: () => null,
@@ -751,7 +749,6 @@ describe("mention resolve time box", () => {
     workDir = await mkdtemp(join(tmpdir(), "bb-plugin-resolve-timeout-"));
     service = createPluginService({
       aiServices: createAiServiceRegistry(),
-      telemetry: createNoopTelemetryService(),
       db,
       hub: {
         getDaemonSessionIdForHost: () => null,

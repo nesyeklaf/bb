@@ -35,7 +35,6 @@ import { PluginHostArtifactRegistry } from "../../../src/services/plugins/plugin
 import { startTestServer, testLogger } from "../../helpers/test-app.js";
 import { defineRpcContract } from "@get-bb/plugin-sdk";
 import { z } from "zod";
-import { createNoopTelemetryService } from "../../../src/services/system/telemetry.js";
 
 const logger = testLogger as unknown as Logger;
 
@@ -202,7 +201,6 @@ describe("plugin bb.sdk bind gate", () => {
     pluginHostArtifacts = new PluginHostArtifactRegistry();
     service = createPluginService({
       aiServices: createAiServiceRegistry(),
-      telemetry: createNoopTelemetryService(),
       db,
       pluginHostArtifacts,
       sharedPorts,

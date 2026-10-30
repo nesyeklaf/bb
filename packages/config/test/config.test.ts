@@ -319,7 +319,6 @@ describe("consumer-specific config", () => {
     );
     expect(serverConfig.featureFlags).toEqual({
       placeholder: false,
-      initiatorTelemetry: true,
       timelineWindowEventBudget: 1_500,
     });
   });
@@ -421,16 +420,6 @@ describe("consumer-specific config", () => {
     expect(serverConfig.featureFlags.placeholder).toBe(true);
   });
 
-  it("parses the initiator telemetry flag from env", () => {
-    const serverConfig = loadServerConfig({
-      env: createServerRuntimeEnv({
-        BB_FF_INITIATOR_TELEMETRY: "false",
-      }),
-    });
-
-    expect(serverConfig.featureFlags.initiatorTelemetry).toBe(false);
-  });
-
   it("parses the timeline window event budget from env", () => {
     const serverConfig = loadServerConfig({
       env: createServerRuntimeEnv({
@@ -483,7 +472,7 @@ describe("consumer-specific config", () => {
     expect(serverConfig.BB_APP_VERSION).toBe("0.1.2");
   });
 
-  it("parses the internal app surface marker for server telemetry", () => {
+  it("parses the internal app surface marker", () => {
     const serverConfig = loadServerConfig({
       env: createServerRuntimeEnv({
         BB_APP_SURFACE: "desktop",

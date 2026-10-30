@@ -89,7 +89,6 @@ import {
 import { recordQueuedMessageDrainFailure } from "./queue-drain-failure.js";
 import {
   appendPluginMentionContext,
-  captureUserMessageSentTelemetry,
   ensureThreadQueueIsWritable,
   formatAgentThreadInput,
   resolveMessageSenderThreadId,
@@ -289,14 +288,6 @@ export async function createQueuedMessageForThread(
       { behavior: "immediate" },
     );
   deps.hub.notifyThread(thread.id, ["queue-changed"]);
-  if (senderThreadId === null && payload.input.length > 0) {
-    captureUserMessageSentTelemetry(deps, {
-      isChildThread: thread.parentThreadId !== null,
-      messageSource: "queued_message",
-      providerId: thread.providerId,
-      initiator: "user",
-    });
-  }
   if (
     (currentThread.status === "idle" && hasProviderSession) ||
     isActiveTurnMainRunIdle(deps, currentThread)

@@ -32,9 +32,6 @@ import {
   type PluginService,
 } from "../../../src/services/plugins/plugin-service.js";
 import { testLogger } from "../../helpers/test-app.js";
-import { pluginInstalledTelemetryEvent } from "../../../src/services/plugins/plugin-registration.js";
-import type { TelemetryEvent } from "../../../src/services/system/telemetry.js";
-import { createNoopTelemetryService } from "../../../src/services/system/telemetry.js";
 import { createProviderRegistryService } from "../../../src/services/providers/provider-registry.js";
 
 const logger = testLogger as unknown as Logger;
@@ -117,7 +114,6 @@ describe("plugin service", () => {
     workDir = await mkdtemp(join(tmpdir(), "bb-plugin-test-"));
     service = createPluginService({
       aiServices: createAiServiceRegistry(),
-      telemetry: createNoopTelemetryService(),
       db,
       hub: {
         getDaemonSessionIdForHost: () => null,
@@ -133,10 +129,7 @@ describe("plugin service", () => {
     });
   });
 
-  function createTelemetryTrackedService(
-    captured: TelemetryEvent[],
-    fixture = { db, workDir },
-  ): PluginService {
+  function createFixtureService(fixture = { db, workDir }): PluginService {
     return createPluginService({
       aiServices: createAiServiceRegistry(),
       db: fixture.db,
@@ -148,10 +141,6 @@ describe("plugin service", () => {
         notifySystem: () => {},
       },
       logger,
-      telemetry: {
-        ...createNoopTelemetryService(),
-        capture: (event) => captured.push(event),
-      },
       dataDir: join(fixture.workDir, "data"),
       appVersion: "0.9.0",
       bundledPlugins: [],
@@ -178,7 +167,7 @@ describe("plugin service", () => {
       expect((await service.installPath(rootDir)).status).toBe("error");
       if (mode === "startup") {
         await service.stop();
-        service = createTelemetryTrackedService([]);
+        service = createFixtureService();
         expect(service.list()[0]).toMatchObject({
           status: "starting",
           statusDetail: null,
@@ -639,7 +628,6 @@ describe("plugin service", () => {
 
     const booting = createPluginService({
       aiServices: createAiServiceRegistry(),
-      telemetry: createNoopTelemetryService(),
       db,
       hub: {
         getDaemonSessionIdForHost: () => null,
@@ -694,7 +682,6 @@ describe("plugin service", () => {
     const makeService = (appVersion: string) =>
       createPluginService({
         aiServices: createAiServiceRegistry(),
-        telemetry: createNoopTelemetryService(),
         db,
         hub: {
           getDaemonSessionIdForHost: () => null,
@@ -786,7 +773,6 @@ describe("plugin service", () => {
 
     const upgraded = createPluginService({
       aiServices: createAiServiceRegistry(),
-      telemetry: createNoopTelemetryService(),
       db,
       hub: {
         getDaemonSessionIdForHost: () => null,
@@ -817,7 +803,6 @@ describe("plugin service", () => {
   it("skips the engines gate on 0.0.0 dev builds instead of marking everything incompatible", async () => {
     const devService = createPluginService({
       aiServices: createAiServiceRegistry(),
-      telemetry: createNoopTelemetryService(),
       db,
       hub: {
         getDaemonSessionIdForHost: () => null,
@@ -839,109 +824,6 @@ describe("plugin service", () => {
     const entry = await devService.installPath(gated);
     expect(entry.status).toBe("running");
     await devService.stop();
-  });
-
-  it("reports one anonymous plugin_installed event per user install", async () => {
-    const captured: TelemetryEvent[] = [];
-    const tracked = createTelemetryTrackedService(captured);
-    const rootDir = await writePlugin(workDir, {
-      name: "bb-plugin-tracked",
-      serverSource: "export default function plugin() {}",
-    });
-    const installed = await tracked.installPath(rootDir);
-    expect(installed.status).toBe("running");
-    expect(captured).toEqual([
-      {
-        name: "plugin_installed",
-        properties: {
-          plugin_id: null,
-          provenance: "direct",
-          marketplace: null,
-          source_kind: "path",
-        },
-      },
-    ]);
-    await tracked.reload("tracked");
-    expect(tracked.list().find((entry) => entry.id === "tracked")?.status).toBe(
-      "running",
-    );
-    expect((await tracked.setEnabled("tracked", false))?.status).toBe(
-      "disabled",
-    );
-    expect((await tracked.setEnabled("tracked", true))?.status).toBe("running");
-    expect(captured).toHaveLength(1);
-    await tracked.stop();
-  });
-
-  it("does not report plugin_installed during boot-time reconcile", async () => {
-    const captured: TelemetryEvent[] = [];
-    const tracked = createTelemetryTrackedService(captured);
-    const rootDir = await writePlugin(workDir, {
-      name: "bb-plugin-reconciled",
-      serverSource: "export default function plugin() {}",
-    });
-    await tracked.installPath(rootDir);
-    await tracked.stop();
-    captured.length = 0;
-
-    await tracked.start();
-
-    expect(captured).toEqual([]);
-    expect(
-      tracked.list().find((entry) => entry.id === "reconciled")?.status,
-    ).toBe("running");
-    await tracked.stop();
-  });
-
-  it("hides names of plugins from third-party catalogs in the install event", () => {
-    const properties = pluginInstalledTelemetryEvent(
-      "internal-tool",
-      {
-        kind: "catalog",
-        marketplace: "acme-private",
-        entryId: "internal-tool",
-      },
-      {
-        kind: "git",
-        url: "git@github.com:acme/internal-tool.git",
-        subdirectory: null,
-        selector: { kind: "ref", ref: "main", refKind: "branch" },
-      },
-    ).properties;
-    expect(properties).toEqual({
-      plugin_id: null,
-      provenance: "catalog",
-      marketplace: null,
-      source_kind: "git",
-    });
-    expect(
-      pluginInstalledTelemetryEvent(
-        "tasks",
-        { kind: "builtin" },
-        { kind: "builtin", name: "tasks" },
-      ).properties.plugin_id,
-    ).toBe("tasks");
-  });
-
-  it("names public plugins in the install event so PostHog can rank them", () => {
-    expect(
-      pluginInstalledTelemetryEvent(
-        "tasks",
-        { kind: "catalog", marketplace: "bb-community", entryId: "tasks" },
-        {
-          kind: "npm",
-          packageName: "@get-bb/tasks",
-          registry: "https://registry.npmjs.org",
-          requestedSpec: "^1",
-          specKind: "range",
-        },
-      ).properties,
-    ).toEqual({
-      plugin_id: "tasks",
-      provenance: "catalog",
-      marketplace: "bb-community",
-      source_kind: "npm",
-    });
   });
 
   it("adds marketplace discovery metadata to an installed plugin", () => {
@@ -1097,7 +979,7 @@ describe("plugin service", () => {
     const db = createMigratedConnection();
     const workDir = await mkdtemp(join(tmpdir(), "bb-plugin-hold-test-"));
     const fixture = { db, workDir };
-    let service = createTelemetryTrackedService([], fixture);
+    let service = createFixtureService(fixture);
 
     try {
       const heldAccountRoot = await writePlugin(workDir, {
@@ -1132,7 +1014,7 @@ describe("plugin service", () => {
       await service.stop();
       globals.__heldFactoryRuns = 0;
       globals.__heldServiceStarts = 0;
-      service = createTelemetryTrackedService([], fixture);
+      service = createFixtureService(fixture);
 
       await service.start({
         hold: {
@@ -1188,7 +1070,7 @@ describe("plugin service", () => {
       await service.installPath(otherRoot);
       await service.stop();
       globals.__heldLoads = 0;
-      service = createTelemetryTrackedService([]);
+      service = createFixtureService();
       await service.start({
         hold: {
           sources: [held.source],
@@ -1293,7 +1175,6 @@ describe("plugin service", () => {
     });
     const observing = createPluginService({
       aiServices: createAiServiceRegistry(),
-      telemetry: createNoopTelemetryService(),
       db,
       hub: {
         getDaemonSessionIdForHost: () => null,
@@ -1558,7 +1439,6 @@ describe("plugins-changed broadcast", () => {
     providerRegistry = createProviderRegistryService();
     service = createPluginService({
       aiServices: createAiServiceRegistry(),
-      telemetry: createNoopTelemetryService(),
       db,
       hub: {
         getDaemonSessionIdForHost: () => null,

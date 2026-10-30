@@ -88,11 +88,8 @@ import {
 } from "./internal/auth.js";
 import {
   captureTrustedRemoteAddress,
-  resolveRequestAppSurface,
 } from "./request-context.js";
 import { runEventLoopWork } from "./services/system/event-loop-work.js";
-import { setTurnTelemetryDeps } from "./services/system/turn-telemetry.js";
-import { runWithTelemetryAppSurface } from "./services/system/telemetry.js";
 import {
   onClientSocketClose,
   onClientSocketMessage,
@@ -534,7 +531,7 @@ export function createApp(
   });
   app.use("*", async (context, next) => {
     captureTrustedRemoteAddress(context);
-    return runWithTelemetryAppSurface(resolveRequestAppSurface(context), next);
+    return next();
   });
   app.use("*", async (context, next) => {
     const path = context.req.path;
@@ -791,7 +788,6 @@ export function createApp(
     db: deps.db,
     hub: deps.hub,
     logger: deps.logger,
-    telemetry: deps.telemetry,
     pendingInteractions: deps.pendingInteractions,
     dataDir: deps.config.dataDir,
     appVersion: deps.config.appVersion,
@@ -839,7 +835,6 @@ export function createApp(
       threadId,
     });
   });
-  setTurnTelemetryDeps(deps);
   setPluginThreadEventEmitter(pluginService.events);
   // Bridge the dispatch pipeline to this service's hooks. Until this runs
   // there are no hooks, which is exactly the zero-overhead path.

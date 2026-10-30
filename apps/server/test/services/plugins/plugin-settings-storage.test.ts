@@ -30,7 +30,6 @@ import {
 } from "../../../src/services/plugins/plugin-service.js";
 import { PluginSettingsValidationError } from "../../../src/services/plugins/plugin-settings.js";
 import { testLogger } from "../../helpers/test-app.js";
-import { createNoopTelemetryService } from "../../../src/services/system/telemetry.js";
 
 const logger = testLogger as unknown as Logger;
 
@@ -86,7 +85,6 @@ describe("plugin settings + storage", () => {
     systemBroadcasts = [];
     service = createPluginService({
       aiServices: createAiServiceRegistry(),
-      telemetry: createNoopTelemetryService(),
       db,
       hub: {
         getDaemonSessionIdForHost: () => null,

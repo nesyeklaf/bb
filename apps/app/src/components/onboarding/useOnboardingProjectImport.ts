@@ -3,7 +3,7 @@ import { isPromptDraftEmpty } from "@bb/client-core";
 import { useCreateProject } from "@/hooks/mutations/project-mutations";
 import { usePromptDraftController } from "@/hooks/usePromptDraftStorage";
 import { useImportedProjectDefault } from "@/lib/root-compose-selection";
-import type { OnboardingEntry } from "./onboarding-telemetry";
+import type { OnboardingEntry } from "./onboarding-entry";
 
 export function useOnboardingProjectImport({
   entry,

@@ -142,7 +142,6 @@ General. Machine-related keys (`machineServerUrl`, `defaultMachineAccess`,
   `defaultProviderId` (default `null`) names the default provider; `null`
   clears it.
 - `idleProviderSessionTimeoutMinutes` (default `30`; Settings → Providers → Configuration → Release idle agent sessions) sets how long an agent can sit idle after its last turn before every machine stops its provider process. Allowed values are `0` (ASAP), `5`, `10`, `30`, and `60`, for example `bb settings general idleProviderSessionTimeoutMinutes 5`. Machines check every five minutes, so release can take up to five minutes beyond the timeout. Changes apply live and on reconnect. Only restorable sessions without active or pending work are eligible; threads keep their history and resume on the next message. `bb thread stop` still releases a runtime manually. This is not a limit on loaded processes or memory. Read the value with `bb settings show`; SDK callers use `system.config()` and `system.updateGeneralSettings({ ...config.generalSettings, idleProviderSessionTimeoutMinutes: 5 })`.
-- `telemetryEnabled`: see Telemetry below.
 
 `bb settings replay-onboarding` clears `onboardingCompletedAt`, so the
 first-run setup guide (connect an agent, add projects, pick plugins, set up
@@ -222,7 +221,7 @@ Launcher settings
 
 `bb-app config` and `bb-app env` reload runtime settings in a running server,
 but the CLI identifies settings that are startup-only, including binding/ports,
-data and the dev-app port, telemetry, inherited skill roots, and
+data and the dev-app port, inherited skill roots, and
 `BB_LOG_LEVEL`. Use `bb-app config`, not `bb-app env`, to change `BB_APP_URL`
 live. After a startup-only change, run `bb-app stop && bb-app start` or restart
 the desktop app; until then, changing or unsetting `BB_SERVER_BIND_HOST` does
@@ -415,14 +414,6 @@ preferred device is used on the next recording. A missing preference alone
 shows no warning. Capture failures warn on the idle microphone; five seconds
 of near-silent audio warns in the preview or recording row without switching
 inputs or stopping capture. Preview audio is never saved or transcribed.
-
-Telemetry
-
-Anonymous usage telemetry is controlled by Settings → General → Privacy &
-diagnostics, `bb settings general telemetryEnabled false`, or SDK
-`system.updateGeneralSettings` with `telemetryEnabled`. The saved preference
-takes effect immediately. `BB_TELEMETRY=false` always disables telemetry, even
-when the saved preference is enabled.
 
 Mobile app downloads
 

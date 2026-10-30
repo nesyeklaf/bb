@@ -28,10 +28,7 @@ import {
 } from "./project-execution-defaults.js";
 import { resolvePromptAttachmentReferences } from "../projects/attachments.js";
 import { projectCheckoutPathOnHost } from "../projects/project-workspace.js";
-import {
-  appendPluginMentionContext,
-  captureUserMessageSentTelemetry,
-} from "./thread-send.js";
+import { appendPluginMentionContext } from "./thread-send.js";
 import {
   attemptDispatch,
   hostIdForEnvironmentIntent,
@@ -60,12 +57,6 @@ import {
   type ThreadCreateServiceRequestInput,
   type ThreadCreateServiceRequest,
 } from "./thread-create-request.js";
-import { resolveDispatchAuthor } from "./dispatch-author.js";
-import { getActiveTurnId } from "./thread-events.js";
-import {
-  resolveTelemetryInitiator,
-  initiatorTelemetryProperty,
-} from "./telemetry-initiator.js";
 import { deriveForkTitle, deriveTitleFallback } from "./title-generation.js";
 import type { ThreadProvisionEnvironmentIntent } from "./thread-startup-store.js";
 import { resolveSystemProviderModels } from "../system/execution-options.js";
@@ -406,7 +397,7 @@ function requireLiveSourceThread(
  * that queued the first turn — whose only real difference was
  * whether anything was allowed to run yet. That is a question the checkpoint
  * answers, so asking it here as well meant two code paths that had to be kept
- * in agreement about forks, execution defaults, telemetry and cleanup.
+ * in agreement about forks, execution defaults and cleanup.
  *
  * The row inserts `pending`: created, with its provider resolved, and nothing
  * provisioned. Creation itself is unhooked — it is a cheap row — and admission
@@ -872,38 +863,5 @@ export async function createThreadFromRequest(
     ...createArgs,
     sendAt: request.sendAt,
   });
-  const { initiator } = resolveDispatchAuthor({
-    retrying: false,
-    senderThreadId: null,
-    startedOnBehalfOf: request.startedOnBehalfOf,
-  });
-  const spawnedByWorkingAgent =
-    request.senderThreadId !== undefined &&
-    getActiveTurnId(deps, request.senderThreadId) !== null;
-  const telemetryInitiator = resolveTelemetryInitiator({
-    origin: request.origin,
-    originPluginId: request.originPluginId ?? null,
-    initiator:
-      spawnedByWorkingAgent && initiator === "user" ? "agent" : initiator,
-  });
-  deps.telemetry.capture({
-    name: "thread_created",
-    properties: {
-      is_child_thread: parentThread !== null,
-      provider: request.providerId,
-      ...initiatorTelemetryProperty(
-        deps.config.featureFlags,
-        telemetryInitiator,
-      ),
-    },
-  });
-  if (initiator === "user" && request.input.length > 0) {
-    captureUserMessageSentTelemetry(deps, {
-      isChildThread: parentThread !== null,
-      messageSource: "thread_create",
-      providerId: request.providerId,
-      initiator: telemetryInitiator,
-    });
-  }
   return thread;
 }
