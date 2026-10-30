@@ -19,7 +19,9 @@ export const BUILTIN_ALLOWED_HOSTS = [
   "objects.githubusercontent.com",
 ] as const;
 
-export const INFERENCE_PROCESSES = new Set([
+export const PROVIDER_BRIDGE_PROCESS = "bb-provider-bridge";
+
+const PROVIDER_CLI_PROCESSES = [
   "claude",
   "codex",
   "pi",
@@ -28,10 +30,15 @@ export const INFERENCE_PROCESSES = new Set([
   "git-remote-https",
   "gh",
   "ssh",
+];
+
+export const INFERENCE_PROCESSES = new Set([
+  ...PROVIDER_CLI_PROCESSES,
+  PROVIDER_BRIDGE_PROCESS,
 ]);
 
 export const THIRD_PARTY_PROCESSES = new Set([
-  ...INFERENCE_PROCESSES,
+  ...PROVIDER_CLI_PROCESSES,
   "opencode",
   "hermes",
   "gemini",
