@@ -108,7 +108,6 @@ Use `--selected-model <model-id>` to discover its reasoning choices and include 
 - `bb server export`
 - `bb server import`
 - `bb server unlock`
-- `bb server allow-connect`
 - `bb server delete-old-copy`
 - `bb server install-machine-service`
 

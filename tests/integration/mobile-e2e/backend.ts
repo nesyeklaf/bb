@@ -1,7 +1,7 @@
 import { existsSync } from "node:fs";
-import { networkInterfaces } from "node:os";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { parseServerBindAddressesOnThisHost } from "@bb/config/server";
 import { getAppSettings, setAppSettings } from "@bb/db";
 import type { PendingInteraction } from "@bb/domain";
 import { createIntegrationHarness } from "../helpers/harness.js";
@@ -42,37 +42,21 @@ function readPort(): number {
   return parsed;
 }
 
-function readBindHost(): "127.0.0.1" | "0.0.0.0" {
+function readBindHost(): string {
   const raw = process.env.BB_MOBILE_E2E_BIND_HOST;
   if (raw === undefined || raw === "127.0.0.1") return "127.0.0.1";
-  if (raw === "0.0.0.0") return "0.0.0.0";
-  throw new Error(`Invalid BB_MOBILE_E2E_BIND_HOST: ${raw}`);
+  const addresses = parseServerBindAddressesOnThisHost(raw);
+  const [address] = addresses;
+  if (addresses.length !== 1 || address === undefined) {
+    throw new Error(
+      `BB_MOBILE_E2E_BIND_HOST must name exactly one tailnet or WireGuard address: ${raw}`,
+    );
+  }
+  return address;
 }
 
-function listLanIpv4Addresses(): string[] {
-  return Object.values(networkInterfaces())
-    .flatMap((entries) => entries ?? [])
-    .filter((entry) => entry.family === "IPv4" && !entry.internal)
-    .map((entry) => entry.address);
-}
-
-function warnWildcardBind(port: number): void {
-  const lanUrls = listLanIpv4Addresses().map(
-    (address) => `http://${address}:${port}`,
-  );
-  process.stderr.write(
-    [
-      "mobile-e2e backend: SECURITY WARNING: binding on 0.0.0.0. The harness",
-      "server is unauthenticated and runs a real host daemon that permits",
-      "command execution (terminal sessions) and file reads as your user.",
-      "Use BB_MOBILE_E2E_BIND_HOST=0.0.0.0 only behind a trusted network",
-      "boundary and stop the backend when you are done.",
-    ].join(" ") +
-      "\n" +
-      (lanUrls.length > 0
-        ? `mobile-e2e backend: point the phone at ${lanUrls.join(" or ")}\n`
-        : ""),
-  );
+function formatUrlHost(address: string): string {
+  return address.includes(":") ? `[${address}]` : address;
 }
 
 const TURN_TIMEOUT_MS = 15_000;
@@ -181,7 +165,11 @@ const LONG_MARKDOWN_MESSAGE = [
 async function main(): Promise<void> {
   const bindHost = readBindHost();
   const serverPort = readPort();
-  if (bindHost === "0.0.0.0") warnWildcardBind(serverPort);
+  if (bindHost !== "127.0.0.1") {
+    process.stderr.write(
+      `mobile-e2e backend: point the phone at http://${formatUrlHost(bindHost)}:${serverPort}\n`,
+    );
+  }
   const harness = await createIntegrationHarness({
     bindHost,
     serverPort,

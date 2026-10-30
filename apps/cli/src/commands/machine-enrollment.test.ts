@@ -263,7 +263,7 @@ it("accepts delivered direct and Connect bundles from file and environment", asy
           : undefined;
       const value = {
         ...bundle(),
-        serverUrl: "https://test.getbb.app",
+        serverUrl: "https://test.example.test",
         headers,
       };
       const path = join(h.dir, "bootstrap.json");

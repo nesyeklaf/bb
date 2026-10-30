@@ -45,10 +45,7 @@ describe("wireguard subnets", () => {
       }),
     );
     const state = (address: string) =>
-      classifyRequestPeer(
-        { address, tunnelIngress: false },
-        { bindSubnets: subnets },
-      ).state;
+      classifyRequestPeer({ address }, { bindSubnets: subnets }).state;
     expect(state("fd42:1234::2")).toBe("allowed");
     expect(state("198.18.7.20")).toBe("allowed");
     expect(state("203.0.113.9")).toBe("red");

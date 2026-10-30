@@ -1,6 +1,5 @@
 import type {
   HostDiscoveredRepo,
-  ServerAccessStatus,
   SystemProviderState,
 } from "@bb/server-contract";
 
@@ -29,8 +28,6 @@ export const ONBOARDING_PLUGINS: readonly {
   { entryId: "agent-annotations", pluginId: "agent-annotations" },
   { entryId: "ask-user-question", pluginId: "ask-user-question" },
 ];
-
-export const CONNECT_PLUGIN_ID = "connect";
 
 export type AgentSetupState =
   | { status: "checking" }
@@ -133,25 +130,6 @@ export function shortRemoteName(originUrl: string | null): string | null {
   if (path === undefined) return null;
   const segments = path.split("/").filter((segment) => segment !== "");
   return segments.length < 2 ? null : segments.slice(-2).join("/");
-}
-
-export function connectAccessUrl(
-  serverAccess: ServerAccessStatus | undefined,
-):
-  | { status: "on"; url: string }
-  | { status: "off" }
-  | { status: "unavailable" } {
-  const provider = serverAccess?.providers.find(
-    (candidate) => candidate.pluginId === CONNECT_PLUGIN_ID,
-  );
-  if (provider === undefined) return { status: "unavailable" };
-  if (
-    provider.availability?.status === "available" &&
-    provider.availability.serverUrl !== undefined
-  ) {
-    return { status: "on", url: provider.availability.serverUrl };
-  }
-  return { status: "off" };
 }
 
 export interface SignInGuide {

@@ -13,9 +13,6 @@ export const SERVER_MOVE_STEP_IDS = [
 export const serverMoveStepIdSchema = z.enum(SERVER_MOVE_STEP_IDS);
 export type ServerMoveStepId = z.infer<typeof serverMoveStepIdSchema>;
 
-export const serverMoveModeSchema = z.enum(["connect", "direct"]);
-export type ServerMoveMode = z.infer<typeof serverMoveModeSchema>;
-
 export const lastServerMoveSchema = z
   .object({
     moveId: z.string().min(1),

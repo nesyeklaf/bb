@@ -65,9 +65,7 @@ function movedLock(): ServerMovedFile {
     fromHostId: "host-laptop",
     toHostId: "host-desktop",
     toHostName: "desktop",
-    serverUrl: "https://me.getbb.app",
-    mode: "connect",
-    connectHandle: "me",
+    serverUrl: "https://me.example.test",
     oldCopyEntries: ["bb.db"],
   };
 }
@@ -87,8 +85,8 @@ async function createFixture(): Promise<Fixture> {
   await writeFile(
     join(dataDir, "config.json"),
     JSON.stringify({
-      serverUrl: "https://me.getbb.app",
-      serverHeaders: { "x-bb-connect-machine": "grant-secret" },
+      serverUrl: "https://me.example.test",
+      serverHeaders: { "x-bb-machine-access": "grant-secret" },
     }),
   );
   const installerPath = join(root, "install-machine.sh");
@@ -165,7 +163,7 @@ describe("bb server install-machine-service", () => {
     const result = JSON.parse(collectLogPayloads(vi.mocked(console.log))[0]!);
     expect(result).toEqual({
       dataDir: fixture.dataDir,
-      serverUrl: "https://me.getbb.app",
+      serverUrl: "https://me.example.test",
       serviceFile: expect.stringContaining(fixture.homeDir),
       toHostName: "desktop",
     });

@@ -17,7 +17,6 @@ export const serverMoveRunFileSchema = z
     sourceServerHost: z
       .object({ id: z.string().min(1), name: z.string().min(1) })
       .strict(),
-    connectHandle: z.string().min(1).nullable(),
     workDir: z.string().min(1),
     grant: z
       .object({

@@ -8,7 +8,7 @@ loads the active server's web app in `react-native-webview` and talks to it
 over `@bb/mobile-bridge` (handshake, haptics, share, open
 external links, open native screens, save files on iOS). Threads, projects, plugins and server
 settings run in the page. The native screens cover what the page cannot
-own: first-run pairing (Direct URL and bb connect QR / code enrollment),
+own: first-run pairing (Direct URL),
 saved servers, This device settings (appearance, haptics,
 reload the page, clear website data), deep links, quick actions, share intents and the connection banner.
 External links use the web app's `shellOpenExternal` helper and the native
@@ -31,11 +31,9 @@ app/                     Expo Router routes (thin: each file re-exports a screen
                          Toaster
   index.tsx              redirects to Add server (no profiles) or the shell
   webview.tsx            the WebView shell (`?profileId=&path=`)
-  connect/index.tsx      bb connect enrollment (QR / code) — also the re-pair
-                         target (`?profileId=`) and the `bb://connect?code=…` link
   settings/              device (This device), appearance,
-                         servers/index (saved servers), servers/add (bb connect
-                         entry + Direct URL form)
+                         servers/index (saved servers), servers/add (Direct URL
+                         form)
   dev/webview-spike.tsx  Phase 0 WebView diagnostics (dev / EXPO_PUBLIC_BB_E2E=1
                          only: release bundles redirect home)
   e2e/reset.tsx          bb://e2e/reset — wipes local state (dev / EXPO_PUBLIC_BB_E2E=1)
@@ -52,32 +50,29 @@ src/
                          reset wiring, ThreadOpenSignalHandler (realtime
                          `thread-open` → shell route), ShareIntentHandler,
                          QuickActionsHandler
-  data/                  connect (pairing payload, enrollment, account servers),
-                         shared (system realtime subscription), system (system
+  data/                  shared (system realtime subscription), system (system
                          config query); see src/data/README.md
   lib/                   pure TypeScript, vitest-tested
-    connection/          active-profile connector (socket + session lifecycle),
+    connection/          active-profile connector (socket lifecycle),
                          connection banner derivation
     e2e/                 launch/deep-link reset logic, flow boundary tests
     haptics/             haptic(kind) over expo-haptics + the preference store
     links/               incoming-link parsing, profile match, add-server path
     native/              RN adapters for the lib contracts (SecureStore,
-                         cookies, AppState, the shared MMKV preferences) —
+                         AppState, the shared MMKV preferences) —
                          never imported by tested modules
     profiles/            ServerProfile model, SecureStore-backed store, URL
                          validation, /health + /system/config probe
     query/               per-profile QueryClient, AppState focus, realtime →
-                         system config invalidation, session refetch
+                         system config invalidation
     realtime/            WebSocketManager-shaped realtime on RN WebSocket
     sdk/                 createMobileSdk (@bb/sdk/browser + app-surface header),
                          per-profile client registry
-    session/             bb connect desktop-session cookie scheduler
     share/               inbound share intent → shell composer seed
     shell/               shell URL and navigation rules, screen state, last-path
                          preferences, share payloads, link resolution, shell
                          commands
-  screens/               connect/ (ConnectEnrollScreen, ConnectScanner —
-                         expo-camera QR, AccountServersList), dev/
+  screens/               dev/
                          (WebViewSpikeScreen + probes), settings/ (This device,
                          Appearance, Servers, Add server, the
                          grouped-list rows), shell/ (RootNavigator, connection
@@ -89,7 +84,7 @@ src/
   ui/                    NativeWind primitives (Text, Button, GroupedSection,
                          ActionSheet, …; see src/ui/README.md)
 e2e/flows/               Maestro shell flows: shell-launch, shell-deep-link,
-                         shell-send, shell-unreachable-server, shell-connect
+                         shell-send, shell-unreachable-server
 e2e/subflows/            shared steps (launch-app.yaml: cold start through the
                          dev client + Metro, or `launchApp` of the embedded
                          Release bundle with `-e BB_E2E_EMBEDDED_BUNDLE=1`;
@@ -99,8 +94,7 @@ e2e/subflows/            shared steps (launch-app.yaml: cold start through the
                          native `bb://` confirmation), called with
                          `runFlow: ../subflows/<name>.yaml`
 e2e/scripts/             ci-run-flows.sh (the CI flow set against a Release
-                         build; see "CI"), connect-stub-control.js (drives the
-                         bb connect stub), pick-simulator.mjs (newest iPhone
+                         build; see "CI"), pick-simulator.mjs (newest iPhone
                          17 Pro/17/16 Pro runtime)
 eas.json                 EAS Build profiles (development / development-device /
                          preview / production); see "Release"
@@ -202,15 +196,6 @@ WebViews when using this patch. System bar and display-cutout insets remain
 unchanged. Recheck this patch when upgrading WebView or changing keyboard
 ownership; see [Android's inset handling guidance](https://developer.android.com/develop/ui/views/layout/webapps/understand-window-insets).
 
-`e2e/android/connect.yaml` additionally needs the local TLS connect stub started
-with `BB_MOBILE_E2E_COOKIE_DOMAIN=stub.localhost`, a
-trusted fixture CA and DNS for `stub.localhost`/`other.localhost` on the test
-emulator, and `adb reverse tcp:42998 tcp:42998`. It resets the stub and checks
-invalid codes, pairing, WebView cookie authentication, relaunch and session
-expiry recovery. Chromium rejects the fixture's default `.localhost` cookie
-domain; the host-specific override tests one server, not account-wide cookie
-sharing across servers. Do not change release TLS validation to run this fixture.
-
 The Hugeicons React Native patch restores missing SVG ellipse/polygon support
 (the globe otherwise renders as a circle with a minus sign).
 
@@ -236,9 +221,8 @@ the public. The first Play upload must be completed manually.
 For Play uploads, add the GitHub secret `GOOGLE_PLAY_SERVICE_ACCOUNT_JSON`.
 Local EAS Submit reads the gitignored `google-play-service-account.json` in
 `apps/mobile`. Register the **Play app-signing certificate**, not only the
-upload certificate, in `ASSETLINKS_SHA256_FINGERPRINTS` on the apex and connect
-gate. Verify real HTTPS app links after installing the Play-signed build.
-The native `bb://` scheme works without those certificates.
+upload certificate, for any HTTPS app-link domain you serve. The native `bb://` scheme works
+without those certificates.
 
 Pending credentials do not establish verified HTTPS app-link coverage. Test
 that separately once signing is configured.
@@ -262,8 +246,10 @@ EXPO_PUBLIC_BB_SERVER_URL=http://127.0.0.1:<port> pnpm dev   # Metro (dev-client
 
 The iOS Simulator shares the Mac loopback, so `pnpm dev` (repo root) or
 `pnpm dev` gives a server URL that works as-is. Physical
-phones need a Tailscale Serve URL, bb connect, or a temporary
-`BB_SERVER_BIND_HOST=0.0.0.0`.
+phones need a Tailscale Serve URL or the server's tailnet address in
+`BB_SERVER_BIND_HOST`. For the E2E backend below, set
+`BB_MOBILE_E2E_BIND_HOST` to one tailnet or WireGuard address of this machine;
+the backend then listens only there.
 
 ## E2E (Maestro)
 
@@ -291,23 +277,12 @@ device settings from it.
 `shell-unreachable-server.yaml` checks that the add-server probe refuses a
 server the phone cannot reach, so the shell never loads a dead origin; it
 does not use the harness backend.
-`shell-connect.yaml` drives bb connect end to end against the stub apex +
-gate (`pnpm --filter @bb/integration-tests e2e:mobile-connect-stub`, see
-"bb connect" below): manual code entry with the handle and the self-hosted
-apex → enrolled screen (session signed in, account servers listed) → Done →
-the shell through the gate (cookie on fetch and on `/ws`) → the stub expires
-the session (the app re-mints and reconnects by itself) → the stub revokes
-the machine ("needs to be paired again" banner) → "Sign in again" re-pairs
-the same profile with a new code. The flow needs the stub started with
-`BB_MOBILE_E2E_SIMULATOR=<udid>` once (it installs its root certificate in
-that simulator) and drives the stub through `e2e/scripts/connect-stub-control.js`
-(plain-HTTP control port 42997).
 Flows open `bb://` links through `subflows/open-bb-link.yaml` and pair through
 `subflows/pair-direct-server.yaml`; `src/lib/e2e/mobile-e2e-flows.test.ts`
 enforces both.
 Flows dismiss the keyboard by tapping a static label ("Server URL",
-"Pairing code"): Maestro's `hideKeyboard` looks for a Return/Done key and the
-Add server and connect fields use "next".
+"Add server"): Maestro's `hideKeyboard` looks for a Return/Done key and the
+Add server fields use "next".
 Flows cold-start the dev client (`stopApp`) because a warm reload keeps the
 last deep link as the initial URL. Without `EXPO_PUBLIC_BB_E2E=1`, open `bb://e2e/reset`
 (dev builds) to return the simulator to first run.
@@ -329,7 +304,7 @@ lives in every flow's header.
 one `maestro test` at a time with `--test-output-dir` per flow (screenshots,
 logs, JUnit); after a failure it clears the native `bb://` confirmation
 before the next flow, and it exits non-zero if any flow failed.
-`shell-connect` needs the connect stub, so it runs on its own. `--dev-client`
+`--dev-client`
 as the first argument drives a dev client through Metro instead.
 
 ## CI
@@ -341,7 +316,7 @@ as the first argument drives a dev client through Metro instead.
   after relaunch, and native settings. It uses the isolated backend and needs
   no EAS or Play credentials. The `mobile-e2e-android` artifact
   contains screenshots, JUnit results, Maestro output, logcat, and backend logs.
-  Keyboard animation and bb connect are outside this basic job.
+  Keyboard animation is outside this basic job.
 
 - Typecheck, lint, and unit tests run on Linux in the regular `CI` workflow
   (`pnpm exec turbo run build typecheck lint` in `Checks`, the `packages`
@@ -362,97 +337,6 @@ as the first argument drives a dev client through Metro instead.
   waits for `/health`), runs `ci-run-flows.sh`, and uploads
   `e2e-artifacts/` (per-flow Maestro output, backend log, simulator log).
 
-## bb connect
-
-- Pair through Settings → Mobile → Add mobile device or `bb connect machine-code`. No experiment is required.
-- Enrollment (`src/screens/connect`, `src/data/connect`, route `/connect`):
-  "Add server" offers "Connect with bb connect" above the Direct URL form.
-  The screen scans the pairing QR (`expo-camera`; payload = the connect
-  plugin's `MobilePairingPayload` JSON `{code, serverUrl, apex, expiresAt}`, a
-  `bb://connect?code=…&serverUrl=…` link, or a bare code —
-  `parseConnectPairingPayload`) or takes the code by hand with an optional
-  server (handle like `bee` or `https://bee.getbb.app`) and an optional
-  self-hosted apex; the apex defaults to `deriveConnectBaseUrl(serverUrl)`
-  or `https://getbb.app` (`resolveEnrollmentTarget`). `redeemEnrollment`
-  calls `redeemMachineCredential` (`POST <apex>/api/connect/redeem-machine`)
-  with the phone’s device name (for example, `Pixel 9 Pro`). The account
-  service stores it on the machine so the dashboard shows a recognizable name.
-  The request accepts an optional `deviceName` string, trimmed and limited to
-  128 characters; older clients may omit it. Existing unnamed devices are not
-  renamed automatically. Both the account service update and a new mobile build
-  are needed for names to appear on new pairings.
-  Enrollment saves `{mode:"connect", serverUrl, handle, credential(bbcm_…), label}`
-  in SecureStore, then activates it: the connector mints the desktop-session
-  cookie and opens realtime (the enrolled screen shows that status live).
-  Errors map to copy per wire code (`describeEnrollmentError`: invalid /
-  expired / already used, the 409 `machine_limit` with the "revoke a device
-  in the dashboard" way out, network, unauthorized).
-- Account servers: the machine credential is account-scoped (the apex stores
-  it against the user, `apps/web/src/server/api.ts` `redeemMachineCode`; the
-  gate checks it against the label's owner), and the desktop-session cookie
-  is a `.getbb.app` cookie carrying the user id and the minting credential, so
-  one enrollment covers every server the account owns — the same as the desktop app's
-  Server menu. After pairing, "Servers on this account"
-  (`GET <serverUrl>/api/connect/servers` with the credential,
-  `listAccountServers`) adds any other server as a profile in one tap with
-  the same credential; no second code is needed.
-- Session: `src/lib/session` mints `POST <serverUrl>/api/connect/desktop-session`
-  with the credential, installs the cookie in both native jars (`Secure`
-  follows the server URL's scheme so a plain-http stub gate works), renews
-  five minutes before expiry and on AppState active. Each minted session
-  (server URL, pairing credential and the full cookie, value included) is kept
-  per profile in SecureStore (`bb.connectSession.<profileId>`); a cold start
-  whose record matches the profile's server URL and credential and is more
-  than five minutes from expiry reinstalls that cookie into both jars instead
-  of minting, so the page loads
-  without a round trip to the gate. Re-pairing with a new credential mints a
-  fresh session. Older cache records without a credential are ignored.
-  A refused mint and Clear website data clear the record. The cookie lasts seven
-  days; the gate re-issues it once a day on ordinary responses and rejects it
-  within about 20 seconds of the machine being revoked. The connector
-  (`src/lib/connection`) re-checks the session on any 401/403 (an API call
-  or the `/ws` upgrade — React Native reports the refused upgrade as the
-  close reason "Received bad response code from server: 401.") and on
-  repeated connection failures (throttled): a fresh cookie reconnects the
-  socket at once; a refused re-mint flips the profile to `auth-required`.
-  Installing a fresh session reloads a WebView showing a 401/403 page, even
-  before the previous cookie expires; routine renewal leaves a healthy page
-  alone.
-  Queries that raced the first mint (or a re-mint) and hit the gate's 401
-  page are fetched again once the cookie lands
-  (`refetchQueriesRejectedBeforeSession`); a 401 within two seconds of a
-  mint is attributed to a request that started with the old cookie and
-  only triggers that refetch, not another mint.
-- Re-auth UX: the `auth-required` banner ("<label> needs to be paired again.")
-  is a button that opens `/connect?profileId=<id>`, which re-pairs the same
-  profile (new credential, same label and place in the list); Settings →
-  Servers offers "Sign in again" from the long-press menu for connect
-  profiles and shows a mode pill (`bb connect` / `direct`) plus `@handle`.
-  "Remove" only forgets the profile locally: the phone stays listed under
-  Machines in the getbb.app dashboard until revoked there (the copy says so).
-- Stub for e2e (`tests/integration/mobile-e2e/connect-stub.ts`,
-  `pnpm --filter @bb/integration-tests e2e:mobile-connect-stub`): plays the
-  apex and the gate on one TLS port (`https://localhost:42998` /
-  `https://stub.localhost:42998`, so `@bb/connect-client`'s "server lives
-  under the apex" rule and the `Secure` cookie hold; iOS ATS refuses plain
-  http to a qualified name). It redeems `STUB-PAIR` (sentinels
-  `EXPIRED-CODE` / `USED-CODE` / `LIMIT-CODE` reproduce the apex errors),
-  mints sessions for its machines, lists two account servers, and reverse
-  proxies everything else (HTTP + WebSocket upgrade) to the harness backend
-  — only with a valid session cookie, otherwise the gate's HTML 401 —
-  rewriting `Origin: https://<gate host>` to the loopback origin like the
-  tunnel client does so the bb server's origin guard accepts RN's
-  WebSocket. Control: `POST /__stub/{expire-session,revoke-machine,reset}`,
-  `GET /__stub/state`, also on plain `http://127.0.0.1:42997`. It generates a
-  local CA under `~/.bb-mobile-e2e/connect-stub-certs` and installs it in
-  the simulator named by `BB_MOBILE_E2E_SIMULATOR` (`xcrun simctl keychain …
-add-root-cert`). Env: `BB_MOBILE_E2E_GATE_PORT` (42998),
-  `BB_MOBILE_E2E_STUB_CONTROL_PORT` (42997), `BB_MOBILE_E2E_UPSTREAM_URL`
-  (`http://127.0.0.1:${BB_MOBILE_E2E_PORT ?? 41999}`),
-  `BB_MOBILE_E2E_CONNECT_CODE`, `BB_MOBILE_E2E_STUB_HANDLE`,
-  `BB_MOBILE_E2E_SESSION_TTL_MS`, `BB_MOBILE_E2E_STUB_LOG=1` (one line per
-  gate request).
-
 ## Server moves
 
 - After `bb server move`, the old computer answers its old address with
@@ -462,28 +346,20 @@ add-root-cert`). Env: `BB_MOBILE_E2E_GATE_PORT` (42998),
   address with the profile ID to `createServerMovedProfileHandler`
   (`src/lib/profiles/server-moved.ts`). A direct profile gets the new
   `serverUrl`: the connector rebuilds the client, the WebView reloads, and
-  a toast says "Server moved to <toHostName>". Connect profiles ignore the
-  response because their URL stays the same. Concurrent 410 responses update
+  a toast says "Server moved to <toHostName>". Concurrent 410 responses update
   the profile once.
 
 ## Deep links
 
 - Deep links: `bb://<path>` (`bb://threads/<id>`, `bb://settings/servers`,
-  `bb://projects/<p>/threads/<t>`, …) and universal / app links
-  `https://<handle>.getbb.app/{threads,projects,settings}/*` (iOS
-  `associatedDomains: applinks:getbb.app, applinks:*.getbb.app`; Android
-  `intentFilters` with `autoVerify`). `app/+native-intent.tsx` resolves every
+  `bb://projects/<p>/threads/<t>`, …) and web links of a saved server.
+  `app/+native-intent.tsx` resolves every
   URL with `src/lib/shell` (`resolveShellIncomingLink` over `src/lib/links`):
   a web link whose origin matches a saved profile switches to that profile
   (waiting for its connection) and opens the shell route carrying the page
-  path; native-only paths (connect, servers and device settings) stay native; an unknown server opens Add server prefilled with
-  the origin and the follow-up path. Universal links only resolve once
-  `https://<handle>.getbb.app/.well-known/apple-app-site-association` /
-  `assetlinks.json` are served (the connect gate and the apex do, before the
-  session gate — `packages/connect-db/src/app-links.ts`) and the app is
-  signed with the team id in that file; until then only the `bb://` scheme
-  works, and wildcard associated-domain behavior still needs a physical
-  device check. The realtime `thread-open` signal (`POST /threads/:id/open`,
+  path; native-only paths (servers and device settings) stay native; an unknown server opens Add server prefilled with
+  the origin and the follow-up path. The app claims no universal-link
+  domain, so only the `bb://` scheme reaches it from other apps. The realtime `thread-open` signal (`POST /threads/:id/open`,
   `bb thread open`) navigates to the thread while the app is foregrounded.
 
 ## Share sheet and haptics
@@ -611,11 +487,7 @@ credentials (distribution certificate, App Store provisioning profile); nobody n
 - The `react-native-webview` pnpm patch and the `lightningcss` override ship
   with the repo and apply on EAS; builds need an EAS image with Xcode 27.x
   (the iOS 27 SDK) for iPhone Duo.
-- Universal links need the signed app's team id in the AASA the connect gate
-  serves (`packages/connect-db/src/app-links.ts`) and a physical-device
-  check against `https://<handle>.getbb.app/threads/…`. Android signing
-  (`eas credentials -p android`, `ASSETLINKS_SHA256_FINGERPRINTS`)
-  is still open.
+- Android signing (`eas credentials -p android`) is still open.
 - `eas update` (JS-only fixes over the air) is deferred: `expo-updates` is
   not installed, so the profiles define no update channels.
 
@@ -640,10 +512,9 @@ group, App Store Connect needs all of this:
   name, phone, and email. Apple uses these, testers never see them.
 - **A way for the reviewer to use the app.** This is the part that fails. bb
   opens on "Add server", and a reviewer has no bb server, so without help they
-  cannot get past the first screen and will reject the build. Neither real
-  path works for a reviewer: a bb server's API is unauthenticated and runs
-  commands, so it cannot be on the internet, and connect pairing codes are
-  single-use and expire in ten minutes. Give them the **demo server** instead:
+  cannot get past the first screen and will reject the build. The real path
+  does not work for a reviewer: a bb server's API is unauthenticated and runs
+  commands, so it cannot be on the internet. Give them the **demo server** instead:
   `apps/demo-server` is a Cloudflare Worker that serves the web app shell, sidebar plugin frontends, and API
   from fixed data, runs nothing, and isolates each client address. Build it
   with `pnpm exec turbo run build --filter=@bb/demo-server`, then deploy it
@@ -686,15 +557,12 @@ Beta App Review and another build of the same version usually does not.
 
 - Server profiles: `expo-secure-store`, one key per profile
   (`bb.profile.<id>`) plus `bb.profiles.index`.
-- Connect sessions: `expo-secure-store`, one key per profile
-  (`bb.connectSession.<profileId>`) holding the last minted desktop-session
-  cookie and its server URL.
 - Preferences (theme mode `bb.theme`, haptics `bb.haptics.enabled`): MMKV
   store `bb.preferences`, one shared instance from
   `src/lib/native/preferences-storage.ts`.
 - Each profile owns one SDK client, one realtime socket, and one TanStack
   QueryClient (`src/lib/sdk/client-registry.ts`, instantiated once by
-  `src/app-shell/client-registry.ts`); the active profile's socket/session
+  `src/app-shell/client-registry.ts`); the active profile's socket
   lifecycle lives in `src/lib/connection`.
 
 ## Theme tokens

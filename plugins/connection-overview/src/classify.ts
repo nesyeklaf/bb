@@ -1,6 +1,7 @@
 import {
   LOCAL_NETWORKS,
   LOOPBACK,
+  TAILNET,
   inAny,
   normalizeIp,
   type Cidr,
@@ -63,21 +64,27 @@ function isLocal(
   return inAny(LOCAL_NETWORKS, ip) || inAny(context.bindSubnets, ip);
 }
 
-export function classifyRequestPeer(
-  peer: { address: string | null; tunnelIngress: boolean },
+function classifyIncoming(
+  ip: string,
   context: Pick<ClassifyContext, "bindSubnets">,
 ): Classification {
   const direction = "in";
-  if (peer.tunnelIngress)
-    return { direction, state: "red", reason: "tunnel ingress" };
-  if (peer.address === null)
-    return { direction, state: "red", reason: "no socket peer" };
-  const ip = normalizeIp(peer.address);
   if (inAny(LOOPBACK, ip))
     return { direction, state: "unverifiable", reason: "loopback origin" };
-  if (isLocal(ip, context))
-    return { direction, state: "allowed", reason: "local network" };
+  if (inAny(TAILNET, ip))
+    return { direction, state: "allowed", reason: "tailnet peer" };
+  if (inAny(context.bindSubnets, ip))
+    return { direction, state: "allowed", reason: "bind interface peer" };
   return { direction, state: "red", reason: "external peer" };
+}
+
+export function classifyRequestPeer(
+  peer: { address: string | null },
+  context: Pick<ClassifyContext, "bindSubnets">,
+): Classification {
+  if (peer.address === null)
+    return { direction: "in", state: "red", reason: "no socket peer" };
+  return classifyIncoming(normalizeIp(peer.address), context);
 }
 
 export function classify(
@@ -90,13 +97,7 @@ export function classify(
 ): Classification {
   const direction = directionOf(row);
   const ip = normalizeIp(row.remoteIp);
-  if (direction === "in") {
-    if (inAny(LOOPBACK, ip))
-      return { direction, state: "unverifiable", reason: "loopback origin" };
-    if (isLocal(ip, context))
-      return { direction, state: "allowed", reason: "local network" };
-    return { direction, state: "red", reason: "external peer" };
-  }
+  if (direction === "in") return classifyIncoming(ip, context);
   if (isLocal(ip, context))
     return { direction, state: "allowed", reason: "local network" };
   if (row.remotePort === 53 && context.resolvers.has(ip))

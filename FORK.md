@@ -64,7 +64,7 @@ ssh AI 'bash ~/bb-fork-remote.sh serve'   # sudo tailscale serve --bg --https=38
 - URL: `https://<host>.<tailnet>.ts.net:38886`. On AI, port 443 belongs to nginx-proxy-manager, so Serve uses 38886.
 - `serve --bg` persists in tailscaled's state and survives a reboot. The server unit is enabled and the user has lingering on, so it starts without a login. Neither has been tested with an actual reboot yet.
 - Never use Funnel. The bb API has no authentication of its own and can run commands, so the tailnet ACLs are the access boundary.
-- bb connect (`<name>.getbb.app`) keeps running alongside as a fallback until every client uses the tailnet URL.
+- `BB_SERVER_BIND_HOST` adds direct listeners, but only on tailnet (`100.64.0.0/10`, `fd7a:115c:a1e0::/48`) or WireGuard interface addresses. The server refuses to start on `0.0.0.0`, `::`, LAN or public addresses.
 
 Clients: the desktop app points at the tailnet URL through its custom server URL. The phone needs Tailscale running. A machine daemon is re-enrolled from the tailnet URL under Settings, Machines, Add machine.
 
@@ -72,3 +72,4 @@ Clients: the desktop app points at the tailnet URL through its custom server URL
 
 - `BbNavigate.toThread(threadId, { experimental_messageSeq })` jumps to a message (`#msg=SEQ`) from plugins, with `split` too. Dropped when get-bb ships an equivalent.
 - `app.slots.experimental_threadTocExtension({ id, title, useBands, tab?, onBandClick?, onBandHover? })` adds topic brackets and a popover tab to the thread TOC rail, with drag-marked ranges (`railSelection`). The tab can be the popover's default (`tab.experimental_default`) and gets `activeSeq`, `hoveredBand` and `setHoveredRange` to link its rows with the brackets. Ticks get their seq from the new `messageSeq` field of the conversation outline item (projection version 3). Dropped when get-bb ships an equivalent.
+- bb connect, the machine tunnel, the account gate and the hosted web app (`apps/web`) are removed. Remote access is Tailscale Serve or `BB_SERVER_BIND_HOST` only.

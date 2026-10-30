@@ -163,10 +163,6 @@ const ONLINE_RPC_RESPONSE_RESULT_FIXTURES: OnlineRpcResponseResultFixtures = {
   "plugin.host.call": { output: { ok: true } },
   "plugin.host.cancel": { cancelled: true },
   "plugin.host.dispose": { disposed: true },
-  "connect-tunnel.ensure-identity": {
-    label: "sawyer-air",
-    baseDomain: "getbb.app",
-  },
   "host.list_files": {
     files: [
       {
@@ -1032,7 +1028,7 @@ describe("host-daemon command schemas", () => {
   });
 
   it("uses the current host-daemon protocol version", () => {
-    expect(HOST_DAEMON_PROTOCOL_VERSION).toBe(259);
+    expect(HOST_DAEMON_PROTOCOL_VERSION).toBe(260);
     expect(HOST_ARTIFACT_MAX_BYTES).toBe(256 * 1024 * 1024);
   });
 
@@ -1051,52 +1047,10 @@ describe("host-daemon command schemas", () => {
     expect(contract.isCompatibleHostDaemonProtocolVersion(256)).toBe(false);
     expect(contract.isCompatibleHostDaemonProtocolVersion(257)).toBe(false);
     expect(contract.isCompatibleHostDaemonProtocolVersion(258)).toBe(false);
-    expect(contract.isCompatibleHostDaemonProtocolVersion(259)).toBe(true);
-    expect(contract.hostDaemonSupportsConnectNext(246)).toBe(false);
-    expect(contract.hostDaemonSupportsConnectNext(247)).toBe(true);
+    expect(contract.isCompatibleHostDaemonProtocolVersion(259)).toBe(false);
+    expect(contract.isCompatibleHostDaemonProtocolVersion(260)).toBe(true);
     expect(contract.hostDaemonSupportsDesktopBrokerProof(247)).toBe(false);
     expect(contract.hostDaemonSupportsDesktopBrokerProof(248)).toBe(true);
-  });
-
-  it("parses connect next config and status messages strictly", () => {
-    const config = {
-      domain: "next.getbb.app",
-      server: { protocol: "wss", host: "tunnel.next.getbb.app", port: 443 },
-    };
-    expect(
-      hostDaemonServerWsMessageSchema.parse({
-        type: "connect-next.replace",
-        generation: 3,
-        config,
-      }),
-    ).toEqual({ type: "connect-next.replace", generation: 3, config });
-    expect(
-      hostDaemonServerWsMessageSchema.safeParse({
-        type: "connect-next.replace",
-        generation: 3,
-        config: { ...config, credential: "x" },
-      }).success,
-    ).toBe(false);
-    const status = {
-      state: "connected",
-      label: "laptop",
-      lastError: null,
-      nextRetryAt: null,
-      since: 1,
-      shares: [{ port: 3000, state: "active", error: null }],
-    };
-    expect(
-      hostDaemonDaemonWsMessageSchema.parse({
-        type: "connect-next.status",
-        status,
-      }),
-    ).toEqual({ type: "connect-next.status", status });
-    expect(
-      hostDaemonDaemonWsMessageSchema.safeParse({
-        type: "connect-next.status",
-        status: { ...status, state: "halted" },
-      }).success,
-    ).toBe(false);
   });
 
   it.each([
@@ -2750,7 +2704,6 @@ describe("host-daemon session schemas", () => {
         instanceId: "instance_1",
         hostName: "test-host",
         hostType: "persistent",
-        hasMachineCredential: true,
         platform: "linux",
         dataDir: "/tmp/bb-data",
         localApiPort: null,
@@ -2766,7 +2719,6 @@ describe("host-daemon session schemas", () => {
         hostId: "host_123",
         instanceId: "instance_1",
         hostName: "Michael's MacBook",
-        hasMachineCredential: true,
         platform: "darwin",
         dataDir: "/tmp/bb-data",
         localApiPort: 38_887,
@@ -2779,7 +2731,6 @@ describe("host-daemon session schemas", () => {
       }),
     ).toMatchObject({
       hostId: "host_123",
-      hasMachineCredential: true,
       loadedEnvironments: [],
     });
 
@@ -2788,7 +2739,6 @@ describe("host-daemon session schemas", () => {
         hostId: "host_123",
         instanceId: "instance_1",
         hostName: "Michael's MacBook",
-        hasMachineCredential: false,
         platform: "darwin",
         dataDir: "/tmp/bb-data",
         localApiPort: null,
@@ -2813,7 +2763,6 @@ describe("host-daemon session schemas", () => {
         hostId: "host_123",
         instanceId: "instance_1",
         hostName: "Michael's MacBook",
-        hasMachineCredential: true,
         platform: "darwin",
         dataDir: "/tmp/bb-data",
         localApiPort: 38_887,
@@ -2831,7 +2780,6 @@ describe("host-daemon session schemas", () => {
         hostId: "host_123",
         instanceId: "instance_1",
         hostName: "Michael's MacBook",
-        hasMachineCredential: true,
         platform: "darwin",
         dataDir: "/tmp/bb-data",
         localApiPort: 38_887,
@@ -2847,7 +2795,6 @@ describe("host-daemon session schemas", () => {
         hostId: "host_123",
         instanceId: "instance_1",
         hostName: "Michael's MacBook",
-        hasMachineCredential: true,
         platform: "darwin",
         dataDir: "/tmp/bb-data",
         localApiPort: 38_887,
@@ -2863,17 +2810,9 @@ describe("host-daemon session schemas", () => {
         idleProviderSessionTimeoutMinutes: 30,
         heartbeatIntervalMs: 5_000,
         leaseTimeoutMs: 30_000,
-        connectShares: {
-          generation: 2,
-          ports: [3000, 8080],
-        },
       }),
     ).toMatchObject({
       sessionId: "session_123",
-      connectShares: {
-        generation: 2,
-        ports: [3000, 8080],
-      },
       retiredEnvironmentIds: [],
       watchSet: {
         generation: 0,
@@ -2881,26 +2820,6 @@ describe("host-daemon session schemas", () => {
         threadStorageTargets: [],
       },
     });
-
-    expect(
-      hostDaemonSessionOpenResponseSchema.parse({
-        sessionId: "session_default_shares",
-        machineEnvironment: { revision: 0, entries: [] },
-        idleProviderSessionTimeoutMinutes: 30,
-        heartbeatIntervalMs: 5_000,
-        leaseTimeoutMs: 30_000,
-      }).connectShares,
-    ).toEqual({ generation: 0, ports: [] });
-
-    expect(
-      hostDaemonSessionOpenResponseSchema.parse({
-        sessionId: "session_default_next",
-        machineEnvironment: { revision: 0, entries: [] },
-        idleProviderSessionTimeoutMinutes: 30,
-        heartbeatIntervalMs: 5_000,
-        leaseTimeoutMs: 30_000,
-      }).connectNext,
-    ).toEqual({ generation: 0, config: null });
 
     expect(() =>
       hostDaemonSessionOpenResponseSchema.parse({
@@ -3317,40 +3236,6 @@ describe("host-daemon session schemas", () => {
           threadId: "thr_123",
         },
       ],
-    });
-
-    expect(
-      hostDaemonServerWsMessageSchema.parse({
-        type: "connect-shares.replace",
-        generation: 3,
-        ports: [3000, 8080],
-      }),
-    ).toEqual({
-      type: "connect-shares.replace",
-      generation: 3,
-      ports: [3000, 8080],
-    });
-
-    expect(
-      hostDaemonServerWsMessageSchema.safeParse({
-        type: "connect-shares.replace",
-        generation: 4,
-        ports: [3000],
-        tunnel: {
-          label: "sawyer-air",
-          baseDomain: "getbb.app",
-        },
-      }).success,
-    ).toBe(false);
-
-    expect(
-      hostDaemonDaemonWsMessageSchema.parse({
-        type: "connect-tunnel.identity",
-        identity: { label: "sawyer-air", baseDomain: "getbb.app" },
-      }),
-    ).toEqual({
-      type: "connect-tunnel.identity",
-      identity: { label: "sawyer-air", baseDomain: "getbb.app" },
     });
 
     expect(

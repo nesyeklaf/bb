@@ -123,15 +123,15 @@ These entries are startup-only:
 - `BB_APP_SURFACE`, `BB_APP_URL` (when set through `bb-app env`),
   `BB_DATA_DIR`, `BB_DEV_APP_PORT`, and `BB_EXTERNAL_URL`
 - `BB_HOST_DAEMON_PORT` and `BB_INHERITED_SKILLS_ROOTS`
-- `BB_CONNECT_GATE_KEYS_URL`, `BB_LOG_LEVEL`,
+- `BB_LOG_LEVEL`,
   `BB_MANAGED_DEV_BUILTIN_PLUGIN_HOT_RELOAD`, and `BB_PERF_DIAGNOSTICS`
 - `BB_SERVER_BIND_HOST`, `BB_SERVER_PORT`, and all `BB_FF_*` feature flags
 
 Setting or unsetting one still reloads any other pending changes, but running
 processes keep their current values until a full launcher restart
 (`bb-app stop && bb-app start`) or a desktop app restart. In particular,
-changing or unsetting `BB_SERVER_BIND_HOST` does not close an existing
-`0.0.0.0` listener until that restart. `bb-app config refresh` names any
+changing or unsetting `BB_SERVER_BIND_HOST` does not close a listener on a
+previously listed address until that restart. `bb-app config refresh` names any
 startup-only keys present in `config.json` or `env.json`.
 
 ## Stopping A Running bb
@@ -186,9 +186,8 @@ do not set it yourself.
 | ------------------------------ | -------------------------------------------------- | ----------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `BB_APP_URL`                   | `bb-app config`                                    | Optional for remote use | Human-facing app URL used for generated links, allowed browser origins, and the allowed DNS hostname for requests. Leave empty for local-only use. Live when set with `bb-app config`.                                                                                     |
 | `BB_EXTERNAL_URL`              | `bb-app env`, or environment                       | Startup-only            | Internet-facing HTTPS base URL for generated public links; the fallback for `machineServerUrl`.                                                                                                                                                                            |
-| `BB_CONNECT_GATE_KEYS_URL`     | `bb-app env`, or environment                       | Startup-only testing    | Public key set the bb connect next tunnel ingress verifies gate assertions with. Default `https://getbb.app/.well-known/bb-connect-gate-keys.json`. See [connect-next.md](connect-next.md).                                                                                |
 | `BB_SERVER_URL`                | `bb-app config`                                    | Remote CLI/host use     | Server targeted by the standalone `bb` CLI and `host-daemon` commands on this machine. Defaults to `http://127.0.0.1:38886`. It does not change where `npx bb-app` binds.                                                                                                  |
-| `BB_SERVER_BIND_HOST`          | `bb-app env`, environment, or `--server-bind-host` | Startup-only            | Server listener host: `127.0.0.1` (default) or `0.0.0.0`. Not a `bb-app config` key. See [Startup Flags](#startup-flags).                                                                                                                                                  |
+| `BB_SERVER_BIND_HOST`          | `bb-app env`, environment, or `--server-bind-host` | Startup-only            | Extra listener addresses besides `127.0.0.1`: tailnet or WireGuard interface addresses, separated by commas or spaces. Not a `bb-app config` key. See [Startup Flags](#startup-flags).                                                                                     |
 | `BB_SERVER_PORT`               | `bb-app env`, environment, or `--server-port`      | Startup-only            | HTTP listener port. Defaults to `38886`.                                                                                                                                                                                                                                   |
 | `BB_HOST_DAEMON_PORT`          | `bb-app env`, environment, or `--host-daemon-port` | Startup-only            | Local host-daemon API port. Defaults to `38887`.                                                                                                                                                                                                                           |
 | `BB_LOG_LEVEL`                 | `bb-app config`                                    | Startup-only debugging  | `trace`, `debug`, `info`, `warn`, `error`, or `fatal`.                                                                                                                                                                                                                     |
@@ -203,8 +202,7 @@ Tailscale IPs), or the hostname in `BB_APP_URL`. For a custom DNS name or
 reverse proxy, set `BB_APP_URL` (for example `https://bb.example.com`) before
 connecting, including from the CLI or SDK; a matching `Host`/`Origin` or
 `X-Forwarded-Host` cannot authorize an unconfigured name. A proxy can preserve
-the configured host or forward to localhost. bb connect needs no additional
-configuration.
+the configured host or forward to localhost.
 
 ## General settings
 
@@ -627,7 +625,8 @@ Grok and Claude-compatible plugin skills.
 ## Multi-machine
 
 Multi-machine execution lets this server dispatch work to host daemons on
-other machines; it is independent of browser access (Tailscale, bb connect).
+other machines; it is independent of browser access (Tailscale Serve or
+`BB_SERVER_BIND_HOST`).
 Add, rename, and remove machines in Settings → Machines; see
 `bb guide machines` for the CLI.
 
@@ -641,7 +640,8 @@ the SDK and CLI, and machine credentials cannot change it. Read it with
 **Machine server access.** `machineServerUrl` (Settings → Machines → Server URL
 reachable by machines; HTTP or HTTPS without embedded credentials) falls back
 to `BB_EXTERNAL_URL` when unset. `defaultMachineAccess` selects the access
-provider; unset selects bb connect, and `direct` (Manual) uses your own URL.
+provider; unset selects the first registered access provider, or `direct`
+(Manual, your own URL) when none is registered.
 An explicit provider must be installed and available. Set them with
 `bb settings general machineServerUrl <url-or-null>` and
 `bb settings general defaultMachineAccess <provider-id-or-null>`.
@@ -676,8 +676,8 @@ changing them:
 - `serverHeaders`: private request headers from the access provider, passed to
   the daemon and its bundled `bb` CLI through `BB_SERVER_HEADERS` (a JSON
   string map) for enrollment, HTTP, WebSocket, and proxy requests.
-- `machineCredential` and `connectMachineId`: the legacy bb connect form;
-  `machineCredential` is sent as the `x-bb-connect-machine` header.
+- `machineCredential` and `connectMachineId` from older installs are ignored
+  and dropped when bb rewrites the file.
 
 These secret fields are omitted from `bb-app config list`.
 
@@ -888,8 +888,7 @@ off. An experiment you set yourself keeps your value either way.
 - `websocketCompression` (on for early adopters) lets the realtime client
   WebSocket (`/ws`) negotiate `permessage-deflate`, so messages of 1 KB or more,
   such as timeline pushes, are compressed (about 4x for timeline JSON). It
-  helps clients that reach the server over a network, including bb connect
-  next; the bb connect relay re-frames messages and does not carry it.
+  helps clients that reach the server over a network.
   Terminal, host daemon, and plugin WebSockets are never compressed. The server
   reads the experiment when a client connects, so a toggle applies when the
   app reconnects.
@@ -948,7 +947,6 @@ manifest:
 
 ```json
 {
-  "$schema": "https://getbb.app/schemas/plugins.schema.json",
   "schemaVersion": 1,
   "name": "acme-plugins",
   "plugins": [
@@ -1185,50 +1183,6 @@ or a plugin's `<pluginId>/<actionId>`. Bare legacy ids and `core/<id>` keys
 migrate to current keys. A key whose action is hidden for a row, or whose
 plugin is not installed, is skipped on that row.
 
-### Connect and bb account
-
-Remote access makes this server reachable at `https://<handle>.getbb.app` once
-it is signed in to a getbb.app account. The builtin bb account plugin holds the
-server credential in its plugin KV (in `bb.db`); the builtin connect plugin
-holds the tunnel while the server runs. See the `bb-account` skill for signing
-in and the `share-server-links` skill for `bb connect` and port shares.
-
-| Connect setting          | Default | Effect                                                                                                                 |
-| ------------------------ | ------- | ---------------------------------------------------------------------------------------------------------------------- |
-| `remoteAccess`           | `true`  | The Remote access switch; `false` closes the tunnel and machine shares without signing out. Also `bb connect off\|on`. |
-| `sendRemoteInstructions` | `true`  | "Tell agents about remote access"; `false` suppresses Connect's remote-use agent message without disabling sharing.    |
-
-`bb plugin disable connect` cuts off all remote access. `--server` and
-`--base-url` on `bb connect` and `bb account login` accept only
-`https://getbb.app` and `https://vibecodethis.site` (plus
-`http://bb.localhost:<port>` in a development build).
-
-Settings → Mobile pairs the bb mobile app (`bb connect machine-code`, see `bb guide machines`). Mobile
-builds, and publishing
-are documented in [`apps/mobile/README.md`](../apps/mobile/README.md).
-
-### Connect next (beta)
-
-The builtin connect-next plugin is disabled by default. Enabled
-(`bb plugin enable bb--connect-next`) and switched on, it also makes this server
-reachable at `https://<label>.next.getbb.app` through the Fly gate, next to
-its connect address. The domain follows the bb account: `next.<host of the
-account's base URL>` (`next.vibecodethis.site` on staging). While it is on,
-every enrolled machine's daemon also serves the ports shared from it with
-`bb connect expose <port> --host <machine>` at
-`https://<machine-label>--<port>.next.getbb.app`, downloading `frpc` into
-`<daemon data dir>/connect-next/frp/`. See the `connect-next` skill and
-[`connect-next.md`](connect-next.md).
-
-| Connect next setting | Default | Effect                                                                      |
-| -------------------- | ------- | --------------------------------------------------------------------------- |
-| `enabled`            | `true`  | "Reach this bb at its next address (beta)". Also `bb connect-next on\|off`. |
-
-| Variable                 | Effect                                                                                                                            |
-| ------------------------ | --------------------------------------------------------------------------------------------------------------------------------- |
-| `BB_CONNECT_FRPC`        | Path of an `frpc` binary to run instead of the frp 0.71.0 release the plugin (or a host daemon) downloads and verifies.           |
-| `BB_CONNECT_NEXT_SERVER` | `ws://host:port` or `wss://host:port` of the frp server to dial instead of `wss://tunnel.<next domain>` derived from the account. |
-
 ### Browser Automation
 
 The Browser Automation plugin installs its pinned `dev-browser` release on
@@ -1242,11 +1196,11 @@ isolated development smoke tests only, `DEV_BROWSER_SMOKE_BINARY` and
 
 The bundled MCP server plugin is disabled by default; enable it with
 `bb plugin enable bb--mcp`. It serves a Model Context Protocol endpoint at
-`/mcp` on the bb connect address and at `/api/v1/plugins/bb--mcp/http/mcp` on
-loopback (`bb mcp status` prints both). Remote apps sign in through the bb
-account, and an approved app can run any `bb` command; `bb mcp clients` lists
-them and `bb mcp revoke <grant-id>` disconnects one. The loopback address needs
-no sign-in and has the same trust as the local `bb` CLI. See the `mcp` skill.
+`/api/v1/plugins/bb--mcp/http/mcp` (`bb mcp status` prints the loopback
+address). The endpoint needs no sign-in and has the same trust as the `bb`
+CLI: a client can run any `bb` command. Devices on your tailnet or WireGuard
+network reach the same path on an address listed in `BB_SERVER_BIND_HOST`.
+Requests from web pages are refused. See the `mcp` skill.
 
 ## Desktop browser cookie discovery
 
@@ -1264,13 +1218,16 @@ Use launcher flags for per-run startup details:
 npx bb-app --data-dir ~/.bb-test --server-port 48886 --host-daemon-port 48887
 ```
 
-The server listens on `127.0.0.1` by default. Set
-`--server-bind-host 0.0.0.0` (or `BB_SERVER_BIND_HOST=0.0.0.0`) only when a
-trusted network boundary must reach the listener directly: the public API is
-unauthenticated and permits command execution and file reads. The only
-accepted bind hosts are `127.0.0.1` and `0.0.0.0` (IPv4 only); containers must
-also publish the port. With wildcard binding the startup `Server listening`
-and `app` lines show `http://0.0.0.0:<port>`.
+The server always listens on `127.0.0.1`. `--server-bind-host <addresses>` (or
+`BB_SERVER_BIND_HOST`) adds listeners on the listed addresses, separated by
+commas or spaces. Each must be a concrete tailnet address (`100.64.0.0/10`,
+`fd7a:115c:a1e0::/48`) or an address of a WireGuard interface on this host;
+`127.0.0.1` in the list is accepted and changes nothing. The server exits at
+startup on `0.0.0.0`, `::`, any other address, a malformed entry, or a
+duplicate. The public API is unauthenticated and permits command execution and
+file reads, so every peer on those networks can drive bb. The startup
+`Server listening` line names every listener address; the `app` line keeps the
+loopback URL. See [Using bb on multiple devices](multiple-devices.md).
 
 The data directory holds all bb-managed state: the SQLite database, logs, host
 identity, thread storage, custom themes, and plugins. It defaults to `~/.bb/`
@@ -1288,7 +1245,7 @@ Expo commands accept `BB_MOBILE_VARIANT=production` (the default) or `dev`;
 other values fail validation. The dev variant omits HTTPS app-link registration. See [mobile build instructions](../apps/mobile/README.md#android-local-apk-and-verification).
 
 For source development only, `pnpm dev`, `pnpm start:worktree`,
-`pnpm start:worktree-remote`, and `pnpm start` load the repo-root
+and `pnpm start` load the repo-root
 [dotenv-cli](https://github.com/entropitor/dotenv-cli) cascade. Add a repo-root
 `.env` only to override the defaults above.
 
@@ -1299,7 +1256,8 @@ For source development only, `pnpm dev`, `pnpm start:worktree`,
   the instance id is the sanitized checkout path relative to your home
   directory plus a short hash. The server and Vite bind to loopback; an
   explicit `BB_DEV_APP_HOST` overrides the Vite listener, and remote HTTP dev
-  through it also needs `BB_SERVER_BIND_HOST=0.0.0.0` for realtime updates.
+  through it also needs the server's tailnet or WireGuard address in
+  `BB_SERVER_BIND_HOST` for realtime updates.
   It defaults `BB_SKIP_ONBOARDING` to `1`, so new instances skip the first-run
   setup screen; set `BB_SKIP_ONBOARDING=0` to retain setup or replay it from Settings.
 - `pnpm start:worktree` loads the same cascade and checkout-specific data
@@ -1307,8 +1265,6 @@ For source development only, `pnpm dev`, `pnpm start:worktree`,
   the main server (no Vite or hot reload). First-run setup is skipped, as with `pnpm dev`. Its data
   directory, ports, inherited skills, and listener host take
   precedence over that instance's `config.json` or `env.json`.
-- `pnpm start:worktree-remote` does the same but binds the main server to
-  `0.0.0.0`; protect the port with a trusted network boundary.
 - `pnpm start` loads `.env`, `.env.local`, `.env.production`, and
   `.env.production.local`, and uses the packaged launcher policy with build
   outputs from `apps/app`, `apps/server`, and `apps/host-daemon`.
@@ -1316,13 +1272,6 @@ For source development only, `pnpm dev`, `pnpm start:worktree`,
   prints the resolved ports and paths, and exits without starting services or
   migrating data. See [Prepared Worktree
   Restarts](debugging-and-qa.md#prepared-worktree-restarts).
-
-`pnpm dev` injects `BB_DEV_CONNECT_BASE_URL=http://bb.localhost:<worktree-cloud-port>`
-(`pnpm dev --staging` injects `https://vibecodethis.site`). With
-`NODE_ENV=development`, the bb account plugin uses it as the sign-in default
-and the connect plugin for its signed-out dashboard link. It is
-launcher-managed, not a `bb-app config` setting, and packaged builds keep
-`https://getbb.app`.
 
 `pnpm bb`, `pnpm bb:dev`, and `pnpm reset` wrap `@bb/scripts` and force
 `NODE_ENV` to the intended mode. `pnpm reset` and `pnpm reset:dev` clear

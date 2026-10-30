@@ -1,6 +1,5 @@
 import {
   lastServerMoveSchema,
-  serverMoveModeSchema,
   serverMoveStepIdSchema,
 } from "@bb/domain";
 import { z } from "zod";
@@ -37,7 +36,6 @@ export const serverMoveStatusSchema = z
   .object({
     moveId: z.string().min(1),
     state: serverMoveStateSchema,
-    mode: serverMoveModeSchema,
     targetHostId: z.string().min(1),
     targetHostName: z.string().min(1),
     serverUrl: z.string().min(1),
@@ -100,9 +98,7 @@ export const serverMoveCheckResponseSchema = z
   .object({
     targetHostId: z.string().min(1),
     targetHostName: z.string().min(1),
-    mode: serverMoveModeSchema,
     serverUrl: z.string().min(1).nullable(),
-    requiresServerUrl: z.boolean(),
     targetDataDir: z.string().min(1).nullable(),
     existingTargetServerData: z
       .object({

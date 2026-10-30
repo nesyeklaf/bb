@@ -30,7 +30,6 @@ import {
 import { requireAuthenticatedDaemonSession } from "./session-state.js";
 import { createAttachmentContentResponse } from "../services/projects/attachments.js";
 import { handleHostSessionOpened } from "./session-owner-side-effects.js";
-import { resolveReportedConnectMachineId } from "./hosts.js";
 import type { PluginService } from "../services/plugins/plugin-service.js";
 import { HostEnvironmentSync } from "../services/hosts/host-environment-sync.js";
 
@@ -170,9 +169,7 @@ export function registerInternalSessionRoutes(
     const previousSession = getLatestSessionForHost(deps.db, {
       hostId: daemon.hostId,
     });
-    const connectMachineId = resolveReportedConnectMachineId(context);
     upsertHost(deps.db, deps.hub, {
-      ...(connectMachineId !== undefined ? { connectMachineId } : {}),
       id: daemon.hostId,
       name: payload.hostName,
     });
@@ -190,11 +187,6 @@ export function registerInternalSessionRoutes(
     });
     deps.hub.recordDaemonSessionPlatform(session.id, payload.platform);
     deps.hub.recordDaemonSessionLocalApiPort(session.id, payload.localApiPort);
-    deps.sharedPorts.recordHostConnectCapability({
-      hostId: daemon.hostId,
-      sessionId: session.id,
-      hasMachineCredential: payload.hasMachineCredential,
-    });
 
     await handleHostSessionOpened(deps, {
       activeThreads: payload.activeThreads,
@@ -221,16 +213,6 @@ export function registerInternalSessionRoutes(
         heartbeatIntervalMs: HEARTBEAT_INTERVAL_MS,
         leaseTimeoutMs: LEASE_TIMEOUT_MS,
         watchSet: deps.watchInterests.reconcileWatchSetForHost(daemon.hostId),
-        connectShares: deps.sharedPorts.reconcileSharedPortsForHost(
-          daemon.hostId,
-        ),
-        ...(deps.sharedPorts.hostSupportsNextTunnel(daemon.hostId)
-          ? {
-              connectNext: deps.sharedPorts.reconcileNextTunnelForHost(
-                daemon.hostId,
-              ),
-            }
-          : {}),
         pluginHostGenerations: plugins.listHostArtifactGenerations(),
         retiredEnvironmentIds,
         machineEnvironment: await machineEnvironment.snapshot(daemon.hostId),

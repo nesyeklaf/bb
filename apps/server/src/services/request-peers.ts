@@ -1,6 +1,5 @@
 import { randomUUID } from "node:crypto";
 import type { Context, MiddlewareHandler } from "hono";
-import { isTunnelIngressContext } from "../request-context.js";
 
 export const REQUEST_PEER_CAPACITY = 8192;
 
@@ -13,7 +12,6 @@ export interface RequestPeer {
   method: string;
   status: number;
   websocket: boolean;
-  tunnelIngress: boolean;
 }
 
 export interface RequestPeerSnapshot {
@@ -88,7 +86,6 @@ export function createRequestPeerRecorder(options?: {
 
   const middleware: MiddlewareHandler = async (context, next) => {
     const peer = socketPeer(context);
-    const tunnelIngress = isTunnelIngressContext(context);
     const at = now();
     let status = 500;
     try {
@@ -103,7 +100,6 @@ export function createRequestPeerRecorder(options?: {
         method: context.req.method,
         status,
         websocket: peer.websocket,
-        tunnelIngress,
       });
     }
   };

@@ -39,7 +39,7 @@ describe("ServerMoveService.handleServerMoved", () => {
     const notice = {
       source: "message" as const,
       serverUrl: "https://studio.example.test/",
-      headers: { "x-bb-connect-machine": "bbcm_new" },
+      headers: { "x-bb-machine-access": "bbcm_new" },
     };
 
     await fixture.service.handleServerMoved(notice);
@@ -47,7 +47,7 @@ describe("ServerMoveService.handleServerMoved", () => {
 
     expect(await readJson(join(fixture.dataDir, "config.json"))).toEqual({
       serverUrl: "https://studio.example.test",
-      serverHeaders: { "x-bb-connect-machine": "bbcm_new" },
+      serverHeaders: { "x-bb-machine-access": "bbcm_new" },
     });
     expect(await readFile(unitPath, "utf8")).toContain(
       '"--server-url" "https://studio.example.test"',
@@ -70,7 +70,7 @@ describe("ServerMoveService.handleServerMoved", () => {
       serverUrl: "http://127.0.0.1:38886",
     });
     const machineConfig = {
-      serverHeaders: { "x-bb-connect-machine": "bbcm_machine" },
+      serverHeaders: { "x-bb-machine-access": "bbcm_machine" },
       machineCredential: "bbcm_machine",
       connectMachineId: "machine-1",
     };
@@ -272,8 +272,6 @@ describe("ServerMoveService.handleServerMoved", () => {
       toHostId: "host-target",
       toHostName: "studio",
       serverUrl: "http://studio.example.test:38886",
-      mode: "direct",
-      connectHandle: null,
       oldCopyEntries: ["bb.db"],
     });
 

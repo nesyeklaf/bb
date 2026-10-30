@@ -373,12 +373,6 @@ const onlineRpcHandlers: OnlineRpcHandlerMap = {
   "desktop.browser.release_control": forwardDesktopBrowserCommand,
   "desktop.browser.list_import_sources": forwardDesktopBrowserCommand,
   "desktop.browser.import_cookies": forwardDesktopBrowserCommand,
-  "connect-tunnel.ensure-identity": async (_command, options) => {
-    if (!options.ensureConnectTunnelIdentity) {
-      throw new Error("bb connect tunnel identity is unavailable");
-    }
-    return options.ensureConnectTunnelIdentity();
-  },
   "host.list_files": (command, _options, signal) =>
     listHostFiles(command, signal),
   "host.list_paths": (command, _options, signal) =>

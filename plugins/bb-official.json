@@ -11,15 +11,6 @@
   "automations": {
     "category": "tasks-and-workflows"
   },
-  "bb-account": {
-    "category": "cloud-and-remote"
-  },
-  "connect": {
-    "category": "cloud-and-remote"
-  },
-  "connect-next": {
-    "category": "cloud-and-remote"
-  },
   "custom-instructions": {
     "category": "memory-and-context"
   },

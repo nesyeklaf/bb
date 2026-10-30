@@ -6,7 +6,6 @@ import {
   setMachineEnvironmentVariable,
   deleteMachineEnvironmentVariable,
 } from "../services/machines/environment-storage.js";
-import { getGateAuthKind } from "../request-context.js";
 import {
   countProjectSources,
   findOrCreateProjectByLocalPathSource,
@@ -357,12 +356,6 @@ export function registerProjectRoutes(app: Hono, deps: AppDeps): void {
   });
   const routes = publicApiRoutes.projects;
   del(routes.deleteMachineEnvironmentVariable, async (context, payload) => {
-    if (getGateAuthKind(context) === "machine")
-      throw new ApiError(
-        403,
-        "forbidden",
-        "Machine credentials cannot change project environment settings",
-      );
     const project = requirePublicProject(deps.db, context.req.param("id"));
     await deleteMachineEnvironmentVariable(deps.db, payload.name, project.id);
     deps.hub.notifySystem(["config-changed"]);
@@ -372,12 +365,6 @@ export function registerProjectRoutes(app: Hono, deps: AppDeps): void {
   });
 
   post(routes.setMachineEnvironmentVariable, async (context, payload) => {
-    if (getGateAuthKind(context) === "machine")
-      throw new ApiError(
-        403,
-        "forbidden",
-        "Machine credentials cannot change project environment settings",
-      );
     const project = requirePublicProject(deps.db, context.req.param("id"));
     await setMachineEnvironmentVariable(
       deps.db,
@@ -392,12 +379,6 @@ export function registerProjectRoutes(app: Hono, deps: AppDeps): void {
   });
 
   put(routes.replaceMachineEnvironment, async (context, payload) => {
-    if (getGateAuthKind(context) === "machine")
-      throw new ApiError(
-        403,
-        "forbidden",
-        "Machine credentials cannot change project environment settings",
-      );
     const project = requirePublicProject(deps.db, context.req.param("id"));
     await replaceMachineEnvironment(
       deps.db,

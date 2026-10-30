@@ -58,8 +58,6 @@ were excluded. See the [audit](../MAINTENANCE.md) and
 | [Fallback question cards](plugin-ask-user-question.md) | 5 | 3 passed, 1 failed, 1 partial/blocked |
 | [Scheduled agent and script automations](plugin-automations.md) | 8 | 8 passed |
 | [Agent concurrency limits](plugin-concurrency-limit.md) | 5 | 4 passed, 1 partial/blocked |
-| [bb account sign-in](plugin-bb-account.md) | 5 | 5 not run |
-| [Remote Connect and port sharing](plugin-connect.md) | 7 | 5 passed, 2 partial/blocked |
 | [Custom agent instructions](plugin-custom-instructions.md) | 3 | 2 passed, 1 partial/blocked |
 | [Docs vaults and editing](plugin-docs.md) | 9 | 7 passed, 2 partial/blocked |
 | [GitHub issues and pull requests](plugin-github.md) | 8 | 2 passed, 6 partial/blocked |
@@ -90,8 +88,6 @@ were excluded. See the [audit](../MAINTENANCE.md) and
 | --- | --- | --- |
 | [Desktop application](desktop.md) | 12 | 12 partial/blocked |
 | [Native mobile shell](mobile.md) | 12 | 12 partial/blocked |
-| [Hosted website, dashboard, and marketplace](hosted-web.md) | 12 | 5 passed, 7 partial/blocked |
-| [Cloud gateway and tunnel behavior](cloud-gateway.md) | 7 | 4 passed, 3 partial/blocked |
 | [Developer tools, fixtures, and scope boundaries](developer-fixtures.md) | 5 | 2 passed, 3 partial/blocked |
 
 ## Additions outside the dated audit

@@ -5,13 +5,6 @@ about threads, projects, plugins and settings runs in the web page inside
 the WebView, which has its own query client; the native `QueryClient` only
 caches the system config the palette sync reads.
 
-- `connect/` backs bb connect enrollment: `parseConnectPairingPayload` (QR
-  JSON, `bb://connect?code=…` link, or a bare code),
-  `resolveEnrollmentTarget` (server handle or URL, optional self-hosted
-  apex), `redeemEnrollment` + `describeEnrollmentError` (redeem the pairing
-  code, map wire errors to copy), `accountServerProfile`, and
-  `useAccountServers` (the other servers the credential's account owns).
-  Pure modules are vitest-tested.
 - `shared/use-realtime-subscription.ts`: `useSystemRealtimeSubscription`
   holds the active profile's `system` realtime subscription while a system
   query is mounted (refcounted per target by the realtime manager).

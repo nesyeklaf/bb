@@ -63,7 +63,7 @@ const TOAST_EXAMPLES: readonly ToastExample[] = [
       description: pluginNotificationDescription(
         { id: "usage", name: "Usage" },
         "installed",
-        "bb connect: timed out waiting for the tunnel client.",
+        "usage: timed out waiting for the plugin worker.",
       ),
     },
   },

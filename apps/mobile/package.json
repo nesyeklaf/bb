@@ -19,7 +19,6 @@
   },
   "dependencies": {
     "@bb/client-core": "workspace:*",
-    "@bb/connect-client": "workspace:*",
     "@bb/core-ui": "workspace:*",
     "@bb/domain": "workspace:*",
     "@bb/mobile-bridge": "workspace:*",

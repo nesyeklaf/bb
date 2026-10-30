@@ -7,7 +7,7 @@ import {
   supportsNativeDownloads,
 } from "./shell-save-file";
 
-const ROOT = "https://bee.getbb.app";
+const ROOT = "https://bee.example.test";
 const PREFIXED = "https://box.example.ts.net/bb";
 
 describe("resolveServerFileUrl", () => {
@@ -23,9 +23,9 @@ describe("resolveServerFileUrl", () => {
   it("refuses another origin, credentials, and non-http schemes", () => {
     expect(resolveServerFileUrl("https://evil.example/x", ROOT)).toBeNull();
     expect(
-      resolveServerFileUrl("https://user:pw@bee.getbb.app/x", ROOT),
+      resolveServerFileUrl("https://user:pw@bee.example.test/x", ROOT),
     ).toBeNull();
-    expect(resolveServerFileUrl("http://bee.getbb.app/x", ROOT)).toBeNull();
+    expect(resolveServerFileUrl("http://bee.example.test/x", ROOT)).toBeNull();
     expect(resolveServerFileUrl("file:///etc/passwd", ROOT)).toBeNull();
     expect(resolveServerFileUrl("not a url", ROOT)).toBeNull();
   });
@@ -57,9 +57,9 @@ describe("resolveOpenWindowAction", () => {
     expect(resolveOpenWindowAction("https://example.com/docs", ROOT)).toBe(
       "external",
     );
-    expect(resolveOpenWindowAction("blob:https://bee.getbb.app/1", ROOT)).toBe(
-      "ignore",
-    );
+    expect(
+      resolveOpenWindowAction("blob:https://bee.example.test/1", ROOT),
+    ).toBe("ignore");
   });
 });
 

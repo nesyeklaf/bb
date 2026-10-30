@@ -446,5 +446,5 @@ Read-state and error behavior is documented in [Frontend hooks and UI](frontend-
 For `app.slots.experimental_tab`, `ExperimentalTabRegistration`,
 `ExperimentalTabReference`, `ExperimentalTabContext`, and
 `experimental_useAppPanel().openTab`, see
-[Thread side-panel tabs in the Plugin Guide](https://getbb.app/plugin-guide#surface-thread-panel).
+the Thread side-panel tabs card in the Plugin Guide.
 Source upgrades are in [Tab API migration](frontend-registration.md#tab-api-migration).

@@ -110,7 +110,7 @@ describe("createMobileFetch", () => {
       Response.json({ code: "unauthorized" }, { status: 401 }),
     );
 
-    await mobileFetch("https://bee.getbb.app/api/v1/x", {
+    await mobileFetch("https://bee.example.test/api/v1/x", {
       headers: { accept: "application/json" },
     });
 

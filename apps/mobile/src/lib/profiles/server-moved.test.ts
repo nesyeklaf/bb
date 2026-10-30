@@ -21,16 +21,9 @@ async function setup() {
     serverUrl: "http://192.168.1.20:38886",
     label: "Laptop",
   });
-  const connect = await store.addProfile({
-    mode: "connect",
-    serverUrl: "https://laptop.getbb.app",
-    label: "laptop",
-    handle: "laptop",
-    credential: "bbcm_secret",
-  });
   const notify = vi.fn<(message: string) => void>();
   const handler = createServerMovedProfileHandler({ store, notify });
-  return { connect, direct, handler, notify, storage, store };
+  return { direct, handler, notify, storage, store };
 }
 
 describe("server moved profile handler", () => {
@@ -47,17 +40,6 @@ describe("server moved profile handler", () => {
       JSON.parse(storage.entries.get(profileStorageKey(direct.id)) ?? "{}"),
     ).toMatchObject({ serverUrl: "https://studio.tailnet.ts.net" });
     expect(notify).toHaveBeenCalledExactlyOnceWith("Server moved to studio");
-  });
-
-  it("ignores connect profiles because their address does not change", async () => {
-    const { connect, handler, notify, store } = await setup();
-
-    await expect(handler.handle(connect.id, MOVED)).resolves.toBe(false);
-
-    expect(store.listProfiles().find((p) => p.id === connect.id)).toEqual(
-      connect,
-    );
-    expect(notify).not.toHaveBeenCalled();
   });
 
   it("updates once when several requests see the move at the same time", async () => {

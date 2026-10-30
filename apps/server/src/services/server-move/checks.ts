@@ -39,7 +39,6 @@ import {
   type EnvPathValue,
   type ServerManagedFiles,
 } from "./managed-files.js";
-import type { ServerMoveModeResolution } from "./mode.js";
 
 const DOCS_PLUGIN_ID = "simple-notes";
 const SUPPORTED_TARGET_PLATFORMS: ReadonlySet<string> = new Set([
@@ -66,7 +65,6 @@ export interface ServerMoveCheckEnvironment {
   fullArtifact: FullBbAppArtifactService;
   inspectTimeoutMs: number;
   readServerDiskFreeBytes(): Promise<number | null>;
-  resolveMode(): Promise<ServerMoveModeResolution>;
   serverAppSurface: AppSurface;
   serverTimeZone: string | null;
   targetServerPort(): number;
@@ -78,7 +76,6 @@ export interface RunServerMoveCheckArgs {
 }
 
 export interface ServerMoveCheckResult {
-  mode: ServerMoveModeResolution;
   response: ServerMoveCheckResponse;
   serverUrl: string | null;
   sourceServerHost: HostRow | null;
@@ -98,7 +95,7 @@ export function validateDirectServerUrl(
       ok: false,
       title: "Enter the new server address",
       detail:
-        "This server doesn't use bb connect, so other machines need an address like https://desktop.example.com to reach the new server.",
+        "Other machines need an address like https://desktop.example.com to reach the new server.",
     };
   }
   let url: URL;
@@ -514,7 +511,6 @@ function appendVersionItems(args: {
 function appendServerStateItems(args: {
   environment: ServerMoveCheckEnvironment;
   items: ServerMoveCheckItem[];
-  mode: ServerMoveModeResolution;
   sourceServerHostId: string | null;
   targetHostId: string;
 }): void {
@@ -550,11 +546,7 @@ function appendServerStateItems(args: {
       id: "offline-machines",
       severity: "warning",
       title: `${plural(offlineMachines.length, "machine is", "machines are")} offline`,
-      detail: `${offlineMachines.map((host) => host.name).join(", ")}. ${
-        args.mode.mode === "connect"
-          ? "They reconnect through bb connect when they come back."
-          : "They learn the new address from this computer when they come back."
-      }`,
+      detail: `${offlineMachines.map((host) => host.name).join(", ")}. They learn the new address from this computer when they come back.`,
     });
   }
   if (getInstalledPlugin(deps.db, DOCS_PLUGIN_ID)?.enabled === true) {
@@ -566,28 +558,13 @@ function appendServerStateItems(args: {
         "Vaults that aren't bound to a machine are read from the new server machine after the move.",
     });
   }
-  if (args.mode.mode === "connect") {
-    args.items.push({
-      id: "connect-address",
-      severity: "info",
-      title: `Machines and apps keep using ${args.mode.serverUrl}`,
-      detail: null,
-    });
-  }
 }
 
 function appendTransportItems(args: {
   deps: AppDeps;
   items: ServerMoveCheckItem[];
-  mode: ServerMoveModeResolution;
   targetHost: HostRow;
 }): void {
-  if (
-    args.mode.mode !== "direct" &&
-    args.targetHost.serverAccessProviderId !== "direct"
-  ) {
-    return;
-  }
   const address = parseHttpUrl(machineServerUrl(args.deps).url);
   if (
     address === null ||
@@ -624,12 +601,8 @@ function appendManagedAddressItems(args: {
   deps: AppDeps;
   items: ServerMoveCheckItem[];
   managed: ServerManagedFiles;
-  mode: ServerMoveModeResolution;
   serverUrl: string | null;
 }): void {
-  if (args.mode.mode !== "direct") {
-    return;
-  }
   const oldAddress = oldServerAddress(args.deps.db, args.managed);
   for (const address of args.managed.addresses) {
     const url = parseHttpUrl(address.value);
@@ -694,36 +667,17 @@ export async function runServerMoveCheck(
   }
   const targetRow = getHost(deps.db, request.targetHostId);
   const targetHost = targetRow?.destroyedAt === null ? targetRow : null;
-  const mode = await environment.resolveMode();
-  const directUrl =
-    mode.mode === "direct"
-      ? validateDirectServerUrl(
-          request.serverUrl,
-          environment.allowLoopbackServerUrl,
-        )
-      : null;
-  const serverUrl =
-    mode.mode === "connect"
-      ? mode.serverUrl
-      : directUrl?.ok === true
-        ? directUrl.serverUrl
-        : null;
+  const directUrl = validateDirectServerUrl(
+    request.serverUrl,
+    environment.allowLoopbackServerUrl,
+  );
+  const serverUrl = directUrl.ok ? directUrl.serverUrl : null;
   const baseResponse = {
     targetHostId: request.targetHostId,
     targetHostName: targetHost?.name ?? request.targetHostId,
-    mode: mode.mode === "direct" ? ("direct" as const) : ("connect" as const),
     serverUrl: serverUrl ?? request.serverUrl,
-    requiresServerUrl: mode.mode === "direct",
   };
-  if (mode.mode === "unavailable") {
-    items.push({
-      id: "connect-unavailable",
-      severity: "blocker",
-      title: "bb connect status is unavailable",
-      detail: mode.message,
-    });
-  }
-  if (directUrl !== null && !directUrl.ok) {
+  if (!directUrl.ok) {
     items.push({
       id: "server-url-required",
       severity: "blocker",
@@ -739,7 +693,6 @@ export async function runServerMoveCheck(
       detail: null,
     });
     return {
-      mode,
       response: {
         ...baseResponse,
         targetDataDir: null,
@@ -871,15 +824,13 @@ export async function runServerMoveCheck(
   appendServerStateItems({
     environment,
     items,
-    mode,
     sourceServerHostId,
     targetHostId: targetHost.id,
   });
-  appendTransportItems({ deps, items, mode, targetHost });
+  appendTransportItems({ deps, items, targetHost });
   appendSkippedServerFileItems({ inventory, items });
-  appendManagedAddressItems({ deps, items, managed, mode, serverUrl });
+  appendManagedAddressItems({ deps, items, managed, serverUrl });
   return {
-    mode,
     response: {
       ...baseResponse,
       targetDataDir: inspect?.dataDir ?? null,

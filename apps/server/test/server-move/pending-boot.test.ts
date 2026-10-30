@@ -10,7 +10,6 @@ import {
   getHost,
   noopNotifier,
   setAppSettings,
-  setPluginKvValue,
   updateHost,
   upsertHost,
   upsertInstalledPlugin,
@@ -138,9 +137,10 @@ function manualMarker(): ServerImportFile {
 
 function rootDirOf(db: DbConnection, pluginId: string): string | undefined {
   return db.$client
-    .prepare<[string], { root_dir: string }>(
-      "SELECT root_dir FROM plugins WHERE id = ?",
-    )
+    .prepare<
+      [string],
+      { root_dir: string }
+    >("SELECT root_dir FROM plugins WHERE id = ?")
     .get(pluginId)?.root_dir;
 }
 
@@ -227,69 +227,6 @@ describe("imported server boot", () => {
           pluginMarketplaces: 0,
         },
       });
-    } finally {
-      db.$client.close();
-    }
-  });
-
-  it("leaves machineServerUrl alone for bb connect moves when bb account holds the pairing", async () => {
-    const { dataDir, db } = await openImportedDataDir();
-    try {
-      setPluginKvValue(
-        db,
-        "bb-account",
-        "credential",
-        JSON.stringify({
-          baseUrl: "https://getbb.test",
-          serverUrl: "https://laptop.getbb.test",
-          serverId: "srv_1",
-          credential: "bbcred_secret",
-        }),
-      );
-      await writeServerImportFile(
-        dataDir,
-        moveMarker({ serverUrl: "https://laptop.getbb.test/" }),
-      );
-
-      await applyServerImportAtBoot({
-        dataDir,
-        db,
-        logger: testLogger,
-        now: 1,
-      });
-
-      expect(getAppSettings(db).machineServerUrl).toBeNull();
-    } finally {
-      db.$client.close();
-    }
-  });
-
-  it("leaves machineServerUrl alone for bb connect moves", async () => {
-    const { dataDir, db } = await openImportedDataDir();
-    try {
-      setPluginKvValue(
-        db,
-        "connect",
-        "credential",
-        JSON.stringify({
-          serverUrl: "https://laptop.getbb.test",
-          handle: "laptop",
-          credential: "bbcs_secret",
-        }),
-      );
-      await writeServerImportFile(
-        dataDir,
-        moveMarker({ serverUrl: "https://laptop.getbb.test/" }),
-      );
-
-      await applyServerImportAtBoot({
-        dataDir,
-        db,
-        logger: testLogger,
-        now: 1,
-      });
-
-      expect(getAppSettings(db).machineServerUrl).toBeNull();
     } finally {
       db.$client.close();
     }
@@ -569,7 +506,6 @@ function sessionOpenRequest(hostId: string, hostName: string) {
       hostId,
       instanceId: `instance-${hostId}`,
       hostName,
-      hasMachineCredential: false,
       platform: "linux",
       dataDir: "/home/me/.bb",
       localApiPort: 38_888,
@@ -698,7 +634,6 @@ describe("manual import completion", () => {
       const app = createApp(harness.deps, {
         serverMove: {
           appSurface: "web",
-          bindHost: null,
           manualImportPending: true,
           pending: null,
           restoredRun: null,
@@ -737,7 +672,6 @@ describe("pending server mode", () => {
       const pendingApp = createApp(harness.deps, {
         serverMove: {
           appSurface: "web",
-          bindHost: null,
           manualImportPending: false,
           pending: {
             moveId: "move-1",
@@ -767,7 +701,6 @@ describe("pending server mode", () => {
           hostId: "host-new",
           instanceId: "instance-new",
           hostName: "Desktop",
-          hasMachineCredential: false,
           platform: "linux",
           dataDir: "/home/me/.bb-machines/laptop",
           localApiPort: 38_888,
@@ -847,7 +780,6 @@ describe("pending server mode", () => {
       const pendingApp = createApp(harness.deps, {
         serverMove: {
           appSurface: "web",
-          bindHost: null,
           manualImportPending: false,
           pending: {
             moveId: "move-1",

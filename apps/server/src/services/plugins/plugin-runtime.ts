@@ -374,12 +374,6 @@ export interface SafeModeActivationRefusalArgs {
 
 const PLUGIN_SAFE_MODE_DETAIL = "safe mode is on";
 
-export interface PluginLoadHold {
-  sources: readonly string[];
-  detail: string;
-  isActive(): Promise<boolean>;
-}
-
 export function createPluginRuntime(context: PluginRuntimeContext) {
   const { deps } = context;
   const settingsChanged = context.settingsChanged ?? (() => {});
@@ -437,7 +431,6 @@ export function createPluginRuntime(context: PluginRuntimeContext) {
   let boundSdk: BbSdk | undefined;
   let boundLoopbackBaseUrl: string | undefined;
   const rpcCallers = createPluginRpcCallerRegistry();
-  let loadHold: PluginLoadHold | null = null;
 
   function publishStatus(
     id: string,
@@ -1604,18 +1597,6 @@ export function createPluginRuntime(context: PluginRuntimeContext) {
     candidate.handle.invalidate();
   }
 
-  function setLoadHold(hold: PluginLoadHold | null): void {
-    loadHold = hold;
-  }
-
-  async function heldDetail(row: InstalledPluginRow): Promise<string | null> {
-    const hold = loadHold;
-    if (hold === null || !row.enabled || !hold.sources.includes(row.source)) {
-      return null;
-    }
-    return (await hold.isActive()) ? hold.detail : null;
-  }
-
   function isSafeModeExempt(args: {
     provenance: InstalledPluginRow["provenance"];
     builtinName: string | null;
@@ -1658,14 +1639,6 @@ export function createPluginRuntime(context: PluginRuntimeContext) {
   }
 
   async function loadOne(row: InstalledPluginRow): Promise<string | null> {
-    const held = await heldDetail(row);
-    if (held !== null) {
-      await disposeOne(row.id);
-      await populateIdentity(row);
-      setStatus(row.id, "disabled", held);
-      logger.warn(`plugin ${row.id} not loaded (held): ${held}`);
-      return null;
-    }
     if (isSuppressedBySafeMode(row)) {
       await disposeOne(row.id);
       await populateIdentity(row);
@@ -1850,48 +1823,6 @@ export function createPluginRuntime(context: PluginRuntimeContext) {
           owner: plugin,
         });
       },
-      ensureSharedPortTunnel: (hostId) => {
-        if (!deps.ensureSharedPortTunnel) {
-          throw new Error("host shared-port control plane is unavailable");
-        }
-        return deps.ensureSharedPortTunnel(hostId);
-      },
-      validateSharedPortDeclaration: (hostId, ports) => {
-        if (!deps.sharedPorts) {
-          throw new Error("host shared-port control plane is unavailable");
-        }
-        return deps.sharedPorts.validateSharedPortDeclaration(hostId, ports);
-      },
-      declareSharedPorts: (hostId, ports) => {
-        if (!deps.sharedPorts) {
-          throw new Error("host shared-port control plane is unavailable");
-        }
-        deps.sharedPorts.declareSharedPorts({
-          ownerId: row.id,
-          hostId,
-          ports,
-        });
-      },
-      setNextTunnels: (config) => {
-        if (!deps.sharedPorts) {
-          throw new Error("host shared-port control plane is unavailable");
-        }
-        deps.sharedPorts.setNextTunnelConfig(row.id, config);
-      },
-      nextTunnelStatuses: () =>
-        (deps.sharedPorts?.listNextTunnelStatuses() ?? []).map((entry) => ({
-          hostId: entry.hostId,
-          hostName: entry.hostName,
-          ...entry.status,
-        })),
-      onNextTunnelStatusChange: (listener) =>
-        deps.sharedPorts?.onNextTunnelStatusChange(listener) ?? (() => {}),
-      replaceDeclaredSharedPorts: (declarations) => {
-        if (declarations.length > 0 && !deps.sharedPorts) {
-          throw new Error("host shared-port control plane is unavailable");
-        }
-        deps.sharedPorts?.replaceDeclarationsForOwner(row.id, declarations);
-      },
       callPluginHost: (args) => {
         if (hostArtifactCandidate === null) {
           throw new Error(
@@ -1906,12 +1837,6 @@ export function createPluginRuntime(context: PluginRuntimeContext) {
           ...args,
           artifact: hostArtifactCandidate,
         });
-      },
-      openTunnelIngress: (audience) => {
-        if (!deps.openTunnelIngress) {
-          throw new Error("tunnel ingress is unavailable in this plugin host");
-        }
-        return deps.openTunnelIngress(audience);
       },
       requestPeers: (after) => {
         if (!deps.requestPeers) {
@@ -2070,7 +1995,6 @@ export function createPluginRuntime(context: PluginRuntimeContext) {
       if (hungAfterDispose !== undefined && hungAfterDispose.size > 0) {
         for (const rollback of rollbackGenerations.reverse()) rollback();
         loaded.delete(row.id);
-        deps.sharedPorts?.clearDeclarationsForOwner(row.id);
         discardCandidate(plugin);
         return hungServicesDetail(hungAfterDispose);
       }
@@ -2190,7 +2114,6 @@ export function createPluginRuntime(context: PluginRuntimeContext) {
     await disposePluginInstance(plugin);
     releaseMutableRoots(plugin.moduleRootUrls);
     hostArtifacts.delete(id);
-    deps.sharedPorts?.clearDeclarationsForOwner(id);
   }
 
   async function disposeAll(): Promise<void> {
@@ -2275,7 +2198,6 @@ export function createPluginRuntime(context: PluginRuntimeContext) {
     brandingAssets,
     safeModeActivationRefusal,
     setDevBuildProblem,
-    setLoadHold,
     setStatus,
     sourceKind,
     stabilizingPluginIds,

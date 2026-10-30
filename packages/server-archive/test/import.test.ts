@@ -79,7 +79,7 @@ const SOURCE_CONFIG = {
 const TARGET_CONFIG = {
   config: { BB_LOG_LEVEL: "debug", BB_APP_URL: "https://target.example" },
   serverUrl: "https://old-server.example",
-  serverHeaders: { "x-bb-connect-machine": "credential" },
+  serverHeaders: { "x-bb-machine-access": "credential" },
   machineCredential: "credential",
   connectMachineId: "machine-1",
 };
@@ -171,7 +171,7 @@ describe("mergeImportedManagedConfig", () => {
       existingConfig: {
         config: { BB_LOG_LEVEL: "debug", BB_APP_URL: "https://target.example" },
         customModels: [{ providerId: "codex", model: "gpt-5.4" }],
-        serverHeaders: { "x-bb-connect-machine": "target-credential" },
+        serverHeaders: { "x-bb-machine-access": "target-credential" },
         machineCredential: "target-credential",
         connectMachineId: "machine-1",
       },

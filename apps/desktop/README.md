@@ -391,7 +391,7 @@ desktop:worktree` sets it. The bundle's own icon in Finder is unchanged.
 
 Desktop main-process logs are written immediately to `desktop.log` under
 `~/.bb/logs/` or `$BB_DATA_DIR/logs/` when `BB_DATA_DIR` is set, including
-updater, Connect, and startup failures from launches without a terminal.
+updater and startup failures from launches without a terminal.
 Logs append across launches and rotate at 10 MiB into `desktop.1.log` through
 `desktop.4.log`. When bb-app exits, its captured output is saved
 with the error. Logging failures fall back to stderr without interrupting
@@ -429,13 +429,12 @@ selects it without creating a duplicate. **This Mac** on macOS or **This
 Computer** on Linux switches back to the built-in server without removing
 saved entries.
 
-**Edit Server…** edits the currently selected custom or Connect server and is
-disabled for **This Mac** / **This Computer**. For a Connect server it changes
-only the name; the address comes from the bb account and is read-only. For a
-custom server, clearing its URL removes
+**Edit Server…** edits the currently selected saved server and is disabled for
+**This Mac** / **This Computer**. Clearing its URL removes
 that entry and, with Show This Mac/Computer checked, switches an active custom
 target to the built-in server. Other
-saved servers and Connect discovery remain available. Existing single-server preferences are
+saved servers remain available. A saved bb connect choice from an older build
+opens the built-in server instead. Existing single-server preferences are
 loaded automatically into the saved list in `<userData>/server-target.json`.
 
 Changing only the name refreshes the menu without switching servers or reloading
@@ -454,37 +453,12 @@ builds with strict parsing can reject the added field on rollback. Invalid names
 do not discard saved URLs, and names for absent URLs are ignored and pruned on
 the next save.
 
-Connect servers owned by your bb account appear in the menu by name, or by
-URL hostname when unnamed, like custom servers. Their names are stored in `server-target.json` as
-`connectServerNames`, keyed by handle, and are kept while discovery is
-unavailable. A saved custom URL that is an account server's address is replaced
-by that account server at startup, after discovery, and after Add/Edit Server.
-Its name moves to the account server unless that server is already named. If
-the replaced URL was selected, the app switches to the account server and
-reloads its windows once.
-
-Connect discovery tries the built-in server, then a stored machine credential,
-then the bb account sign-in. When none of these load the servers and the app
-has no credential or account sign-in, the Server menu offers **Sign in to bb
-Connect…** above **Add Server…**. If bb Connect rejected the credentials, the
-item is **Sign in to bb Connect again…**. Other failures add no menu row; the
-menu keeps the servers from the last successful load, and the app logs the
-reason as `connect server sync skipped (<reason>)`. The sign-in item opens
-bb account sign-in in a desktop window, the same window as **Reconnect** below,
-from any selected server, including **This Mac** / **This Computer**. Once the
-new account session arrives, the window closes and the app reloads the
-account's servers into the menu. Without a known Connect server, the app signs
-in at `https://getbb.app`. Development builds use `BB_DEV_CONNECT_BASE_URL`
-when it is valid.
-
 The app command palette lists **Switch to <server>** for each inactive choice
-from this same Server menu, including Connect discovery. Palette list requests
-use the menu's discovery refresh policy (at most once per minute, with the
-existing ten-minute background refresh). The optional `window.bbDesktop`
+from this same Server menu. The optional `window.bbDesktop`
 `getServerChoices`, `onServerChoicesChange`, and `selectServer` methods expose
 only `{id, name, active}`; custom server IDs are opaque hashes. Selection is
-validated against native choices and runs the menu's existing authentication,
-window navigation, and runtime lifecycle. Older desktop shells omit these actions.
+validated against native choices and runs the menu's existing window
+navigation and runtime lifecycle. Older desktop shells omit these actions.
 
 Desktop Settings → Server → **Show This Mac** (or **Show This Computer** off macOS)
 defaults to checked and is disabled while This Mac/Computer is selected.
@@ -501,9 +475,8 @@ may drop it on save; older strict readers can reject the whole file, so keep a
 backup before rolling back to a build predating the tolerant-reader fix #5286.
 
 When a custom URL is removed while the built-in server is hidden, an active
-custom target switches to the first remaining custom URL in saved order, then
-the saved Connect server, then a discovered Connect server in handle order,
-and finally the built-in server if no alternative exists. With the checkbox
+custom target switches to the first remaining custom URL in saved order, or
+to the built-in server if no alternative exists. With the checkbox
 checked, removing an active custom target still switches to the built-in server.
 The native menus, renderer Server popup, and app palette use the same choices.
 
@@ -521,20 +494,15 @@ committed move. A move is committed when the local server address answers
 launcher process is alive. The app checks once when it starts or loads the
 built-in server. When a move finishes while the app is open, the app checks every
 second for up to 120 seconds. It stops if the lock disappears. The first time the app
-sees a committed lock for a `moveId`, it switches the server target once:
-
-- `mode: "connect"` selects `connectHandle` with `serverUrl`.
-- `mode: "direct"` sets the custom server URL. When a move finishes while
-  the app is open, the app waits up to 60 seconds for the new `/health`
-  endpoint before it switches the window.
+sees a committed lock for a `moveId`, it switches the server target once to
+the custom server URL `serverUrl`. When a move finishes while the app is open,
+the app waits up to 60 seconds for the new `/health` endpoint before it
+switches the window.
 
 The app shows "Your bb server moved to <toHostName>" once for each `moveId`
 (`<userData>/server-move-notice.json`). It still starts its own `bb-app`
 launcher unless another bb process answers the local server port. The launcher
-runs this computer as a regular machine, and quitting the app stops it. If the
-app has no stored bb Connect credential, it signs in to a connect target with
-the `x-bb-connect-machine` header that the move wrote to the data dir's
-`config.json`. The app logs a warning and ignores an invalid lock.
+runs this computer as a regular machine, and quitting the app stops it. The app logs a warning and ignores an invalid lock.
 
 On startup, a saved built-in server choice also switches to the moved server;
 it never starts the old copy automatically. A different saved remote server
@@ -546,12 +514,6 @@ its background machine service.
 
 Startup error screens list their actions as buttons. Any screen where
 retrying can help shows **Try again**. **Choose server…** opens the Server menu,
-where the user can select the built-in server if needed. A bb Connect
-`unauthorized` error has no **Try again**, because the same credential fails
-the same way. **Reconnect** opens account sign-in in a desktop
-window. The app clears its old account sign-in, waits for a new session, then
-retries the selected server. A valid account session can mint and renew the
-desktop session when a machine credential is rejected. Closing the sign-in
-window leaves the error screen available. Fatal errors have no buttons. The renderer sends the chosen
+where the user can select the built-in server if needed. Fatal errors have no buttons. The renderer sends the chosen
 action on `bb-desktop:startup-action`. The main process accepts only actions
 from the error page that is currently loaded in an app window's main frame.

@@ -166,10 +166,9 @@ function preparingMove(): ServerMoveStatus {
   return {
     moveId: "move_1",
     state: "preparing",
-    mode: "connect",
     targetHostId: "host_desk",
     targetHostName: "desk",
-    serverUrl: "https://sawyer.getbb.app",
+    serverUrl: "https://sawyer.example.test",
     destinationStatusUrl: null,
     startedAt: NOW,
     finishedAt: null,
@@ -878,9 +877,7 @@ describe("MachinesSettingsSection", () => {
     vi.mocked(sdk.experimental_server.checkMove).mockResolvedValue({
       targetHostId: "host_desk",
       targetHostName: "desk",
-      mode: "connect",
       serverUrl: null,
-      requiresServerUrl: false,
       targetDataDir: "/home/sawyer/.bb-machines/macbook-pro",
       existingTargetServerData: null,
       items: [],

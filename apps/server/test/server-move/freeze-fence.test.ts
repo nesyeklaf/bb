@@ -387,9 +387,9 @@ function snapshotFenceMove(
     },
     plugins: {
       ...environment.plugins,
-      suspendAllButConnect: async () => {
+      suspendAll: async () => {
         observe("suspend plugins");
-        await environment.plugins.suspendAllButConnect();
+        await environment.plugins.suspendAll();
       },
     },
     stopRunningWork: async () => {

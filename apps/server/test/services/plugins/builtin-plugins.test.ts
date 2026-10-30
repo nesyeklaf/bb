@@ -462,7 +462,7 @@ describe("builtin plugin reconciliation", () => {
     ).toEqual(once);
   });
 
-  it("removes retired outgoing-connection state once on upgrade and leaves local plugins intact", async () => {
+  it("removes retired connection state once on upgrade and leaves local plugins intact", async () => {
     const legacyRoot = join(workDir, "missing-legacy-root");
     db.$client
       .prepare(
@@ -488,6 +488,11 @@ describe("builtin plugin reconciliation", () => {
     setPluginKvValue(db, "bb-account", "credential", "{}");
     setPluginKvValue(db, "bb-account", "profile", "{}");
     setPluginKvValue(db, "bb-account", "revision", "3");
+    setPluginSettingsValues(db, "bb-account", { server: "x" });
+    setPluginKvValue(db, "connect", "machine-credential", "{}");
+    setPluginSettingsValues(db, "connect", { enabled: "true" });
+    setPluginKvValue(db, "bb--connect-next", "gate", "{}");
+    setPluginSettingsValues(db, "bb--connect-next", { enabled: "true" });
     setPluginKvValue(db, "bb-ai", "state", "{}");
     setPluginSettingsValues(db, "bb-ai", { enabled: "true" });
     setPluginKvValue(db, "environment-modal-sandbox", "state", "{}");
@@ -510,6 +515,11 @@ describe("builtin plugin reconciliation", () => {
       "last-send-outcome",
     ]);
     expect(listPluginKvKeys(db, "bb-account")).toEqual([]);
+    expect(getPluginSettingsValues(db, "bb-account")).toEqual({});
+    expect(listPluginKvKeys(db, "connect")).toEqual([]);
+    expect(getPluginSettingsValues(db, "connect")).toEqual({});
+    expect(listPluginKvKeys(db, "bb--connect-next")).toEqual([]);
+    expect(getPluginSettingsValues(db, "bb--connect-next")).toEqual({});
     expect(listPluginKvKeys(db, "bb-ai")).toEqual([]);
     expect(getPluginSettingsValues(db, "bb-ai")).toEqual({});
     expect(listPluginKvKeys(db, "environment-modal-sandbox")).toEqual([]);

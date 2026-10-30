@@ -13,10 +13,9 @@ import {
 } from "./app-surface.js";
 import { validateLogLevel } from "./log-level.js";
 import { validateOptionalUrl, validateRequiredUrl } from "./public-url.js";
-import { BB_LOOPBACK_HOST, parsePortValue } from "./runtime.js";
+import { parseServerBindAddressesOnThisHost } from "./bind-addresses.js";
+import { parsePortValue } from "./runtime.js";
 import { toOptionalString } from "./strings.js";
-
-export type ServerBindHost = "127.0.0.1" | "0.0.0.0";
 
 function parseBooleanEnvValue(args: EnvVarParseArgs): boolean {
   const normalizedValue = args.value.trim().toLowerCase();
@@ -91,17 +90,8 @@ function parsePortEnvValue(args: EnvVarParseArgs): number {
   });
 }
 
-export function parseServerBindHost(value: string): ServerBindHost {
-  const trimmedValue = value.trim();
-  if (trimmedValue === "127.0.0.1" || trimmedValue === "0.0.0.0") {
-    return trimmedValue;
-  }
-
-  throw new Error('BB_SERVER_BIND_HOST must be "127.0.0.1" or "0.0.0.0"');
-}
-
-function parseServerBindHostEnvValue(args: EnvVarParseArgs): ServerBindHost {
-  return parseServerBindHost(args.value);
+function parseServerBindHostEnvValue(args: EnvVarParseArgs): string[] {
+  return parseServerBindAddressesOnThisHost(args.value);
 }
 
 function parsePositiveIntegerEnvValue(args: EnvVarParseArgs): number {
@@ -136,8 +126,9 @@ export const BB_SERVER_PORT_ENV = defineEnvVar<number>({
   parse: parsePortEnvValue,
 });
 
-export const BB_SERVER_BIND_HOST_ENV = defineEnvVar<ServerBindHost>({
-  description: "HTTP bind host for the server",
+export const BB_SERVER_BIND_HOST_ENV = defineEnvVar<string[]>({
+  description:
+    "Additional tailnet or WireGuard addresses the server listens on besides 127.0.0.1",
   name: "BB_SERVER_BIND_HOST",
   parse: parseServerBindHostEnvValue,
 });
@@ -176,8 +167,7 @@ export const BB_CLI_LAUNCHER_ENV = defineEnvVar<string>({
 });
 
 export const BB_APP_SURFACE_ENV = defineEnvVar<AppSurface>({
-  description:
-    "Internal launcher marker. Set by bb-app and desktop launchers.",
+  description: "Internal launcher marker. Set by bb-app and desktop launchers.",
   name: APP_SURFACE_ENV_NAME,
   parse: parseAppSurfaceEnvValue,
 });
@@ -194,13 +184,6 @@ export const BB_EXTERNAL_URL_ENV = defineEnvVar<string>({
     "Internet-facing HTTPS base URL used for generated public links. Does not control which host or port the server binds to.",
   name: "BB_EXTERNAL_URL",
   parse: parseOptionalUrlEnvValue,
-});
-
-export const BB_CONNECT_GATE_KEYS_URL_ENV = defineEnvVar<string>({
-  description:
-    "URL of the bb connect next gate public key set the server's tunnel ingress verifies gate assertions with. Point it at a local file server to test the ingress.",
-  name: "BB_CONNECT_GATE_KEYS_URL",
-  parse: parseRequiredUrlEnvValue,
 });
 
 export const BB_PERF_DIAGNOSTICS_ENV = defineEnvVar<boolean>({
@@ -279,15 +262,6 @@ export const BB_SERVER_HEADERS_ENV = defineEnvVar<Record<string, string>>({
   },
 });
 
-export const BB_CONNECT_MACHINE_CREDENTIAL_ENV = defineEnvVar<
-  string | undefined
->({
-  description:
-    "Daemon-managed bb connect credential for traversing the public machine gate",
-  name: "BB_CONNECT_MACHINE_CREDENTIAL",
-  parse: parseOptionalTrimmedStringEnvValue,
-});
-
 export const BB_HOST_ENROLL_KEY_ENV = defineEnvVar<string | undefined>({
   description:
     "One-time enrollment token used to bootstrap a host daemon with the bb server",
@@ -319,11 +293,9 @@ export const BB_HOST_ID_ENV = defineEnvVar<string | undefined>({
 export const DEFAULT_BB_APP_VERSION = DEFAULTS.appVersion;
 export const DEFAULT_BB_APP_SURFACE = APP_SURFACE_WEB;
 export const DEFAULT_BB_APP_URL = "";
-export const DEFAULT_BB_SERVER_BIND_HOST: ServerBindHost = BB_LOOPBACK_HOST;
+export const DEFAULT_BB_SERVER_BIND_HOST: string[] = [];
 export const DEFAULT_BB_EXTERNAL_URL = "";
 export const DEFAULT_BB_DEV_APP_HOST = "";
-export const DEFAULT_BB_CONNECT_GATE_KEYS_URL =
-  "https://getbb.app/.well-known/bb-connect-gate-keys.json";
 export const DEFAULT_BB_FF_PLACEHOLDER = defaultFeatureFlags.placeholder;
 export const DEFAULT_BB_FF_TIMELINE_WINDOW_EVENT_BUDGET =
   defaultFeatureFlags.timelineWindowEventBudget;

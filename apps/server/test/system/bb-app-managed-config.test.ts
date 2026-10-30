@@ -62,7 +62,6 @@ function createRuntimeConfig(): ServerRuntimeConfig {
     builtinSkillsRootPath: "/tmp/bb-test/builtin-skills",
     customModels: [],
     dataDir: "/tmp/bb-test",
-    connectGateKeysUrl: "https://gate-keys.invalid/bb-connect-gate-keys.json",
     featureFlags: defaultFeatureFlags,
     hostDaemonPort: 38887,
     inheritedSkillsRootPaths: [],

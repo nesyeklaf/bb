@@ -15,7 +15,6 @@ import {
   type HostDaemonBridgeLaunch,
   type HostDaemonInjectedSkillSource,
   type HostDaemonOnlineRpcCommand,
-  type HostDaemonConnectTunnelIdentity,
   type WorkspaceContext,
 } from "@bb/host-daemon-contract";
 import { BRIDGE_JSON_RPC_ERRORS } from "@bb/provider-bridge-protocol";
@@ -89,7 +88,6 @@ export interface CommandDispatchOptions {
   resolveInteractiveRequest?: (
     request: InteractiveResolveCommandInput,
   ) => Promise<void>;
-  ensureConnectTunnelIdentity?: () => Promise<HostDaemonConnectTunnelIdentity>;
   serverMove?: ServerMoveService;
   threadStorageRootPath: string;
 }

@@ -388,9 +388,7 @@ describe("MachineSettingsView", () => {
     vi.mocked(sdk.experimental_server.checkMove).mockResolvedValue({
       targetHostId: HOST_ID,
       targetHostName: "dev-vm",
-      mode: "connect",
       serverUrl: null,
-      requiresServerUrl: false,
       targetDataDir: "/home/sawyer/.bb-machines/workstation",
       existingTargetServerData: null,
       items: [],

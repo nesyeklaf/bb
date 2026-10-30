@@ -25,7 +25,7 @@ const local: BbDesktopServerChoice = {
 const studio: BbDesktopServerChoice = {
   id: "connect:studio",
   name: "Studio",
-  origin: "https://studio.getbb.app",
+  origin: "https://studio.example.test",
   kind: "account",
   active: false,
 };

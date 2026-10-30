@@ -4,8 +4,8 @@ import { homedir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import type { ServerConfig } from "@bb/config/server";
-import { isLoopbackHostname } from "@bb/config/loopback";
 import { toOptionalString } from "@bb/config/strings";
+import { BB_LOOPBACK_HOST } from "@bb/config/runtime";
 import { createLogger } from "@bb/logger";
 import { getAppSettings, getDisabledProviderIds, setAppSettings } from "@bb/db";
 import { initDb } from "./db.js";
@@ -41,14 +41,12 @@ import type { ServerLogger, ServerRuntimeConfig } from "./types.js";
 import { NotificationHub } from "./ws/hub.js";
 import { startDaemonLivenessChecks } from "./ws/daemon-protocol.js";
 import { WatchInterestCoordinator } from "./ws/watch-interests.js";
-import { HostSharedPortCoordinator } from "./ws/host-shared-ports.js";
 import { disconnectImportedDaemonSessions } from "./internal/session-owner-side-effects.js";
 import {
   applyServerImportAtBoot,
   refuseInterruptedServerImport,
   repairLastServerMoveHostName,
 } from "./services/server-move/pending-boot.js";
-import { createConnectHold } from "./services/server-move/connect-hold.js";
 import { isServerMoveFrozen } from "./services/server-move/freeze-state.js";
 import { reconcileServerMoveRunAtBoot } from "./services/server-move/reconcile.js";
 import {
@@ -65,17 +63,19 @@ interface StartHttpListenerArgs {
   serverConfig: Pick<ServerConfig, "BB_SERVER_BIND_HOST" | "BB_SERVER_PORT">;
 }
 
-export function startHttpListener(args: StartHttpListenerArgs) {
-  return serve({
-    hostname: args.serverConfig.BB_SERVER_BIND_HOST,
-    port: args.serverConfig.BB_SERVER_PORT,
-    fetch: args.fetch,
-  });
+export function startHttpListeners(args: StartHttpListenerArgs) {
+  return [BB_LOOPBACK_HOST, ...args.serverConfig.BB_SERVER_BIND_HOST].map(
+    (hostname) =>
+      serve({
+        hostname,
+        port: args.serverConfig.BB_SERVER_PORT,
+        fetch: args.fetch,
+      }),
+  );
 }
 
 export interface StartServerPluginsArgs {
-  dataDir: string;
-  logger: Pick<ServerLogger, "error" | "warn">;
+  logger: Pick<ServerLogger, "error">;
   pluginService: Pick<PluginService, "start" | "startPeriodicUpdateChecks">;
   providerRegistry: Pick<ProviderRegistryService, "markRegistrationsSettled">;
 }
@@ -84,9 +84,7 @@ export function startServerPlugins(
   args: StartServerPluginsArgs,
 ): Promise<void> {
   return args.pluginService
-    .start({
-      hold: createConnectHold({ dataDir: args.dataDir, logger: args.logger }),
-    })
+    .start()
     .catch((error: unknown) => {
       args.logger.error({ err: error }, "Plugin startup failed");
     })
@@ -145,7 +143,6 @@ export async function runServer(serverConfig: ServerConfig): Promise<void> {
       : null;
   const hub = new NotificationHub();
   const watchInterests = new WatchInterestCoordinator({ db, hub });
-  const sharedPorts = new HostSharedPortCoordinator({ db, hub });
   const lifecycleDedupers = createLifecycleDedupers();
   const appUrl = toOptionalString(serverConfig.BB_APP_URL);
 
@@ -158,7 +155,6 @@ export async function runServer(serverConfig: ServerConfig): Promise<void> {
   const runtimeConfig: ServerRuntimeConfig = {
     appVersion: serverConfig.BB_APP_VERSION,
     builtinSkillsRootPath: resolveBuiltinSkillsRootPath(),
-    connectGateKeysUrl: serverConfig.BB_CONNECT_GATE_KEYS_URL,
     customModels: [],
     dataDir: serverConfig.BB_DATA_DIR,
     featureFlags: serverConfig.featureFlags,
@@ -246,7 +242,6 @@ export async function runServer(serverConfig: ServerConfig): Promise<void> {
     pluginCatalogService,
     pluginService,
     serverMove,
-    tunnelIngress,
   } = createApp(
     {
       bbAppManagedConfig,
@@ -266,12 +261,10 @@ export async function runServer(serverConfig: ServerConfig): Promise<void> {
       skillTreeRegistry,
       terminalSessions,
       watchInterests,
-      sharedPorts,
     },
     {
       serverMove: {
         appSurface: serverConfig.BB_APP_SURFACE,
-        bindHost: serverConfig.BB_SERVER_BIND_HOST,
         manualImportPending: serverImport.manualImportPending,
         pending: pendingServerMove,
         restoredRun: serverMoveRun,
@@ -321,7 +314,6 @@ export async function runServer(serverConfig: ServerConfig): Promise<void> {
     providerRegistry,
     pluginHostArtifacts,
     aiServices,
-    sharedPorts,
     skillTreeRegistry,
     terminalSessions,
   });
@@ -352,22 +344,17 @@ export async function runServer(serverConfig: ServerConfig): Promise<void> {
     });
   }
 
-  if (!isLoopbackHostname(serverConfig.BB_SERVER_BIND_HOST)) {
-    logger.warn(
-      { bindHost: serverConfig.BB_SERVER_BIND_HOST },
-      "SECURITY WARNING: The public API is unauthenticated and permits command execution and file reads. Wildcard server binding must only be used behind a trusted network boundary.",
-    );
-  }
-
-  const server = startHttpListener({
+  const servers = startHttpListeners({
     fetch: app.fetch,
     serverConfig,
   });
-  injectWebSocket(server);
+  for (const server of servers) {
+    injectWebSocket(server);
+  }
 
   logger.info(
     {
-      bindHost: serverConfig.BB_SERVER_BIND_HOST,
+      bindAddresses: [BB_LOOPBACK_HOST, ...serverConfig.BB_SERVER_BIND_HOST],
       port: serverConfig.BB_SERVER_PORT,
       dataDir: serverConfig.BB_DATA_DIR,
     },
@@ -386,7 +373,6 @@ export async function runServer(serverConfig: ServerConfig): Promise<void> {
       providerRegistry.markRegistrationsSettled();
     } else {
       void startServerPlugins({
-        dataDir: serverConfig.BB_DATA_DIR,
         logger,
         pluginService,
         providerRegistry,
@@ -430,18 +416,22 @@ export async function runServer(serverConfig: ServerConfig): Promise<void> {
           logger.warn({ err: error }, "Plugin shutdown failed");
         });
       }
-      const closeServer = new Promise<void>((resolve, reject) => {
-        server.close((error) => {
-          if (error) {
-            reject(error);
-            return;
-          }
-          resolve();
-        });
-      });
-      await tunnelIngress.closeAll();
+      const closeServers = Promise.all(
+        servers.map(
+          (server) =>
+            new Promise<void>((resolve, reject) => {
+              server.close((error) => {
+                if (error) {
+                  reject(error);
+                  return;
+                }
+                resolve();
+              });
+            }),
+        ),
+      );
       await closeWebSockets();
-      await closeServer;
+      await closeServers;
     })();
     return shutdownPromise;
   };

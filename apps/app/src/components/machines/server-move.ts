@@ -100,7 +100,6 @@ interface ServerMoveStartGateArgs {
   result: ServerMoveCheckResponse | null;
   checking: boolean;
   starting: boolean;
-  showAddress: boolean;
   addressDraft: string;
   checkedServerUrl: string | null;
   archiveConfirmed: boolean;
@@ -110,7 +109,6 @@ export function serverMoveStartAllowed({
   result,
   checking,
   starting,
-  showAddress,
   addressDraft,
   checkedServerUrl,
   archiveConfirmed,
@@ -121,10 +119,7 @@ export function serverMoveStartAllowed({
   if (result.items.some((item) => item.severity === "blocker")) {
     return false;
   }
-  if (
-    showAddress &&
-    (checkedServerUrl === null || addressDraft.trim() !== checkedServerUrl)
-  ) {
+  if (checkedServerUrl === null || addressDraft.trim() !== checkedServerUrl) {
     return false;
   }
   return result.existingTargetServerData === null || archiveConfirmed;
@@ -226,7 +221,6 @@ export type ServerMoveOverlayContent =
       destinationState: ServerMoveHealthState | null;
     }
   | { kind: "redirecting"; move: ServerMoveStatus; destination: string }
-  | { kind: "reconnecting"; move: ServerMoveStatus }
   | { kind: "arrived"; lastMove: LastServerMove }
   | { kind: "ended"; move: ServerMoveStatus }
   | { kind: "abandoned"; move: ServerMoveStatus };
@@ -321,9 +315,7 @@ function completedContent(
   destination: ServerMoveHealth | null,
   location: CurrentAppLocation,
 ): ServerMoveOverlayContent {
-  return move.mode === "direct"
-    ? destinationContent(move, move.serverUrl, destination, location)
-    : { kind: "reconnecting", move };
+  return destinationContent(move, move.serverUrl, destination, location);
 }
 
 export function serverMoveOverlayPollIntervalMs(args: {
@@ -335,7 +327,7 @@ export function serverMoveOverlayPollIntervalMs(args: {
   if (content === null) {
     return null;
   }
-  if (content.kind === "reconnecting" || content.kind === "waiting") {
+  if (content.kind === "waiting") {
     return args.intervalMs;
   }
   if (content.kind === "recovery") {

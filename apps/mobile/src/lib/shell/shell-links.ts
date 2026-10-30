@@ -10,7 +10,6 @@ import {
 export const SHELL_ROUTE_PATH = "/webview";
 
 const NATIVE_ONLY_PREFIXES = [
-  "/connect",
   "/settings/servers",
   "/settings/machines",
   "/settings/device",

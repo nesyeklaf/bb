@@ -22,8 +22,9 @@ app. Only the latest release is supported.
 
 bb's server binds to loopback by default, and its local HTTP API is
 unauthenticated by design: anyone who can reach it can run commands on the
-host. Exposing it with `--server-bind-host 0.0.0.0` on an untrusted network is
-documented as unsafe (see [docs/multiple-devices.md](docs/multiple-devices.md)).
+host. Extra listeners are limited to tailnet and WireGuard interface addresses, and
+every peer on those networks can drive bb (see
+[docs/multiple-devices.md](docs/multiple-devices.md)).
 Reports that a process on the same machine, or a peer the user chose to expose
 the API to, can drive bb are out of scope. Ways for a web page, a remote party,
 or an untrusted repository to reach or drive a bb server, host daemon, or bb

@@ -22,7 +22,7 @@ type ServerUrlDialogResult =
   | { kind: "clear" }
   | { kind: "set"; name: string | null; url: string };
 
-type ServerUrlDialogMode = "add" | "edit" | "rename";
+type ServerUrlDialogMode = "add" | "edit";
 
 interface OpenServerUrlDialogArgs {
   initialName: string | null;
@@ -35,14 +35,11 @@ interface OpenServerUrlDialogArgs {
 const SERVER_URL_DIALOG_TITLES: Record<ServerUrlDialogMode, string> = {
   add: "Add Server",
   edit: "Edit Server",
-  rename: "Edit Server",
 };
 
 const SERVER_URL_DIALOG_DESCRIPTIONS: Record<ServerUrlDialogMode, string> = {
   add: "Save another bb server to the Server menu.",
   edit: "Edit this saved server. Leave the URL empty to remove it.",
-  rename:
-    "Name this bb Connect server. Its address comes from your bb account.",
 };
 
 function renderServerUrlDialogHtml(
@@ -101,7 +98,7 @@ ${DESKTOP_DIALOG_BASE_CSS}
   <h1>${title}</h1>
   <p>${SERVER_URL_DIALOG_DESCRIPTIONS[mode]}</p>
   <form>
-    <input name="url" type="text" placeholder="https://example.com:38886" value="${escapeHtmlText(initialUrl ?? "")}"${mode === "rename" ? " readonly" : ""} autocomplete="off" spellcheck="false">
+    <input name="url" type="text" placeholder="https://example.com:38886" value="${escapeHtmlText(initialUrl ?? "")}" autocomplete="off" spellcheck="false">
     <input name="name" type="text" placeholder="Name (optional)" value="${escapeHtmlText(initialName ?? "")}" maxlength="${MAX_SERVER_NAME_LENGTH}" autocomplete="off" spellcheck="false">
     <div data-error></div>
     <div class="actions">
@@ -168,14 +165,6 @@ export function openServerUrlDialog(
         const parsed = serverUrlDialogSubmitRequestSchema.safeParse(payload);
         if (!parsed.success) {
           return { ok: false, message: "Enter a valid http(s) URL." };
-        }
-        if (args.mode === "rename" && args.initialUrl !== null) {
-          finish({
-            kind: "set",
-            name: normalizeServerName(parsed.data.name),
-            url: args.initialUrl,
-          });
-          return { ok: true };
         }
         if (parsed.data.url.trim().length === 0 && args.mode === "edit") {
           finish({ kind: "clear" });

@@ -793,43 +793,14 @@ export function OnboardingPluginCard({
   );
 }
 
-function CopyableLine({
-  value,
-  onCopy,
-}: {
-  value: string;
-  onCopy: (value: string) => void;
-}) {
-  return (
-    <div className="mt-3 flex items-center gap-2 rounded-md border border-border bg-surface-recessed py-1 pl-3 pr-1">
-      <code className="min-w-0 flex-1 truncate font-mono text-xs">{value}</code>
-      <Button
-        variant="ghost"
-        size="sm"
-        aria-label="Copy address"
-        onClick={() => onCopy(value)}
-      >
-        <Icon name="Copy" aria-hidden />
-      </Button>
-    </div>
-  );
-}
-
 interface DeviceRowProps {
   icon: IconName;
   title: string;
   description: string;
   action: ReactNode;
-  children?: ReactNode;
 }
 
-function DeviceRow({
-  icon,
-  title,
-  description,
-  action,
-  children,
-}: DeviceRowProps) {
+function DeviceRow({ icon, title, description, action }: DeviceRowProps) {
   return (
     <li className="px-3 py-3">
       <div className="flex items-center gap-3">
@@ -844,67 +815,21 @@ function DeviceRow({
         </div>
         {action}
       </div>
-      {children}
     </li>
   );
 }
 
-export type OnboardingConnectState =
-  | { status: "on"; url: string }
-  | { status: "off" }
-  | { status: "unavailable" };
-
 interface DevicesStepProps {
-  connect: OnboardingConnectState;
-  connectSetup: ReactNode;
-  connectSetupOpen: boolean;
   otherMachineCount: number;
-  onToggleConnectSetup: () => void;
-  onCopyConnectUrl: (url: string) => void;
   onAddMachine: () => void;
 }
 
 export function DevicesStep({
-  connect,
-  connectSetup,
-  connectSetupOpen,
   otherMachineCount,
-  onToggleConnectSetup,
-  onCopyConnectUrl,
   onAddMachine,
 }: DevicesStepProps) {
   return (
     <ul className="divide-y divide-border-hairline rounded-lg border border-border">
-      <DeviceRow
-        icon="ComputerCloud"
-        title="Open bb from any browser"
-        description={
-          connect.status === "unavailable"
-            ? "bb connect is turned off on this server. Enable its plugin to get a private getbb.app address."
-            : "bb connect gives this bb a private getbb.app address that only you can open."
-        }
-        action={
-          connect.status === "on" ? (
-            <span className="flex items-center gap-1.5 text-xs font-medium text-success">
-              <Icon name="CircleCheck" aria-hidden className="size-4" />
-              On
-            </span>
-          ) : connect.status === "off" ? (
-            <Button size="sm" variant="outline" onClick={onToggleConnectSetup}>
-              {connectSetupOpen ? "Hide" : "Set up"}
-            </Button>
-          ) : null
-        }
-      >
-        {connect.status === "on" ? (
-          <CopyableLine value={connect.url} onCopy={onCopyConnectUrl} />
-        ) : null}
-        {connect.status === "off" && connectSetupOpen ? (
-          <div className="mt-3 rounded-md border border-border p-3">
-            {connectSetup}
-          </div>
-        ) : null}
-      </DeviceRow>
       <DeviceRow
         icon="Laptop"
         title="Add another machine"

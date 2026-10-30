@@ -203,7 +203,7 @@ async function createSourceServer(root: string): Promise<SourceServer> {
     JSON.stringify({
       config: { BB_LOG_LEVEL: "info" },
       serverUrl: "https://bb.example.test",
-      serverHeaders: { "x-bb-connect-machine": "bbcm_source" },
+      serverHeaders: { "x-bb-machine-access": "bbcm_source" },
     }),
   );
   await writeFileWithDirs(
@@ -310,8 +310,6 @@ export async function writeLauncherMovedMode(args: {
     toHostId: "host-other",
     toHostName: "other",
     serverUrl: "http://other.example.test:38886",
-    mode: "direct",
-    connectHandle: null,
     oldCopyEntries: args.oldCopyEntries ?? [],
   });
   await writeBbAppRuntime({
@@ -573,7 +571,6 @@ export async function prepareCommand(
     },
     bbApp: null,
     serverPort: overrides.serverPort ?? (await fixture.reserveServerPort()),
-    bindHost: null,
     sourceDataDir: "/Users/me/.bb",
     sourceServerHostId: "host-source",
     serverUrl: "https://bb.example.test",

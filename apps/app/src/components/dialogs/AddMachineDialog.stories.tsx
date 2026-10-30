@@ -2,8 +2,8 @@ import { useState } from "react";
 import { MachineAccessGate, ManualMachineSetupView } from "./AddMachineDialog";
 import { MachineAccessControlsContent } from "@/components/settings/MachineAccessSettings";
 import {
-  CONNECT_UNAVAILABLE,
-  CONNECT_UNPAIRED,
+  TAILNET_UNAVAILABLE,
+  TAILNET_SETUP_REQUIRED,
   MANUAL_WITHOUT_URL,
   machineAccessState,
 } from "../../../.ladle/machine-story-fixtures";
@@ -40,25 +40,25 @@ export function AccessGate() {
         </DialogStage>
       </StoryRow>
       <StoryRow
-        label="bb connect unpaired"
+        label="tailnet not set up"
         hint="default provider is setup-required — the primary action leaves for plugin settings"
       >
         <DialogStage>
           <MachineAccessGate state={{ status: "blocked" }}>
             <MachineAccessControlsContent
-              machineAccess={machineAccessState(CONNECT_UNPAIRED)}
+              machineAccess={machineAccessState(TAILNET_SETUP_REQUIRED)}
             />
           </MachineAccessGate>
         </DialogStage>
       </StoryRow>
       <StoryRow
-        label="bb connect unavailable"
-        hint="paired once, now refused — a status line appears because there is a verdict to report"
+        label="tailnet unavailable"
+        hint="set up once, now refused — a status line appears because there is a verdict to report"
       >
         <DialogStage>
           <MachineAccessGate state={{ status: "blocked" }}>
             <MachineAccessControlsContent
-              machineAccess={machineAccessState(CONNECT_UNAVAILABLE)}
+              machineAccess={machineAccessState(TAILNET_UNAVAILABLE)}
             />
           </MachineAccessGate>
         </DialogStage>

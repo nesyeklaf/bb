@@ -62,6 +62,10 @@ export function cidrContains(cidr: Cidr, ip: string): boolean {
 
 export const LOOPBACK = ["127.0.0.0/8", "::1/128"].map((c) => parseCidr(c)!);
 
+export const TAILNET = ["100.64.0.0/10", "fd7a:115c:a1e0::/48"].map(
+  (c) => parseCidr(c)!,
+);
+
 export const LOCAL_NETWORKS = [
   "127.0.0.0/8",
   "::1/128",

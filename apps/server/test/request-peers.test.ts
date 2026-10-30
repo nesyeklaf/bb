@@ -104,7 +104,6 @@ describe("request peer recorder", () => {
       method: "GET",
       status: 200,
       websocket: false,
-      tunnelIngress: false,
     });
     expect(peers[0]?.port).toBeGreaterThan(0);
     expect(Object.keys(peers[0] ?? {}).sort()).toEqual([
@@ -115,7 +114,6 @@ describe("request peer recorder", () => {
       "port",
       "seq",
       "status",
-      "tunnelIngress",
       "websocket",
     ]);
   });
@@ -137,7 +135,6 @@ describe("request peer recorder", () => {
       address: "127.0.0.1",
       method: "GET",
       websocket: true,
-      tunnelIngress: false,
     });
   });
 
@@ -171,7 +168,6 @@ describe("request peer recorder", () => {
     expect(peers).toHaveLength(1);
     expect(peers[0]).toMatchObject({
       address: "127.0.0.1",
-      tunnelIngress: false,
       websocket: false,
     });
     expect(JSON.stringify(peers[0])).not.toContain("203.0.113.7");

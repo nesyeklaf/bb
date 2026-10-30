@@ -1814,12 +1814,7 @@ describe("public terminal routes", () => {
       socket: replacementSocket,
     });
 
-    expect(await waitForDaemonMessage(replacementSocket)).toEqual({
-      type: "connect-shares.replace",
-      generation: 0,
-      ports: [],
-    });
-    const closeMessage = await waitForDaemonMessage(replacementSocket, 1);
+    const closeMessage = await waitForDaemonMessage(replacementSocket);
     expect(closeMessage).toMatchObject({
       type: "terminal.close",
       terminalId: stored.id,
@@ -1894,12 +1889,7 @@ describe("public terminal routes", () => {
       socket: replacementSocket,
     });
 
-    expect(await waitForDaemonMessage(replacementSocket)).toEqual({
-      type: "connect-shares.replace",
-      generation: 0,
-      ports: [],
-    });
-    const closeMessage = await waitForDaemonMessage(replacementSocket, 1);
+    const closeMessage = await waitForDaemonMessage(replacementSocket);
     expect(closeMessage).toMatchObject({
       type: "terminal.close",
       terminalId: stored.id,
@@ -2386,13 +2376,8 @@ describe("public terminal routes", () => {
       socket: replacementSocket,
     });
 
-    expect(await waitForDaemonMessage(replacementSocket)).toEqual({
-      type: "connect-shares.replace",
-      generation: 0,
-      ports: [],
-    });
     await expect(
-      waitForDaemonMessage(replacementSocket, 1),
+      waitForDaemonMessage(replacementSocket),
     ).resolves.toMatchObject({
       type: "terminal.close",
       terminalId: stored.id,

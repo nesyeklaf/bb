@@ -1,8 +1,3 @@
-import {
-  fetchDesktopSession,
-  redeemMachineCredential,
-} from "@bb/connect-client";
-import CookieManager from "@react-native-cookies/cookies";
 import { File, Directory, Paths } from "expo-file-system";
 import { useLocalSearchParams } from "expo-router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -61,8 +56,6 @@ function appendSessionLine(event: SpikeEvent): void {
   } catch {}
 }
 
-const APEX_URL = process.env.EXPO_PUBLIC_BB_CONNECT_APEX ?? "https://getbb.app";
-
 export function WebViewSpikeScreen() {
   const insets = useSafeAreaInsets();
   const params = useLocalSearchParams<{
@@ -71,7 +64,6 @@ export function WebViewSpikeScreen() {
     chrome?: string;
     incognito?: string;
     cache?: string;
-    code?: string;
     accessory?: string;
     appbound?: string;
     probes?: string;
@@ -131,57 +123,6 @@ export function WebViewSpikeScreen() {
       reloadKey,
     });
   }, [cacheEnabled, grantType, incognito, loadedUrl, record, reloadKey]);
-
-  const enroll = useCallback(
-    async (machineCode: string) => {
-      try {
-        const credential = await redeemMachineCredential({
-          apexUrl: APEX_URL,
-          code: machineCode.trim(),
-        });
-        record("native", {
-          kind: "enroll",
-          step: "redeem",
-          handle: credential.handle,
-          serverUrl: credential.serverUrl,
-        });
-        const { cookie } = await fetchDesktopSession(credential);
-        const cookieSpec = {
-          name: cookie.name,
-          value: cookie.value,
-          domain: cookie.domain,
-          path: "/",
-          secure: true,
-          httpOnly: true,
-          expires: new Date(cookie.expiresAt).toISOString(),
-        };
-        await CookieManager.set(credential.serverUrl, cookieSpec, false);
-        await CookieManager.set(credential.serverUrl, cookieSpec, true);
-        record("native", {
-          kind: "enroll",
-          step: "cookie",
-          domain: cookie.domain,
-          expiresAt: cookie.expiresAt,
-        });
-        setUrlDraft(`${credential.serverUrl}/`);
-        setLoadedUrl(`${credential.serverUrl}/`);
-        setReloadKey((value) => value + 1);
-      } catch (error) {
-        record("native", {
-          kind: "enroll",
-          step: "failed",
-          error: String(error),
-        });
-      }
-    },
-    [record],
-  );
-
-  const enrollCode = firstParam(params.code);
-  useEffect(() => {
-    if (enrollCode === undefined || enrollCode.length === 0) return;
-    void enroll(enrollCode);
-  }, [enroll, enrollCode]);
 
   const urlParam = firstParam(params.url);
   const cacheParam = firstParam(params.cache);

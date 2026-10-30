@@ -11,13 +11,13 @@ import {
 const SCHEMA_PATHS = {
   1: fileURLToPath(
     new URL(
-      "../../../../web/public/schemas/marketplace.schema.json",
+      "./schemas/marketplace.schema.json",
       import.meta.url,
     ),
   ),
   2: fileURLToPath(
     new URL(
-      "../../../../web/public/schemas/marketplace-v2.schema.json",
+      "./schemas/marketplace-v2.schema.json",
       import.meta.url,
     ),
   ),
@@ -218,7 +218,7 @@ const v2Fixtures: readonly Fixture[] = [
         updatedAt: "2026-08-27T16:12:00Z",
       },
       {
-        $schema: "https://getbb.app/schemas/marketplace-v2.schema.json",
+        $schema: "./marketplace-v2.schema.json",
         categories: [
           {
             id: "acme-tools",

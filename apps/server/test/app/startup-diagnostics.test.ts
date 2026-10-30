@@ -4,7 +4,7 @@ import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { loadServerConfig } from "@bb/config/server";
 import { describe, expect, it } from "vitest";
-import { startHttpListener } from "../../src/start-server.js";
+import { startHttpListeners } from "../../src/start-server.js";
 
 const testDir = dirname(fileURLToPath(import.meta.url));
 
@@ -36,50 +36,77 @@ describe("server startup diagnostics", () => {
     expect(packageJson).toContain("src/start-server.ts dist/start-server.js");
   });
 
-  it.each([
-    {
-      bindHost: undefined,
-      expectedAddress: "127.0.0.1",
-      name: "binds the default server listener to IPv4 loopback",
-    },
-    {
-      bindHost: "0.0.0.0",
-      expectedAddress: "0.0.0.0",
-      name: "binds the explicit wildcard listener to IPv4 only",
-    },
-  ])("$name", async ({ bindHost, expectedAddress }) => {
+  async function closeAll(
+    servers: ReturnType<typeof startHttpListeners>,
+  ): Promise<void> {
+    await Promise.all(
+      servers.map(
+        (server) =>
+          new Promise<void>((resolveClose, rejectClose) => {
+            server.close((error) => {
+              if (error) {
+                rejectClose(error);
+                return;
+              }
+              resolveClose();
+            });
+          }),
+      ),
+    );
+  }
+
+  async function listeningAddresses(
+    servers: ReturnType<typeof startHttpListeners>,
+  ): Promise<unknown[]> {
+    const addresses: unknown[] = [];
+    for (const server of servers) {
+      if (!server.listening) {
+        await once(server, "listening");
+      }
+      addresses.push(server.address());
+    }
+    return addresses;
+  }
+
+  it("binds only IPv4 loopback by default", async () => {
     const serverConfig = loadServerConfig({
       env: {
         BB_DATA_DIR: "/tmp/bb-server-listener-test",
         BB_HOST_DAEMON_PORT: "49162",
-        ...(bindHost === undefined ? {} : { BB_SERVER_BIND_HOST: bindHost }),
         BB_SERVER_PORT: "49161",
         NODE_ENV: "development",
       },
     });
-    const server = startHttpListener({
+    const servers = startHttpListeners({
       fetch: () => new Response("ok"),
       serverConfig: { ...serverConfig, BB_SERVER_PORT: 0 },
     });
 
     try {
-      if (!server.listening) {
-        await once(server, "listening");
-      }
-      expect(server.address()).toMatchObject({
-        address: expectedAddress,
-        family: "IPv4",
-      });
+      expect(await listeningAddresses(servers)).toEqual([
+        expect.objectContaining({ address: "127.0.0.1", family: "IPv4" }),
+      ]);
     } finally {
-      await new Promise<void>((resolveClose, rejectClose) => {
-        server.close((error) => {
-          if (error) {
-            rejectClose(error);
-            return;
-          }
-          resolveClose();
-        });
-      });
+      await closeAll(servers);
     }
   });
+
+  it.runIf(process.platform === "linux")(
+    "keeps loopback and adds one listener per configured address",
+    async () => {
+      const servers = startHttpListeners({
+        fetch: () => new Response("ok"),
+        serverConfig: { BB_SERVER_BIND_HOST: ["127.0.0.2"], BB_SERVER_PORT: 0 },
+      });
+
+      try {
+        expect(await listeningAddresses(servers)).toEqual([
+          expect.objectContaining({ address: "127.0.0.1", family: "IPv4" }),
+          expect.objectContaining({ address: "127.0.0.2", family: "IPv4" }),
+        ]);
+      } finally {
+        await closeAll(servers);
+      }
+    },
+  );
 });

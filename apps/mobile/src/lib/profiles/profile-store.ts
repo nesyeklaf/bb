@@ -199,12 +199,6 @@ export function createProfileStore(deps: CreateProfileStoreDeps): ProfileStore {
       return mutate(async () => {
         const existing = state.profiles.find((p) => p.id === id);
         if (!existing) throw new Error(`Unknown server profile: ${id}`);
-        if (
-          existing.mode === "direct" &&
-          (patch.handle !== undefined || patch.credential !== undefined)
-        ) {
-          throw new Error("Direct profiles have no connect handle/credential");
-        }
         const merged = { ...existing, ...withoutUndefined(patch) };
         const profile = serverProfileSchema.parse(merged);
         await storage.setItem(profileStorageKey(id), serializeProfile(profile));

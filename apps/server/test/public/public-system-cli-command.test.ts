@@ -5,7 +5,6 @@ import { readJson } from "../helpers/json.js";
 import { withTestHarness } from "../helpers/test-app.js";
 
 const API = "/api/v1/system/cli-command";
-const MACHINE_HEADERS = { "x-bb-gate-auth": "machine" };
 
 function recordingService(): {
   calls: string[];
@@ -76,20 +75,6 @@ describe("/api/v1/system/cli-command", () => {
       });
       expect(await readJson(removed)).toMatchObject({ installedPath: null });
       expect(calls).toEqual(["install", "remove"]);
-    });
-  });
-
-  it("does not let machine credentials change the server computer's PATH", () => {
-    const { calls, service } = recordingService();
-    return withTestHarness({ cliCommandService: service }, async (harness) => {
-      for (const action of ["install", "remove"]) {
-        const response = await harness.app.request(`${API}/${action}`, {
-          headers: MACHINE_HEADERS,
-          method: "POST",
-        });
-        expect(response.status).toBe(403);
-      }
-      expect(calls).toEqual([]);
     });
   });
 });
