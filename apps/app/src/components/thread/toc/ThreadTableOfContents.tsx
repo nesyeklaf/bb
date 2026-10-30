@@ -1,3 +1,4 @@
+import type { PointerEvent as ReactPointerEvent } from "react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type {
   ExperimentalThreadTocRange,
@@ -31,6 +32,7 @@ import {
   bandTickRange,
   selectionFromTicks,
 } from "./toc-rail-bands";
+import { railHalfAt, railHalfTint, type TocRailHalf } from "./toc-rail-half";
 
 export interface TocItem {
   id: string;
@@ -577,6 +579,7 @@ export function ThreadTableOfContents({
   const tocVisible = useThreadTocVisible(rootElement);
   const [open, setOpen] = useState(false);
   const [chosenTab, setTab] = useState<PanelTab | null>(null);
+  const [railHalf, setRailHalf] = useState<TocRailHalf | null>(null);
   const [hoveredRange, setHoveredRangeState] =
     useState<ExperimentalThreadTocRange | null>(null);
   const [pointerBand, setPointerBand] =
@@ -773,6 +776,8 @@ export function ThreadTableOfContents({
   useEffect(() => {
     if (panelOpen) return;
     setHoveredRangeState(null);
+    setRailHalf(null);
+    setTab(null);
   }, [panelOpen]);
 
   useEffect(() => {
@@ -894,6 +899,17 @@ export function ThreadTableOfContents({
   };
 
   const canSelect = extensionTabs.length > 0;
+  const syncRailHalf = (event: ReactPointerEvent<HTMLElement>) => {
+    if (!canSelect || dragRef.current?.moved) return;
+    const half = railHalfAt(
+      event.clientX,
+      event.currentTarget.getBoundingClientRect(),
+    );
+    if (half === railHalf) return;
+    setRailHalf(half);
+    const target = defaultExtensionTab ?? extensionTabs[0];
+    setTab(half === "topics" && target ? `ext:${target.key}` : "user");
+  };
 
   if (userItems.length < TOC_MIN_USER_MESSAGES) {
     return <span ref={setRootElement} aria-hidden className="hidden" />;
@@ -927,7 +943,10 @@ export function ThreadTableOfContents({
           aria-expanded={panelOpen}
           aria-controls={`thread-toc-panel-${threadId}`}
           onClick={() => setOpen(true)}
+          data-rail-half={railHalf ?? undefined}
+          onPointerEnter={syncRailHalf}
           onPointerDown={(event) => {
+            syncRailHalf(event);
             if (!canSelect || event.button !== 0) return;
             dragRef.current = {
               startId: nearestTickId(rootElement, event.clientY),
@@ -937,7 +956,10 @@ export function ThreadTableOfContents({
           }}
           onPointerMove={(event) => {
             const drag = dragRef.current;
-            if (!drag) return;
+            if (!drag) {
+              syncRailHalf(event);
+              return;
+            }
             if (
               !drag.moved &&
               Math.abs(event.clientY - drag.startY) < TOC_DRAG_THRESHOLD_PX
@@ -959,7 +981,14 @@ export function ThreadTableOfContents({
           onPointerCancel={() => {
             dragRef.current = null;
           }}
-          className="no-scrollbar flex max-h-[calc(100vh-7rem)] w-8 cursor-pointer select-none flex-col items-center gap-2 overflow-y-auto py-2"
+          className="no-scrollbar flex max-h-[calc(100vh-7rem)] w-8 cursor-pointer select-none flex-col items-center gap-2 overflow-y-auto rounded-full py-2"
+          style={
+            canSelect && railHalf
+              ? {
+                  backgroundImage: railHalfTint(railHalf),
+                }
+              : undefined
+          }
         >
           <span
             aria-hidden
@@ -1053,7 +1082,11 @@ export function ThreadTableOfContents({
             id={`thread-toc-panel-${threadId}`}
             className="pointer-events-auto absolute right-full top-0 w-[18.25rem] max-w-[calc(100vw-3rem)] pr-1"
           >
-            <div className="rounded-lg border border-border bg-popover p-1 shadow-lg">
+            <div
+              data-toc-view={extensionTab ? "topics" : "messages"}
+              className="rounded-lg border border-border bg-popover p-1 shadow-lg"
+            >
+              {extensionTab && canSelect ? null : (
               <div className="flex items-center gap-1 pb-1">
                 {hasAgentMessages ? (
                   <TocPanelTab
@@ -1067,17 +1100,13 @@ export function ThreadTableOfContents({
                   active={extensionTab === null && activeTab === "user"}
                   onSelect={() => setTab("user")}
                 />
-                {extensionTabs.map((entry) => (
-                  <TocPanelTab
-                    key={entry.key}
-                    label={entry.label}
-                    active={extensionTab === entry}
-                    onSelect={() => setTab(`ext:${entry.key}`)}
-                  />
-                ))}
               </div>
+              )}
               {extensionTab ? (
-                <div className="max-h-64 overflow-y-auto overflow-x-hidden">
+                <div
+                  key={extensionTab.key}
+                  className="max-h-64 overflow-y-auto overflow-x-hidden motion-safe:animate-in motion-safe:fade-in motion-safe:duration-150"
+                >
                   <ThreadTocTabMount
                     slot={extensionTab.slot}
                     threadId={threadId}
@@ -1094,7 +1123,7 @@ export function ThreadTableOfContents({
                   />
                 </div>
               ) : (
-                <div className="relative isolate">
+                <div className="relative isolate motion-safe:animate-in motion-safe:fade-in motion-safe:duration-150">
                   <div
                     ref={scrollRef}
                     className="max-h-64 overflow-y-auto overflow-x-hidden"
