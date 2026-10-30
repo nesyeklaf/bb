@@ -1,0 +1,9 @@
+# path prefix	reason
+apps/web	marketing site, not part of the fork runtime
+.github	upstream CI and release workflows, not run by the fork
+README.md	upstream download links, no runtime access
+apps/desktop/README.md	upstream release documentation
+docs	upstream release documentation
+turbo.json	build env passthrough for apps/web
+scripts/bb-cloud-dev.mjs	local cloud dev stub value for apps/web
+plugins/provider-claude-code/src/__fixtures__	recorded transcripts contain the word as data
