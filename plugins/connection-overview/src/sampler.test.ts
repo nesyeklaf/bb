@@ -30,6 +30,7 @@ function fakeFs(state: {
   tcp: string;
   fds: Record<number, number[]>;
   extra?: Record<number, string>;
+  cmdlines?: Record<number, string>;
 }): ProcFs {
   const procs: Record<number, string> = {
     1: stat(1, 0, "init"),
@@ -48,6 +49,12 @@ function fakeFs(state: {
     async readFile(path) {
       const statPid = /\/proc\/(\d+)\/stat$/.exec(path)?.[1];
       if (statPid !== undefined) return procs[Number(statPid)]!;
+      const cmdlinePid = /\/proc\/(\d+)\/cmdline$/.exec(path)?.[1];
+      if (cmdlinePid !== undefined) {
+        const cmdline = state.cmdlines?.[Number(cmdlinePid)];
+        if (cmdline === undefined) throw new Error("ENOENT");
+        return cmdline;
+      }
       if (path.endsWith("/net/tcp")) return HEADER + state.tcp;
       return HEADER;
     },
@@ -89,6 +96,33 @@ describe("createSampler", () => {
       remotePort: 443,
       continued: false,
     });
+  });
+
+  it("names a provider bridge worker after its role, not its node thread", async () => {
+    const state = {
+      tcp: OUT + tcpLine("0100007F:C001", "06797A8C:01BB", "01", 502),
+      fds: { 10: [], 11: [], 12: [501], 13: [502] },
+      extra: {
+        12: stat(12, 10, "node-MainThread"),
+        13: stat(13, 10, "node-MainThread"),
+      },
+      cmdlines: {
+        12: "/usr/bin/node\0--use-system-ca\0/opt/bb-app/host-daemon/dist/bb-provider-bridge-worker.mjs\0/plugins/provider-codex/host.js\0",
+        13: "/usr/bin/node\0/opt/bb-app/host-daemon/dist/daemon-bundle.mjs\0",
+      },
+    };
+    const sampler = createSampler({
+      fs: fakeFs(state),
+      rootPid: 10,
+      generation: "g1",
+      now: () => 1_000,
+    });
+    await sampler.tick();
+    const reply = sampler.read({ generation: null, cursor: 0, gapCursor: 0 });
+    expect(reply.rows.map((row) => [row.pid, row.comm]).sort()).toEqual([
+      [12, "bb-provider-bridge"],
+      [13, "node-MainThread"],
+    ]);
   });
 
   it("emits an open socket once, then again as a continued heartbeat", async () => {

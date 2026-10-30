@@ -117,6 +117,32 @@ describe("classify, first match wins", () => {
     });
   });
 
+  it("infers a provider bridge socket like a provider CLI and keeps it bb's own", () => {
+    const fresh = {
+      "2a06:98c1:3101::6812:202f": [
+        {
+          name: "chatgpt.com",
+          ip: "2a06:98c1:3101::6812:202f",
+          at: NOW - 1_000,
+        },
+      ],
+    };
+    expect(
+      classify(
+        out("2a06:98c1:3101::6812:202f", 443, "bb-provider-bridge"),
+        null,
+        context(fresh),
+      ),
+    ).toMatchObject({ state: "inferred", reason: "resolves to chatgpt.com" });
+    expect(
+      classify(
+        out("2a00:1450:4001:c13::65", 443, "bb-provider-bridge"),
+        null,
+        context(),
+      ),
+    ).toMatchObject({ state: "red", reason: "unknown address" });
+  });
+
   it("names the unlisted host a red address resolves to", () => {
     const seen = {
       "2606:4700:20::681a:384": [

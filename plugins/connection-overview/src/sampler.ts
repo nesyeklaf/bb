@@ -8,6 +8,9 @@ import {
   type ProcStat,
 } from "./proc-net.js";
 import type { SampleGap, SampleReply, SocketRow } from "./contract.js";
+import { PROVIDER_BRIDGE_PROCESS } from "./allowlist.js";
+
+const PROVIDER_BRIDGE_ENTRY = "bb-provider-bridge-worker.mjs";
 
 export interface ProcFs {
   readdir(path: string): Promise<string[]>;
@@ -55,7 +58,18 @@ async function readTree(
         } catch {}
       }),
   );
-  return descendants(rootPid, stats, excluded);
+  const tree = descendants(rootPid, stats, excluded);
+  await Promise.all(
+    tree.map(async (proc) => {
+      if (!proc.comm.startsWith("node")) return;
+      try {
+        const cmdline = await fs.readFile(`/proc/${proc.pid}/cmdline`);
+        if (cmdline.includes(PROVIDER_BRIDGE_ENTRY))
+          proc.comm = PROVIDER_BRIDGE_PROCESS;
+      } catch {}
+    }),
+  );
+  return tree;
 }
 
 export function createSampler(options: {
