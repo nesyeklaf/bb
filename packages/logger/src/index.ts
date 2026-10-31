@@ -3,6 +3,7 @@ import { join } from "node:path";
 import pino from "pino";
 import type { Logger } from "pino";
 import { loadLoggerConfig } from "@bb/config/logger";
+import { otlpServiceName, otlpSignalUrl } from "@bb/config/otlp";
 
 export type { Logger };
 
@@ -89,6 +90,30 @@ export function createLogger(options: CreateLoggerOptions): Logger {
         messageFormat: "[{component}] {msg}",
         singleLine: true,
         translateTime: "SYS:HH:MM:ss",
+      },
+      level: loggerConfig.BB_LOG_LEVEL,
+    });
+  }
+
+  if (loggerConfig.BB_OTLP_ENDPOINT !== null) {
+    targets.push({
+      target: "pino-opentelemetry-transport",
+      options: {
+        loggerName: component,
+        serviceVersion: loggerConfig.BB_APP_VERSION,
+        resourceAttributes: {
+          "service.name": otlpServiceName(component),
+          "service.version": loggerConfig.BB_APP_VERSION,
+        },
+        logRecordProcessorOptions: {
+          recordProcessorType: "batch",
+          exporterOptions: {
+            protocol: "http/protobuf",
+            protobufExporterOptions: {
+              url: otlpSignalUrl(loggerConfig.BB_OTLP_ENDPOINT, "logs"),
+            },
+          },
+        },
       },
       level: loggerConfig.BB_LOG_LEVEL,
     });

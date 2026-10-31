@@ -25,6 +25,7 @@ const dependencyNames = [
   "fs-native-extensions",
   "node-pty",
   "pino",
+  "pino-opentelemetry-transport",
   "pino-pretty",
   "pino-roll",
 ];

@@ -505,7 +505,7 @@ export function createPluginRuntime(context: PluginRuntimeContext) {
 
   function reportAgentToolProblem(id: string, message: string): void {
     agentToolProblems.set(id, message);
-    logger.warn(`[plugin:${id}] ${message}`);
+    logger.warn({ pluginId: id }, `[plugin:${id}] ${message}`);
     if (statuses.get(id)?.status === "running") {
       setStatus(id, "running", message);
     }
@@ -575,7 +575,7 @@ export function createPluginRuntime(context: PluginRuntimeContext) {
     if (!reportedStaleErrors.has(error)) {
       reportedStaleErrors.add(error);
       logger.warn(
-        { err: error },
+        { err: error, pluginId: error.pluginId },
         `[plugin:${error.pluginId}] ${error.message}`,
       );
     }
@@ -588,7 +588,7 @@ export function createPluginRuntime(context: PluginRuntimeContext) {
     if (pluginId === undefined) return false;
     const message = error instanceof Error ? error.message : String(error);
     logger.warn(
-      { err: error },
+      { err: error, pluginId },
       `[plugin:${pluginId}] uncaught error: ${message}`,
     );
     if (statuses.get(pluginId)?.status === "running") {
@@ -605,6 +605,7 @@ export function createPluginRuntime(context: PluginRuntimeContext) {
     const message = error instanceof Error ? error.message : String(error);
     if (service.controller !== controller || service.disposed) {
       logger.warn(
+        { pluginId: id },
         `[plugin:${id}] service ${name} raised an uncaught exception from a stopped run: ${message}`,
       );
       return true;
@@ -612,7 +613,7 @@ export function createPluginRuntime(context: PluginRuntimeContext) {
     if (instance.uncaughtError !== undefined) return true;
     instance.uncaughtError = { error };
     logger.warn(
-      { err: error },
+      { err: error, pluginId: id },
       `[plugin:${id}] service ${name} raised an uncaught exception outside start(): ${message} — aborting it`,
     );
     const current = service.current;
@@ -628,6 +629,7 @@ export function createPluginRuntime(context: PluginRuntimeContext) {
         `service ${name} did not stop after an uncaught exception`,
       );
       logger.warn(
+        { pluginId: id },
         `[plugin:${id}] service ${name} did not stop within ${serviceStopTimeoutMs}ms of its uncaught exception — plugin degraded until it does`,
       );
     });
@@ -645,7 +647,7 @@ export function createPluginRuntime(context: PluginRuntimeContext) {
     const name = service.record.name;
     if (!outcome.crashed) {
       service.state = "stopped";
-      logger.info(`[plugin:${id}] service ${name} stopped`);
+      logger.info({ pluginId: id }, `[plugin:${id}] service ${name} stopped`);
       return;
     }
     if (isNeedsConfigurationError(outcome.error)) {
@@ -655,6 +657,7 @@ export function createPluginRuntime(context: PluginRuntimeContext) {
         outcome.error.message || `service ${name} needs configuration`,
       );
       logger.info(
+        { pluginId: id },
         `[plugin:${id}] service ${name} needs configuration; not restarting until reload`,
       );
       return;
@@ -667,6 +670,7 @@ export function createPluginRuntime(context: PluginRuntimeContext) {
       service.state = "stopped";
       setStatus(id, "error", `service ${name} crashed: ${message}`);
       logger.warn(
+        { pluginId: id },
         `[plugin:${id}] service ${name} crashed during activation: ${message}`,
       );
       return;
@@ -682,6 +686,7 @@ export function createPluginRuntime(context: PluginRuntimeContext) {
     service.consecutiveCrashes += 1;
     service.state = "backoff";
     logger.warn(
+      { pluginId: id },
       `[plugin:${id}] service ${name} crashed: ${message} — restarting in ${delayMs}ms`,
     );
     const timer = setTimeout(() => {
@@ -715,6 +720,7 @@ export function createPluginRuntime(context: PluginRuntimeContext) {
           hung.add(name);
           setStatus(id, "degraded", `service ${name} did not stop`);
           logger.warn(
+            { pluginId: id },
             `[plugin:${id}] service ${name} did not stop within ${serviceStopTimeoutMs}ms — plugin degraded until it does`,
           );
           void current.then(
@@ -733,6 +739,7 @@ export function createPluginRuntime(context: PluginRuntimeContext) {
     hung.delete(name);
     if (hung.size === 0) hungServices.delete(id);
     logger.info(
+      { pluginId: id },
       `[plugin:${id}] service ${name} eventually stopped — reload to recover`,
     );
   }
@@ -804,6 +811,7 @@ export function createPluginRuntime(context: PluginRuntimeContext) {
       for (const provider of select(plugin)) {
         if (seen.has(provider.id)) {
           logger.warn(
+            { pluginId },
             `[plugin:${pluginId}] ${kindLabel} provider "${provider.id}" is already registered by another plugin; ignoring`,
           );
           continue;
@@ -931,7 +939,10 @@ export function createPluginRuntime(context: PluginRuntimeContext) {
       const message = error instanceof Error ? error.message : String(error);
       stats.errorCount += 1;
       if (!reportStaleError(error)) {
-        logger.warn(`[plugin:${id}] ${label} failed: ${message}`);
+        logger.warn(
+          { pluginId: id },
+          `[plugin:${id}] ${label} failed: ${message}`,
+        );
         if (
           loaded.get(id) === instance &&
           statuses.get(id)?.status === "running"
@@ -947,6 +958,7 @@ export function createPluginRuntime(context: PluginRuntimeContext) {
       void execution.catch((error: unknown) => {
         if (released.aborted && !reportStaleError(error)) {
           logger.warn(
+            { pluginId: id },
             `[plugin:${id}] ${label} failed after its caller was released: ${error instanceof Error ? error.message : String(error)}`,
           );
         }

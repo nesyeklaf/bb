@@ -1,5 +1,7 @@
 import { spawn } from "node:child_process";
 import fs from "node:fs";
+import { createServer } from "node:http";
+import type { AddressInfo } from "node:net";
 import os from "node:os";
 import path from "node:path";
 import { afterAll, afterEach, describe, expect, it, vi } from "vitest";
@@ -134,6 +136,46 @@ function readComponentLogLines(
       .filter(Boolean)
       .map((line) => JSON.parse(line) as Record<string, unknown>);
   });
+}
+
+interface OtlpRequest {
+  body: Buffer;
+  contentType: string | undefined;
+  path: string | undefined;
+}
+
+async function startOtlpReceiver(): Promise<{
+  close: () => Promise<void>;
+  endpoint: string;
+  requests: OtlpRequest[];
+}> {
+  const requests: OtlpRequest[] = [];
+  const server = createServer((request, response) => {
+    const chunks: Buffer[] = [];
+    request.on("data", (chunk: Buffer) => chunks.push(chunk));
+    request.on("end", () => {
+      requests.push({
+        body: Buffer.concat(chunks),
+        contentType: request.headers["content-type"],
+        path: request.url,
+      });
+      response.writeHead(200, { "content-type": "application/x-protobuf" });
+      response.end();
+    });
+  });
+  await new Promise<void>((resolve) =>
+    server.listen(0, "127.0.0.1", () => resolve()),
+  );
+  const { port } = server.address() as AddressInfo;
+  return {
+    close: () =>
+      new Promise<void>((resolve) => {
+        server.closeAllConnections();
+        server.close(() => resolve());
+      }),
+    endpoint: `http://127.0.0.1:${port}/`,
+    requests,
+  };
 }
 
 afterEach(() => {
@@ -296,6 +338,43 @@ describe("createLogger", () => {
       msg: "explicit data dir",
       requestId: "req_explicit",
     });
+  });
+
+  it("exports log records to the OTLP endpoint when one is configured", async () => {
+    const dataDir = createTempDir();
+    const receiver = await startOtlpReceiver();
+    vi.stubEnv("NODE_ENV", "production");
+    vi.stubEnv("BB_DATA_DIR", dataDir);
+    vi.stubEnv("BB_OTLP_ENDPOINT", receiver.endpoint);
+    vi.stubEnv("OTEL_BLRP_SCHEDULE_DELAY", "50");
+
+    try {
+      const { createLogger } = await importFreshLogger();
+      const logger = createLogger({ component: "server" });
+      const message = `otlp-export-${Date.now()}`;
+      logger.warn({ pluginId: "otlp-fixture" }, message);
+
+      await waitFor(
+        () =>
+          receiver.requests.some((request) => request.body.includes(message)),
+        10_000,
+      );
+
+      const request = receiver.requests.find((entry) =>
+        entry.body.includes(message),
+      );
+      expect(request?.path).toBe("/v1/logs");
+      expect(request?.contentType).toBe("application/x-protobuf");
+      expect(request?.body.includes("bb-server")).toBe(true);
+      expect(request?.body.includes("pluginId")).toBe(true);
+      expect(request?.body.includes("otlp-fixture")).toBe(true);
+      expect(request?.body.includes("warn")).toBe(true);
+      expect(
+        readComponentLogLines(path.join(dataDir, "logs"), "server"),
+      ).toMatchObject([{ msg: message, pluginId: "otlp-fixture" }]);
+    } finally {
+      await receiver.close();
+    }
   });
 
   it("serializes nested error causes", async () => {

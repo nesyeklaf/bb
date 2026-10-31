@@ -35,7 +35,8 @@ const packageJson = {
     "@parcel/watcher": "2.5.6",
     "fs-native-extensions": "1.5.0",
     "node-pty": "1.2.0-beta.15",
-    pino: "9.6.0",
+    pino: "10.4.0",
+    "pino-opentelemetry-transport": "4.0.2",
     "pino-pretty": "13.0.0",
     "pino-roll": "4.0.0",
   },
@@ -354,6 +355,7 @@ describe.each(MODES)("bb-app artifact service (%s)", (mode) => {
         "fs-native-extensions",
         "node-pty",
         "pino",
+        "pino-opentelemetry-transport",
         "pino-pretty",
         "pino-roll",
       ]);
