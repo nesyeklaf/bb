@@ -23,7 +23,8 @@ const SKILL_SOURCE_COPY: Readonly<
   },
   "bb-user": {
     label: "Your bb skills",
-    description: "Skills in bb's own skills folder in its data directory.",
+    description:
+      "Skills in bb's own skills folder in its data directory and in the folders set by BB_INHERITED_SKILLS_ROOTS.",
   },
   "bb-project": {
     label: "Project skills",

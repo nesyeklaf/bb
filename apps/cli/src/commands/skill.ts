@@ -64,7 +64,8 @@ function addWorkspaceOptions(command: Command): Command {
 const SKILL_SOURCE_DESCRIPTIONS: Readonly<Record<BbSkillSourceId, string>> = {
   "bb-plugins":
     "Skills that installed bb plugins contribute, including generated plugin command skills",
-  "bb-user": "Skills in bb's data directory and inherited skill roots",
+  "bb-user":
+    "Skills in bb's data directory skills folder and in BB_INHERITED_SKILLS_ROOTS",
   "bb-project": "Skills in the project's .bb/skills directory",
   shared: "Skills from the sharedSkillRoots in config.json",
 };
