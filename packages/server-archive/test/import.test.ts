@@ -228,11 +228,11 @@ describe("installImportedServerFiles and removeImportedServerFiles", () => {
     expect([...result.importedEntries].sort()).toEqual([
       "attachments/thr_1/image.png",
       "auth-secret",
-      "sandy.db",
       "config.json",
       "env.json",
       "plugins/docs/data.db",
       "plugins/docs/secrets/token",
+      "sandy.db",
       "skills/review/SKILL.md",
     ]);
     expect(result.importedEntries.at(-1)).toBe("sandy.db");

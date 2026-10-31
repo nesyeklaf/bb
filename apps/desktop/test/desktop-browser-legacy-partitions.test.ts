@@ -27,8 +27,8 @@ describe("removeLegacyAutomationPartitions", () => {
     await removeLegacyAutomationPartitions(userDataPath);
 
     expect((await readdir(partitions)).sort()).toEqual([
-      "sandy-browser",
       "other-app",
+      "sandy-browser",
     ]);
   });
 

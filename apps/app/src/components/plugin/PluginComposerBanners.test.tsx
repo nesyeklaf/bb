@@ -224,6 +224,6 @@ describe("ComposerBannersSlot", () => {
         <div>SANDY row</div>
       </ComposerBannersSlot>,
     );
-    expect(view.container.textContent).toBe("Plugin rowBB row");
+    expect(view.container.textContent).toBe("Plugin rowSANDY row");
   });
 });

@@ -30,7 +30,6 @@ describe("listServerOwnedEntries", () => {
       "AGENTS.md",
       "attachments",
       "auth-secret",
-      "sandy.db",
       "config.json",
       "env.json",
       "machine-environment-key",
@@ -41,6 +40,7 @@ describe("listServerOwnedEntries", () => {
       "plugins/docs/secrets",
       "plugins/npm",
       "plugins/snapshots",
+      "sandy.db",
       "skills",
       "theme",
     ]);
@@ -49,7 +49,7 @@ describe("listServerOwnedEntries", () => {
         .filter((file) => file.sqliteDatabase)
         .map((file) => file.path)
         .sort(),
-    ).toEqual(["sandy.db", "plugins/docs/data.db"]);
+    ).toEqual(["plugins/docs/data.db", "sandy.db"]);
     const database = files.find((file) => file.path === "sandy.db");
     expect(database?.absolutePath).toBe(path.join(dataDir, "sandy.db"));
     expect(database?.sizeBytes).toBe(fixtureBody("sandy.db").length);
@@ -97,8 +97,8 @@ describe("listServerOwnedEntries", () => {
     expect(inventory.skippedPaths).toEqual([
       "attachments/linked.png",
       "auth-secret",
-      "sandy.db",
       "plugins/dev-plugin",
+      "sandy.db",
       "skills",
     ]);
   });

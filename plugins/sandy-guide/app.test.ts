@@ -27,7 +27,7 @@ describe("withCreatePluginPrompt", () => {
 
     expect(next.text).toBe("Create a new sandy plugin that wraps @spec");
     expect(next.mentions).toEqual([
-      { kind: "project", projectId: "p", label: "spec", from: 34, to: 39 },
+      { kind: "project", projectId: "p", label: "spec", from: 37, to: 42 },
     ]);
     expect(withCreatePluginPrompt({ ...draft, ...next })).toEqual(next);
   });

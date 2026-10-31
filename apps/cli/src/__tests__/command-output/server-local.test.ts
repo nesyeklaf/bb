@@ -474,10 +474,10 @@ describe("sandy server import", () => {
       ".config.json.lock",
       "attachments",
       "auth-secret",
-      "sandy.db",
       "config.json",
       "host-id",
       "plugins",
+      "sandy.db",
       "server-import.json",
     ]);
     expect(

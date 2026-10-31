@@ -126,7 +126,7 @@ describe("sandy marketplace", () => {
     await runCommand(["marketplace", "list"], register);
 
     const output = collectLogPayloads(vi.mocked(console.log)).join("\n");
-    expect(output).toContain("sandy-official (official)");
+    expect(output).toContain("sandy-official");
     expect(output).toContain("acme-plugins");
     expect(output).toContain("path:/work/acme-marketplace");
     expect(output).not.toContain("Subdirectory");

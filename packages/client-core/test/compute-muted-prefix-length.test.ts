@@ -17,14 +17,14 @@ describe("computeMutedPrefixLength", () => {
 
   it("eats \\n\\n after ] for block-form messages", () => {
     const text = "[sandy system]\n\nWelcome!";
-    expect(computeMutedPrefixLength("system", text)).toBe(13);
-    expect(text.slice(13)).toBe("Welcome!");
+    expect(computeMutedPrefixLength("system", text)).toBe(16);
+    expect(text.slice(16)).toBe("Welcome!");
   });
 
   it("eats a single space after ] for inline-form messages", () => {
     const text = "[sandy system] Thread completed.";
-    expect(computeMutedPrefixLength("system", text)).toBe(12);
-    expect(text.slice(12)).toBe("Thread completed.");
+    expect(computeMutedPrefixLength("system", text)).toBe(15);
+    expect(text.slice(15)).toBe("Thread completed.");
   });
 
   it("returns text.length when the entire text is the prefix", () => {

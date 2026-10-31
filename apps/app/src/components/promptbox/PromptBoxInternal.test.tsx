@@ -5689,7 +5689,7 @@ describe("ComposerBox prompt actions", () => {
       label: "sandy",
     } as const;
     const { changes, promptBoxRef } = renderPromptBox("fix @sandy", {
-      initialMentionRanges: [{ start: 4, end: 7, resource: project }],
+      initialMentionRanges: [{ start: 4, end: 10, resource: project }],
     });
 
     await focusPromptEnd(promptBoxRef);

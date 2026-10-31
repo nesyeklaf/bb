@@ -94,7 +94,7 @@ describe("bundled plugin SDK declarations", () => {
     }
     for (const content of declarations.slice(3)) {
       const sandyImports = [
-        ...content.matchAll(/from ['"](@(?:get-)?sandy\/[^'"]+)['"]/gu),
+        ...content.matchAll(/from ['"](@(?:sandy-sdk|sandy)\/[^'"]+)['"]/gu),
       ].map((match) => match[1]);
       expect(new Set(sandyImports)).toEqual(new Set(["@sandy-sdk/plugin-sdk"]));
       expect(content).not.toContain("@sandy/sdk");

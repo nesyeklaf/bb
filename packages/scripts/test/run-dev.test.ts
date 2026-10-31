@@ -306,9 +306,9 @@ describe("run-dev", () => {
       migratedEntries: [
         "attachments",
         "auth-secret",
+        "logs",
         "sandy.db",
         "sandy.db.backup-20260515-160305",
-        "logs",
       ],
     });
     await expect(

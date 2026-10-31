@@ -38,10 +38,10 @@ describe("fitPathMiddle", () => {
   });
 
   it("replaces whole middle segments with an ellipsis segment", () => {
-    expect(fitPathMiddle(path, 28, measure)).toBe(
+    expect(fitPathMiddle(path, 34, measure)).toBe(
       "~/.sandy/plugins/…/thr_abc-1/sandy",
     );
-    expect(fitPathMiddle(path, 22, measure)).toBe("~/.sandy/…/thr_abc-1/sandy");
+    expect(fitPathMiddle(path, 26, measure)).toBe("~/.sandy/…/thr_abc-1/sandy");
   });
 
   it("keeps only the last segment once only the root is left", () => {
@@ -59,7 +59,7 @@ describe("fitPathMiddle", () => {
     expect(fitPathMiddle("/tmp/qa/run/external-root", 20, measure)).toBe(
       "/tmp/…/external-root",
     );
-    expect(fitPathMiddle("C:\\Users\\me\\Code\\sandy", 12, measure)).toBe(
+    expect(fitPathMiddle("C:\\Users\\me\\Code\\sandy", 14, measure)).toBe(
       "C:\\…\\Code\\sandy",
     );
   });

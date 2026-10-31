@@ -54,7 +54,7 @@ describe("plugin marketplace author links", () => {
     expect(
       screen.getByRole("link", { name: "Pat Lee" }).getAttribute("href"),
     ).toBe(
-      "/plugins?category=security&author=12%3Asandy-community%3Agithub%3Apatlee",
+      "/plugins?category=security&author=15%3Asandy-community%3Agithub%3Apatlee",
     );
   });
 

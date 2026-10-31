@@ -104,7 +104,7 @@ describe("common config", () => {
         homeDir,
         repoRoot,
       }).SANDY_DATA_DIR,
-    ).toBe(path.normalize("/Users/tester/.sandy-dev/src-sandy-9039de53a76a"));
+    ).toBe(path.normalize("/Users/tester/.sandy-dev/src-sandy-d51679e46e2a"));
   });
 
   it("expands home-directory overrides for SANDY_DATA_DIR", () => {
@@ -191,7 +191,7 @@ describe("data-dir helpers", () => {
         mode: "dev",
         repoRoot,
       }),
-    ).toBe(path.normalize("/Users/tester/.sandy-dev/src-sandy-9039de53a76a"));
+    ).toBe(path.normalize("/Users/tester/.sandy-dev/src-sandy-d51679e46e2a"));
   });
 
   it("keeps the legacy fallback label for degenerate checkout labels", () => {

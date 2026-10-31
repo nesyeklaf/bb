@@ -42,7 +42,7 @@ describe("Cursor ACP session MCP approvals", () => {
         config: mcpConfig(),
         projectRoot: "/workspace/project",
       }),
-    ).toBe("sandy-bridge-d4709a3db84ddb48");
+    ).toBe("sandy-bridge-75f4c39ebe232993");
   });
 
   it("does not touch Cursor data for other ACP agents", async () => {

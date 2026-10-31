@@ -287,7 +287,7 @@ describe("push sender", () => {
       host.setThread({
         id: "thr_23456789ab",
         title:
-          "Compare sandy in-app terminal against Moshi, Termius, and Blink Shell",
+          "Compare sandy app terminal against Moshi, Termius, and Blink Shell",
       });
       const thread = host.setThread({ title: "Discord Dude" });
 
@@ -307,7 +307,7 @@ describe("push sender", () => {
       await vi.waitFor(() => expect(host.clientSignals()).toHaveLength(1));
       expect(host.clientSignals()[0]?.payload).toMatchObject({
         title: "Discord Dude",
-        body: "“Fix scroll jumps” fixed #4793 as 9579549809; thr_8quy6y32b5 and snake_case_name remain. Then see “Compare sandy in-app terminal against Mosh…”.",
+        body: "“Fix scroll jumps” fixed #4793 as 9579549809; thr_8quy6y32b5 and snake_case_name remain. Then see “Compare sandy app terminal against Mosh…”.",
       });
     } finally {
       await host.cleanup();
