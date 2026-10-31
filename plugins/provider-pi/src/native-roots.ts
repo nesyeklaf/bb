@@ -6,6 +6,7 @@ import {
   type ExperimentalNativeRootsResolveAnswer,
 } from "@get-bb/plugin-sdk/host";
 import { z } from "zod";
+import { resolvePiPackageSkillRoots } from "./pi-package-skills.js";
 
 export const PI_NATIVE_ROOTS_DECLARATION: Pick<
   PluginProviderDeclaration,
@@ -33,6 +34,7 @@ const DEFAULT_AGENT_DIR_SEGMENTS = [".pi", "agent"] as const;
 export interface ResolvePiNativeRootsArgs {
   homeDir: string;
   env: Readonly<Record<string, string | undefined>>;
+  cwd: string | null;
 }
 
 function resolvePiAgentDir(args: ResolvePiNativeRootsArgs): string {
@@ -57,6 +59,37 @@ function isPlainSkillSource(value: string): boolean {
 }
 
 export async function resolvePiNativeRoots(
+  args: ResolvePiNativeRootsArgs,
+): Promise<ExperimentalNativeRootsResolveAnswer> {
+  try {
+    const packageRoots = await resolvePiPackageSkillRoots({
+      cwd: args.cwd,
+      env: args.env,
+    });
+    return {
+      skills: experimental_filterResolvedNativeRoots(
+        {
+          skills: packageRoots.map((root) => ({
+            path: root.path,
+            origin: root.origin,
+            recursive: false,
+            shape: "skill" as const,
+          })),
+        },
+        { warn: console.warn },
+      ).answer.skills,
+    };
+  } catch (error) {
+    const reason = error instanceof Error ? error.message : String(error);
+    console.warn(
+      "pi native skill roots: Pi's own resolver was unavailable, falling back to settings.json skills: " +
+        reason,
+    );
+    return resolvePiSettingsNativeRoots(args);
+  }
+}
+
+async function resolvePiSettingsNativeRoots(
   args: ResolvePiNativeRootsArgs,
 ): Promise<ExperimentalNativeRootsResolveAnswer> {
   const agentDir = resolvePiAgentDir(args);
