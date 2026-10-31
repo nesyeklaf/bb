@@ -34,7 +34,22 @@ export async function readProcessIdentity(
   }
 }
 
-async function readWindowsProcess(pid: number) {
+const WINDOWS_READ_ATTEMPTS = 3;
+const WINDOWS_READ_TIMEOUT_MS = 10_000;
+
+async function readWindowsProcess(
+  pid: number,
+): Promise<ProcessIdentity | null> {
+  for (let attempt = 0; attempt < WINDOWS_READ_ATTEMPTS; attempt++) {
+    const identity = await readWindowsProcessOnce(pid);
+    if (identity !== null) return identity;
+  }
+  return null;
+}
+
+async function readWindowsProcessOnce(
+  pid: number,
+): Promise<ProcessIdentity | null> {
   try {
     const pending = execFileAsync(
       path.join(
@@ -57,7 +72,7 @@ async function readWindowsProcess(pid: number) {
       {
         encoding: "utf8",
         windowsHide: true,
-        timeout: 30_000,
+        timeout: WINDOWS_READ_TIMEOUT_MS,
         maxBuffer: 1024 * 1024,
       },
     );
