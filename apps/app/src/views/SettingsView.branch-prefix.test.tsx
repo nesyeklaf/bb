@@ -45,6 +45,8 @@ function renderSection(overrides?: {
       openLinksInAppBrowser={false}
       rewriteLocalhostLinks={false}
       steerActiveThreadOnEnter={false}
+      disabledSkillSources={[]}
+      onDisabledSkillSourcesChange={vi.fn()}
     />,
   );
 }

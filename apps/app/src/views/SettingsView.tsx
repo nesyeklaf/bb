@@ -19,6 +19,7 @@ import {
   experimentKeys,
   managedBranchPrefixSchema,
   type AppTheme,
+  type BbSkillSourceId,
   type ExperimentKey,
   type Experiments,
   type FaviconColorPreference,
@@ -192,6 +193,8 @@ interface GeneralSettingsSectionProps {
   openLinksInAppBrowser: boolean;
   rewriteLocalhostLinks: boolean;
   steerActiveThreadOnEnter: boolean;
+  disabledSkillSources: readonly BbSkillSourceId[];
+  onDisabledSkillSourcesChange: (disabledSources: BbSkillSourceId[]) => void;
 }
 
 interface PrivacySettingsSectionProps {
@@ -879,6 +882,8 @@ export function GeneralSettingsSection({
   openLinksInAppBrowser,
   rewriteLocalhostLinks,
   steerActiveThreadOnEnter,
+  disabledSkillSources,
+  onDisabledSkillSourcesChange,
 }: GeneralSettingsSectionProps) {
   const localhostRewriteDescription = localhostLinkRewriteDescription(
     typeof window === "undefined" ? undefined : window.location.hostname,
@@ -1002,7 +1007,11 @@ export function GeneralSettingsSection({
           </SettingsWithControl>
         </div>
       </SettingsSection>
-      <SkillSourcesSettings />
+      <SkillSourcesSettings
+        disabled={generalSettingsDisabled}
+        disabledSources={disabledSkillSources}
+        onDisabledSourcesChange={onDisabledSkillSourcesChange}
+      />
 
       <SettingsSection title="Links">
         <div className="space-y-5">
@@ -1465,6 +1474,12 @@ export function SettingsView() {
           openLinksInAppBrowser={openLinksInAppBrowser}
           rewriteLocalhostLinks={rewriteLocalhostLinks}
           steerActiveThreadOnEnter={generalSettings.steerActiveThreadOnEnter}
+          disabledSkillSources={generalSettings.disabledSkillSources}
+          onDisabledSkillSourcesChange={(disabledSources) =>
+            updateGeneralSettingsMutation.mutate({
+              disabledSkillSources: disabledSources,
+            })
+          }
           terminalCopyOnSelect={generalSettings.terminalCopyOnSelect}
           onTerminalCopyOnSelectChange={(enabled) =>
             updateGeneralSettingsMutation.mutate({

@@ -1,17 +1,9 @@
-import { useQueryClient } from "@tanstack/react-query";
-import {
-  BB_SKILL_SOURCE_IDS,
-  defaultAppSettings,
-  type BbSkillSourceId,
-} from "@bb/domain";
+import { BB_SKILL_SOURCE_IDS, type BbSkillSourceId } from "@bb/domain";
 import { Switch } from "@bb/shared-ui/switch";
 import {
   SettingsSection,
   SettingsWithControl,
 } from "@/components/ui/settings-section.js";
-import { invalidateAllProjectSkillsQueries } from "@/hooks/cache-owners/skills-cache-effects";
-import { useUpdateGeneralSettings } from "@/hooks/mutations/settings-mutations";
-import { useSystemConfig } from "@/hooks/queries/system-queries";
 
 const SKILL_SOURCE_COPY: Readonly<
   Record<BbSkillSourceId, { label: string; description: string }>
@@ -36,23 +28,20 @@ const SKILL_SOURCE_COPY: Readonly<
   },
 };
 
-export function SkillSourcesSettings() {
-  const queryClient = useQueryClient();
-  const systemConfigQuery = useSystemConfig();
-  const updateGeneralSettings = useUpdateGeneralSettings();
-  const disabledSources =
-    systemConfigQuery.data?.generalSettings.disabledSkillSources ??
-    defaultAppSettings.disabledSkillSources;
+export function SkillSourcesSettings({
+  disabled,
+  disabledSources,
+  onDisabledSourcesChange,
+}: {
+  disabled: boolean;
+  disabledSources: readonly BbSkillSourceId[];
+  onDisabledSourcesChange: (disabledSources: BbSkillSourceId[]) => void;
+}) {
   const setSourceEnabled = (source: BbSkillSourceId, enabled: boolean) => {
-    updateGeneralSettings.mutate(
-      {
-        disabledSkillSources: BB_SKILL_SOURCE_IDS.filter((id) =>
-          id === source ? !enabled : disabledSources.includes(id),
-        ),
-      },
-      {
-        onSuccess: () => invalidateAllProjectSkillsQueries({ queryClient }),
-      },
+    onDisabledSourcesChange(
+      BB_SKILL_SOURCE_IDS.filter((id) =>
+        id === source ? !enabled : disabledSources.includes(id),
+      ),
     );
   };
   return (
@@ -71,7 +60,7 @@ export function SkillSourcesSettings() {
           >
             <Switch
               checked={!disabledSources.includes(source)}
-              disabled={systemConfigQuery.data === undefined}
+              disabled={disabled}
               onCheckedChange={(enabled) => setSourceEnabled(source, enabled)}
               aria-label={SKILL_SOURCE_COPY[source].label}
             />
