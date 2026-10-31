@@ -14,9 +14,8 @@ const RESOLVE_MAX_BUFFER = 16 * 1024 * 1024;
 const RESOLVER_SCRIPT = `
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
-const [pkgDir, workspace] = process.argv.slice(1);
+const [pkgDir, agentDir, workspace] = process.argv.slice(1);
 const m = await import(pathToFileURL(join(pkgDir, "dist/index.js")).href);
-const agentDir = m.getAgentDir();
 const cwd = workspace || agentDir;
 const settingsManager = m.SettingsManager.create(cwd, agentDir, { projectTrusted: Boolean(workspace) });
 const packageManager = new m.DefaultPackageManager({ cwd, agentDir, settingsManager });
@@ -49,6 +48,8 @@ export interface PiPackageSkillRoot {
 
 export interface PiPackageSkillsArgs {
   cwd: string | null;
+  homeDir: string;
+  agentDir: string;
   env: Readonly<Record<string, string | undefined>>;
 }
 
@@ -131,13 +132,25 @@ function locatePiPackageDir(
 export async function resolvePiPackageSkillRoots(
   args: PiPackageSkillsArgs,
 ): Promise<PiPackageSkillRoot[]> {
-  const env: NodeJS.ProcessEnv = { ...args.env };
+  const env: NodeJS.ProcessEnv = {
+    ...args.env,
+    HOME: args.homeDir,
+    USERPROFILE: args.homeDir,
+    PI_CODING_AGENT_DIR: args.agentDir,
+  };
   const cwd = args.cwd ?? undefined;
   const packageDir = locatePiPackageDir(env, cwd);
   const node = hostToolchain.resolve("node", { env, cwd }) ?? "node";
   const { stdout } = await execHostFile(
     node,
-    ["--input-type=module", "-e", RESOLVER_SCRIPT, packageDir, args.cwd ?? ""],
+    [
+      "--input-type=module",
+      "-e",
+      RESOLVER_SCRIPT,
+      packageDir,
+      args.agentDir,
+      args.cwd ?? "",
+    ],
     {
       env,
       cwd,
@@ -150,7 +163,7 @@ export async function resolvePiPackageSkillRoots(
   for (const skill of skills) {
     if (
       !skill.enabled ||
-      skill.source === "auto" ||
+      skill.origin !== "package" ||
       path.basename(skill.path) !== "SKILL.md"
     ) {
       continue;

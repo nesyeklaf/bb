@@ -119,9 +119,6 @@ it("never answers a root the contract would refuse", async () => {
 
 const FAKE_PI_INDEX = `
 import { writeFileSync } from "node:fs";
-export function getAgentDir() {
-  return process.env.FAKE_PI_AGENT_DIR;
-}
 export const SettingsManager = {
   create(cwd, agentDir, options) {
     if (process.env.FAKE_PI_RECORD) {
@@ -200,14 +197,13 @@ function fakePiEnv(
 ): Record<string, string | undefined> {
   return {
     PATH: fake.binDir,
-    FAKE_PI_AGENT_DIR: join(homeDir, ".pi", "agent"),
     FAKE_PI_RECORD: fake.record,
     FAKE_PI_SKILLS: JSON.stringify(skills),
     ...extra,
   };
 }
 
-it("answers the skills Pi itself resolved, one skill root each, and drops disabled and auto entries", async () => {
+it("answers the package skills Pi itself resolved, one skill root each, and drops disabled and top-level entries", async () => {
   const fake = installFakePi();
   const env = fakePiEnv(fake, [
     { path: join(fake.skillsDir, "b-skill", "SKILL.md") },
@@ -217,6 +213,11 @@ it("answers the skills Pi itself resolved, one skill root each, and drops disabl
     {
       path: join(homeDir, ".agents", "skills", "auto", "SKILL.md"),
       source: "auto",
+      origin: "top-level",
+    },
+    {
+      path: join(homeDir, ".pi", "agent", "skills", "listed", "SKILL.md"),
+      source: "local",
       origin: "top-level",
     },
     { path: join(fake.skillsDir, "notes.md") },
@@ -266,6 +267,41 @@ it("answers the skills Pi itself resolved, one skill root each, and drops disabl
     cwd: join(homeDir, "work"),
     agentDir: join(homeDir, ".pi", "agent"),
     options: { projectTrusted: true },
+  });
+});
+
+it("adds Pi's package skills to the settings.json skill roots", async () => {
+  const fake = installFakePi();
+  writeSettings(join(homeDir, ".pi", "agent"), {
+    skills: ["/opt/team-skills", "npm:@acme/skills"],
+  });
+  const env = fakePiEnv(fake, [
+    { path: join(fake.skillsDir, "a-skill", "SKILL.md") },
+  ]);
+  const answer = await resolvePiNativeRoots({ homeDir, env, cwd: null });
+  expect(
+    experimental_nativeRootsResolveOutputSchema
+      .parse(answer)
+      .skills.map(({ path, shape }) => ({ path, shape })),
+  ).toEqual([
+    { path: resolve("/opt/team-skills"), shape: "skills" },
+    { path: join(fake.skillsDir, "a-skill"), shape: "skill" },
+  ]);
+  expect(console.warn).not.toHaveBeenCalled();
+});
+
+it("hands Pi the agent dir and home bb resolved, not the daemon's own", async () => {
+  const fake = installFakePi();
+  const agentDir = join(homeDir, "moved-agent");
+  const env = fakePiEnv(fake, [], {
+    PI_CODING_AGENT_DIR: agentDir,
+    HOME: "/nonexistent/daemon-home",
+  });
+  await resolvePiNativeRoots({ homeDir, env, cwd: null });
+  expect(JSON.parse(readFileSync(fake.record, "utf8"))).toEqual({
+    cwd: agentDir,
+    agentDir,
+    options: { projectTrusted: false },
   });
 });
 
