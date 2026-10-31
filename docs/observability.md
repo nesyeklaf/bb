@@ -44,13 +44,16 @@ docker compose -f ops/observability/compose.yaml up -d
   - One plugin: `{service_name="bb-server"} | pluginId="<id>"`.
   - Slow or failing requests: Explore → Tempo, service `bb-server`; Prometheus, `http_server_request_duration_seconds_count`.
 
-## Errors dashboard
+## Dashboards
 
-The compose file provisions the dashboard `ops/observability/grafana/dashboards/bb-errors.json` into the Grafana folder `bb` as "bb errors". It is read-only in Grafana: edit the JSON, and Grafana reloads it within 30 seconds.
+The compose file provisions every JSON file in `ops/observability/grafana/dashboards/` into the Grafana folder `bb`. The dashboards are read-only in Grafana: edit the JSON, and Grafana reloads it within 30 seconds. Each dashboard links to the others through the "bb dashboards" menu, which keeps the time range.
 
-- Totals for the selected range: errors, warnings, server 5xx responses, web app errors, plugin errors and rejected daemon sessions.
-- Errors and warnings over time per service, and 5xx responses per route.
-- The most frequent error messages, server error responses by error code, and plugin errors and warnings by `pluginId`.
-- The latest failed traces from Tempo, the error log, and the web app errors.
+| Dashboard              | uid            | Shows                                                                                                                                                                                                                                         |
+| ---------------------- | -------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| bb errors              | `bb-errors`    | Error and warning totals, 5xx responses per route, the most frequent error messages, error responses by code, plugin errors, failed traces, the error log and web app errors. The `service` variable narrows the log panels to one component. |
+| bb API performance     | `bb-api`       | Request rate by status class, latency percentiles, the busiest and slowest routes, a per-route table and all non-2xx responses. Event streams stay open by design and are left out of the latency panels.                                     |
+| bb host RPC and traces | `bb-host-rpc`  | Calls from the server to host daemons per method from the span metrics: rate, failures and p95 latency, the server to daemon edge of the service graph, the service map, and slow or failed host RPC traces.                                  |
+| bb plugins             | `bb-plugins`   | Log lines, warnings and errors per `pluginId`, host plugin worker events, plugin RPC latency and status codes, and the plugin log.                                                                                                            |
+| bb telemetry pipeline  | `bb-telemetry` | What the collector receives and exports per signal, refused or failed data, exporter queues, log volume per service and collector memory. Use it when a dashboard looks empty.                                                                |
 
-The `service` variable at the top narrows the log panels to one component.
+The host RPC dashboard counts calls the server sends. Calls to daemons that export to a different collector, or none, appear only on the server side.

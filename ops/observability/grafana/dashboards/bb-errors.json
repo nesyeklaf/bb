@@ -41,7 +41,16 @@
   "annotations": {
     "list": []
   },
-  "links": [],
+  "links": [
+    {
+      "type": "dashboards",
+      "tags": ["bb"],
+      "asDropdown": true,
+      "title": "bb dashboards",
+      "includeVars": false,
+      "keepTime": true
+    }
+  ],
   "panels": [
     {
       "id": 1,
