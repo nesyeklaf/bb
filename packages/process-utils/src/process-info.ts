@@ -78,6 +78,7 @@ async function readWindowsProcessOnce(
     );
     pending.child.stdin?.end();
     const { stdout } = await pending;
+    process.stderr.write(`DIAG stdout ${stdout}\n`);
     const value: unknown = JSON.parse(stdout);
     if (
       typeof value !== "object" ||
@@ -90,7 +91,8 @@ async function readWindowsProcessOnce(
     )
       return null;
     return { command: value.command, startedAt: value.startedAt };
-  } catch {
+  } catch (error) {
+    process.stderr.write(`DIAG readWindowsProcessOnce ${String(error)} ${JSON.stringify(error)}\n`);
     return null;
   }
 }
