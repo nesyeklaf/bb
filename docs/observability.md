@@ -43,3 +43,14 @@ docker compose -f ops/observability/compose.yaml up -d
   - Web app errors: `{service_name="bb-server"} |= "Client error"`.
   - One plugin: `{service_name="bb-server"} | pluginId="<id>"`.
   - Slow or failing requests: Explore → Tempo, service `bb-server`; Prometheus, `http_server_request_duration_seconds_count`.
+
+## Errors dashboard
+
+The compose file provisions the dashboard `ops/observability/grafana/dashboards/bb-errors.json` into the Grafana folder `bb` as "bb errors". It is read-only in Grafana: edit the JSON, and Grafana reloads it within 30 seconds.
+
+- Totals for the selected range: errors, warnings, server 5xx responses, web app errors, plugin errors and rejected daemon sessions.
+- Errors and warnings over time per service, and 5xx responses per route.
+- The most frequent error messages, server error responses by error code, and plugin errors and warnings by `pluginId`.
+- The latest failed traces from Tempo, the error log, and the web app errors.
+
+The `service` variable at the top narrows the log panels to one component.
