@@ -1172,9 +1172,9 @@ function stageQueuedMessageGroups(
 ): void {
   const sqlite = db.$client;
   sqlite.exec(
-    "CREATE TEMP TABLE IF NOT EXISTS sandy_migration_queued_message_groups (id TEXT PRIMARY KEY, group_with_next INTEGER NOT NULL)",
+    "CREATE TEMP TABLE IF NOT EXISTS bb_migration_queued_message_groups (id TEXT PRIMARY KEY, group_with_next INTEGER NOT NULL)",
   );
-  sqlite.exec("DELETE FROM sandy_migration_queued_message_groups");
+  sqlite.exec("DELETE FROM bb_migration_queued_message_groups");
   if (
     !tableExists(db, "__drizzle_migrations") ||
     !tableExists(db, "queued_thread_messages") ||
@@ -1190,7 +1190,7 @@ function stageQueuedMessageGroups(
     return;
   }
   sqlite.exec(
-    "INSERT INTO sandy_migration_queued_message_groups (id, group_with_next) SELECT id, group_with_next FROM queued_thread_messages",
+    "INSERT INTO bb_migration_queued_message_groups (id, group_with_next) SELECT id, group_with_next FROM queued_thread_messages",
   );
 }
 
@@ -1418,26 +1418,26 @@ export function migrate(db: DbConnection, options: MigrateOptions = {}): void {
     db.$client.prepare("SELECT 1 FROM __drizzle_migrations LIMIT 1").get() !==
       undefined;
   sqlite.exec(
-    "CREATE TEMP TABLE IF NOT EXISTS sandy_migration_existing_installation (existing INTEGER NOT NULL)",
+    "CREATE TEMP TABLE IF NOT EXISTS bb_migration_existing_installation (existing INTEGER NOT NULL)",
   );
-  sqlite.exec("DELETE FROM sandy_migration_existing_installation");
+  sqlite.exec("DELETE FROM bb_migration_existing_installation");
   sqlite
     .prepare(
-      "INSERT INTO sandy_migration_existing_installation (existing) VALUES (?)",
+      "INSERT INTO bb_migration_existing_installation (existing) VALUES (?)",
     )
     .run(existingInstallation ? 1 : 0);
 
   sqlite.exec(
-    "CREATE TEMP TABLE IF NOT EXISTS sandy_migration_local_host (id TEXT PRIMARY KEY)",
+    "CREATE TEMP TABLE IF NOT EXISTS bb_migration_local_host (id TEXT PRIMARY KEY)",
   );
-  sqlite.exec("DELETE FROM sandy_migration_local_host");
+  sqlite.exec("DELETE FROM bb_migration_local_host");
   if (sqlite.name !== ":memory:") {
     const identityPath = join(dirname(sqlite.name), "host-id");
     if (existsSync(identityPath)) {
       const hostId = readFileSync(identityPath, "utf8").trim();
       if (hostId)
         sqlite
-          .prepare("INSERT INTO sandy_migration_local_host (id) VALUES (?)")
+          .prepare("INSERT INTO bb_migration_local_host (id) VALUES (?)")
           .run(hostId);
     }
   }

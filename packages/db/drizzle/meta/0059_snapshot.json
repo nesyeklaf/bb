@@ -2003,8 +2003,8 @@
           "notNull": true,
           "autoincrement": false
         },
-        "sandy_connect": {
-          "name": "sandy_connect",
+        "bb_connect": {
+          "name": "bb_connect",
           "type": "integer",
           "primaryKey": false,
           "notNull": true,

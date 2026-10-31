@@ -2229,8 +2229,8 @@
           "notNull": false,
           "autoincrement": false
         },
-        "rollback_sandy_version": {
-          "name": "rollback_sandy_version",
+        "rollback_bb_version": {
+          "name": "rollback_bb_version",
           "type": "text",
           "primaryKey": false,
           "notNull": false,
