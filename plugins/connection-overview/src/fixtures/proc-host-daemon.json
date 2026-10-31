@@ -1,0 +1,432 @@
+{
+ "rootPid": 1798293,
+ "procs": {
+  "1798293": {
+   "stat": "1798293 (node-MainThread) S 1798205 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 18806569 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0",
+   "cmdline": "node\u0000--use-system-ca\u0000--use-env-proxy\u0000daemon-bundle.mjs\u0000",
+   "netns": "net:[4026531840]",
+   "fds": [
+    "socket:[21970783]",
+    "socket:[21970784]",
+    "socket:[21970787]",
+    "socket:[23856130]",
+    "socket:[24421798]",
+    "socket:[21970790]",
+    "socket:[23856132]",
+    "socket:[24455143]",
+    "socket:[24423416]",
+    "socket:[21992165]",
+    "socket:[24469742]",
+    "socket:[24423418]",
+    "socket:[21992167]",
+    "socket:[24465501]",
+    "socket:[24423420]",
+    "socket:[24465508]",
+    "socket:[24455145]",
+    "socket:[24465503]",
+    "socket:[24465515]",
+    "socket:[24465505]",
+    "socket:[24465510]",
+    "socket:[24465522]",
+    "socket:[24465512]",
+    "socket:[24389541]",
+    "socket:[23863943]",
+    "socket:[23880465]",
+    "socket:[24465517]",
+    "socket:[24465529]",
+    "socket:[24406550]",
+    "socket:[24465519]",
+    "socket:[24389543]",
+    "socket:[23880467]",
+    "socket:[24423744]",
+    "socket:[21976607]",
+    "socket:[24406552]",
+    "socket:[23880469]",
+    "socket:[21976609]",
+    "socket:[24421800]",
+    "socket:[24399528]",
+    "socket:[24465524]",
+    "socket:[23863945]",
+    "socket:[24399530]",
+    "socket:[24423746]",
+    "socket:[24465526]",
+    "socket:[24465531]",
+    "socket:[24423748]",
+    "socket:[24470824]",
+    "socket:[24465533]",
+    "socket:[24470831]",
+    "socket:[24470826]",
+    "socket:[24470838]",
+    "socket:[24470828]",
+    "socket:[24470833]",
+    "socket:[24470835]",
+    "socket:[24470840]",
+    "socket:[24470842]"
+   ]
+  },
+  "1798328": {
+   "stat": "1798328 (node-MainThread) S 1798293 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 18806604 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0",
+   "cmdline": "node\u0000--use-system-ca\u0000--use-env-proxy\u0000bb-parcel-watcher-child.mjs\u0000",
+   "netns": "net:[4026531840]",
+   "fds": [
+    "socket:[21970785]"
+   ]
+  },
+  "1798340": {
+   "stat": "1798340 (sh) Z 1798328 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 18806609 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0",
+   "cmdline": null,
+   "netns": null,
+   "fds": null
+  },
+  "1798915": {
+   "stat": "1798915 (node-MainThread) S 1798293 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 18807592 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0",
+   "cmdline": "node\u0000--use-system-ca\u0000--use-env-proxy\u0000bb-plugin-host-worker.mjs\u0000host.mjs\u0000<arg>\u0000<arg>\u0000<arg>\u0000<arg>\u0000",
+   "netns": "net:[4026531840]",
+   "fds": [
+    "socket:[21976608]",
+    "socket:[21976610]"
+   ]
+  },
+  "1803809": {
+   "stat": "1803809 (node-MainThread) S 1798293 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 18836581 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0",
+   "cmdline": "node\u0000--use-system-ca\u0000--use-env-proxy\u0000bb-plugin-host-worker.mjs\u0000host.mjs\u0000<arg>\u0000<arg>\u0000<arg>\u0000<arg>\u0000",
+   "netns": "net:[4026531840]",
+   "fds": [
+    "socket:[21992166]",
+    "socket:[21992168]"
+   ]
+  },
+  "2310758": {
+   "stat": "2310758 (node-MainThread) S 1798293 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 21626868 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0",
+   "cmdline": "node\u0000--use-system-ca\u0000--use-env-proxy\u0000bb-plugin-host-worker.mjs\u0000host.mjs\u0000<arg>\u0000<arg>\u0000<arg>\u0000<arg>\u0000",
+   "netns": "net:[4026531840]",
+   "fds": [
+    "socket:[23856131]",
+    "socket:[23856133]"
+   ]
+  },
+  "2313222": {
+   "stat": "2313222 (node-MainThread) S 1798293 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 21637147 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0",
+   "cmdline": "node\u0000--use-system-ca\u0000--use-env-proxy\u0000bb-plugin-host-worker.mjs\u0000host.mjs\u0000<arg>\u0000<arg>\u0000<arg>\u0000<arg>\u0000",
+   "netns": "net:[4026531840]",
+   "fds": [
+    "socket:[23863944]",
+    "socket:[23863946]"
+   ]
+  },
+  "2318658": {
+   "stat": "2318658 (node-MainThread) S 1798293 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 21663364 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0",
+   "cmdline": "node\u0000--use-system-ca\u0000--use-env-proxy\u0000bb-provider-bridge-worker.mjs\u0000host.mjs\u0000<arg>\u0000<arg>\u0000",
+   "netns": "net:[4026531840]",
+   "fds": [
+    "socket:[23880466]",
+    "socket:[23880468]",
+    "socket:[23880470]",
+    "socket:[23888914]",
+    "socket:[23888916]",
+    "socket:[23888918]",
+    "socket:[23888920]",
+    "socket:[23888922]"
+   ]
+  },
+  "2318681": {
+   "stat": "2318681 (pi) S 2318658 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 21663456 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0",
+   "cmdline": null,
+   "netns": "net:[4026531840]",
+   "fds": [
+    "socket:[23888915]",
+    "socket:[23888917]",
+    "socket:[23888919]",
+    "socket:[24427195]",
+    "socket:[23888921]",
+    "socket:[24427197]",
+    "socket:[23888923]"
+   ]
+  },
+  "2476056": {
+   "stat": "2476056 (node-MainThread) S 1798293 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 21792005 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0",
+   "cmdline": "node\u0000--use-system-ca\u0000--use-env-proxy\u0000bb-plugin-host-worker.mjs\u0000host.mjs\u0000<arg>\u0000<arg>\u0000<arg>\u0000<arg>\u0000",
+   "netns": "net:[4026531840]",
+   "fds": [
+    "socket:[24389542]",
+    "socket:[24389544]"
+   ]
+  },
+  "2477476": {
+   "stat": "2477476 (node-MainThread) S 1798293 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 21797581 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0",
+   "cmdline": "node\u0000--use-system-ca\u0000--use-env-proxy\u0000bb-plugin-host-worker.mjs\u0000host.mjs\u0000<arg>\u0000<arg>\u0000<arg>\u0000<arg>\u0000",
+   "netns": "net:[4026531840]",
+   "fds": [
+    "socket:[24399529]",
+    "socket:[24399531]"
+   ]
+  },
+  "2479048": {
+   "stat": "2479048 (node-MainThread) S 1798293 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 21803207 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0",
+   "cmdline": "node\u0000--use-system-ca\u0000--use-env-proxy\u0000bb-plugin-host-worker.mjs\u0000host.mjs\u0000<arg>\u0000<arg>\u0000<arg>\u0000<arg>\u0000",
+   "netns": "net:[4026531840]",
+   "fds": [
+    "socket:[24406551]",
+    "socket:[24406553]"
+   ]
+  },
+  "2481568": {
+   "stat": "2481568 (node-MainThread) S 1798293 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 21813011 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0",
+   "cmdline": "node\u0000--use-system-ca\u0000--use-env-proxy\u0000bb-plugin-host-worker.mjs\u0000host.mjs\u0000<arg>\u0000<arg>\u0000<arg>\u0000<arg>\u0000",
+   "netns": "net:[4026531840]",
+   "fds": [
+    "socket:[24421799]",
+    "socket:[24421801]"
+   ]
+  },
+  "2482352": {
+   "stat": "2482352 (node-MainThread) S 1798293 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 21814201 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0",
+   "cmdline": "node\u0000--use-system-ca\u0000--use-env-proxy\u0000bb-provider-bridge-worker.mjs\u0000host.mjs\u0000<arg>\u0000<arg>\u0000",
+   "netns": "net:[4026531840]",
+   "fds": [
+    "socket:[24423745]",
+    "socket:[24423747]",
+    "socket:[24423749]",
+    "socket:[24417164]",
+    "socket:[24417180]",
+    "socket:[24417166]",
+    "socket:[24417168]",
+    "socket:[24417182]",
+    "socket:[24417170]",
+    "socket:[24417172]",
+    "socket:[24417184]",
+    "socket:[24417186]",
+    "socket:[24417188]"
+   ]
+  },
+  "2482364": {
+   "stat": "2482364 (pi) S 2482352 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 21814217 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0",
+   "cmdline": null,
+   "netns": "net:[4026531840]",
+   "fds": [
+    "socket:[24417165]",
+    "socket:[24417167]",
+    "socket:[24417169]",
+    "socket:[24417171]",
+    "socket:[24417173]"
+   ]
+  },
+  "2482379": {
+   "stat": "2482379 (pi) S 2482352 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 21814283 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0",
+   "cmdline": null,
+   "netns": "net:[4026531840]",
+   "fds": [
+    "socket:[24417181]",
+    "socket:[24417183]",
+    "socket:[24417185]",
+    "socket:[24417187]",
+    "socket:[24419126]",
+    "socket:[24419128]",
+    "socket:[24417189]"
+   ]
+  },
+  "2482858": {
+   "stat": "2482858 (bash) S 2482379 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 21816589 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0",
+   "cmdline": null,
+   "netns": "net:[4026531840]",
+   "fds": [
+    "socket:[24419127]",
+    "socket:[24419129]"
+   ]
+  },
+  "2482859": {
+   "stat": "2482859 (find) R 2482858 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 21816589 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0",
+   "cmdline": null,
+   "netns": "net:[4026531840]",
+   "fds": []
+  },
+  "2482860": {
+   "stat": "2482860 (head) S 2482858 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 21816589 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0",
+   "cmdline": null,
+   "netns": "net:[4026531840]",
+   "fds": [
+    "socket:[24419127]",
+    "socket:[24419129]"
+   ]
+  },
+  "2484765": {
+   "stat": "2484765 (bash) S 2318681 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 21825664 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0",
+   "cmdline": null,
+   "netns": "net:[4026531840]",
+   "fds": [
+    "socket:[24427196]",
+    "socket:[24427198]"
+   ]
+  },
+  "2484880": {
+   "stat": "2484880 (node-MainThread) S 1798293 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 21825737 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0",
+   "cmdline": "node\u0000--use-system-ca\u0000--use-env-proxy\u0000bb-provider-bridge-worker.mjs\u0000host.mjs\u0000<arg>\u0000<arg>\u0000",
+   "netns": "net:[4026531840]",
+   "fds": [
+    "socket:[24423417]",
+    "socket:[24423419]",
+    "socket:[24423421]",
+    "socket:[24431036]",
+    "socket:[24431056]",
+    "socket:[24431038]",
+    "socket:[24431040]",
+    "socket:[24431058]",
+    "socket:[24431042]",
+    "socket:[24431044]",
+    "socket:[24431060]",
+    "socket:[24431062]",
+    "socket:[24431064]"
+   ]
+  },
+  "2484904": {
+   "stat": "2484904 (pi) S 2484880 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 21825752 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0",
+   "cmdline": null,
+   "netns": "net:[4026531840]",
+   "fds": [
+    "socket:[24431037]",
+    "socket:[24431039]",
+    "socket:[24431041]",
+    "socket:[24431043]",
+    "socket:[24431045]"
+   ]
+  },
+  "2484939": {
+   "stat": "2484939 (pi) S 2484880 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 21825819 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0",
+   "cmdline": null,
+   "netns": "net:[4026531840]",
+   "fds": [
+    "socket:[24431057]",
+    "socket:[24431059]",
+    "socket:[24431061]",
+    "socket:[24462770]",
+    "socket:[24467257]",
+    "socket:[24431063]",
+    "socket:[24431065]"
+   ]
+  },
+  "2493155": {
+   "stat": "2493155 (node-MainThread) S 1798293 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 21838713 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0",
+   "cmdline": "node\u0000--use-system-ca\u0000--use-env-proxy\u0000bb-provider-bridge-worker.mjs\u0000host.mjs\u0000<arg>\u0000<arg>\u0000",
+   "netns": "net:[4026531840]",
+   "fds": [
+    "socket:[24465502]",
+    "socket:[24465504]",
+    "socket:[24465506]"
+   ]
+  },
+  "2493156": {
+   "stat": "2493156 (node-MainThread) S 1798293 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 21838714 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0",
+   "cmdline": "node\u0000--use-system-ca\u0000--use-env-proxy\u0000bb-provider-bridge-worker.mjs\u0000host.mjs\u0000<arg>\u0000<arg>\u0000",
+   "netns": "net:[4026531840]",
+   "fds": [
+    "socket:[24465509]",
+    "socket:[24465511]",
+    "socket:[24465513]"
+   ]
+  },
+  "2493162": {
+   "stat": "2493162 (node-MainThread) S 1798293 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 21838714 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0",
+   "cmdline": "node\u0000--use-system-ca\u0000--use-env-proxy\u0000bb-provider-bridge-worker.mjs\u0000host.mjs\u0000<arg>\u0000<arg>\u0000",
+   "netns": "net:[4026531840]",
+   "fds": [
+    "socket:[24465516]",
+    "socket:[24465518]",
+    "socket:[24465520]"
+   ]
+  },
+  "2493163": {
+   "stat": "2493163 (node-MainThread) S 1798293 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 21838714 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0",
+   "cmdline": "node\u0000--use-system-ca\u0000--use-env-proxy\u0000bb-provider-bridge-worker.mjs\u0000host.mjs\u0000<arg>\u0000<arg>\u0000",
+   "netns": "net:[4026531840]",
+   "fds": [
+    "socket:[24465523]",
+    "socket:[24465525]",
+    "socket:[24465527]"
+   ]
+  },
+  "2493174": {
+   "stat": "2493174 (node-MainThread) S 1798293 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 21838715 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0",
+   "cmdline": "node\u0000--use-system-ca\u0000--use-env-proxy\u0000bb-provider-bridge-worker.mjs\u0000host.mjs\u0000<arg>\u0000<arg>\u0000",
+   "netns": "net:[4026531840]",
+   "fds": [
+    "socket:[24465530]",
+    "socket:[24465532]",
+    "socket:[24465534]",
+    "socket:[24462614]",
+    "socket:[24462616]",
+    "socket:[24462618]",
+    "socket:[24462620]",
+    "socket:[24462622]"
+   ]
+  },
+  "2493296": {
+   "stat": "2493296 (pi) S 2493174 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 21838758 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0",
+   "cmdline": null,
+   "netns": "net:[4026531840]",
+   "fds": [
+    "socket:[24462615]",
+    "socket:[24462617]",
+    "socket:[24462619]",
+    "socket:[24462621]",
+    "socket:[24462623]"
+   ]
+  },
+  "2493891": {
+   "stat": "2493891 (node-MainThread) S 1798293 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 21839651 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0",
+   "cmdline": "node\u0000--use-system-ca\u0000--use-env-proxy\u0000bb-plugin-host-worker.mjs\u0000host.mjs\u0000<arg>\u0000<arg>\u0000<arg>\u0000<arg>\u0000",
+   "netns": "net:[4026531840]",
+   "fds": [
+    "socket:[24455144]",
+    "socket:[24455146]"
+   ]
+  },
+  "2495974": {
+   "stat": "2495974 (node-MainThread) S 1798293 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 21842979 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0",
+   "cmdline": "node\u0000--use-system-ca\u0000--use-env-proxy\u0000bb-provider-bridge-worker.mjs\u0000host.mjs\u0000<arg>\u0000<arg>\u0000",
+   "netns": "net:[4026531840]",
+   "fds": [
+    "socket:[24470825]",
+    "socket:[24470827]",
+    "socket:[24470829]",
+    "socket:[24473631]"
+   ]
+  },
+  "2495975": {
+   "stat": "2495975 (node-MainThread) S 1798293 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 21842979 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0",
+   "cmdline": "node\u0000--use-system-ca\u0000--use-env-proxy\u0000bb-provider-bridge-worker.mjs\u0000host.mjs\u0000<arg>\u0000<arg>\u0000",
+   "netns": "net:[4026531840]",
+   "fds": [
+    "socket:[24470832]",
+    "socket:[24470834]",
+    "socket:[24470836]",
+    "socket:[24466000]"
+   ]
+  },
+  "2495982": {
+   "stat": "2495982 (node-MainThread) S 1798293 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 21842980 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0",
+   "cmdline": "node\u0000--use-system-ca\u0000--use-env-proxy\u0000bb-provider-bridge-worker.mjs\u0000host.mjs\u0000<arg>\u0000<arg>\u0000",
+   "netns": "net:[4026531840]",
+   "fds": [
+    "socket:[24470839]",
+    "socket:[24470841]",
+    "socket:[24470843]"
+   ]
+  },
+  "2496065": {
+   "stat": "2496065 (node-MainThread) R 2484765 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 21843034 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0",
+   "cmdline": "node\u0000capture-proc-fixture.mjs\u0000<arg>\u0000<arg>\u0000",
+   "netns": "net:[4026531840]",
+   "fds": [
+    "socket:[24427198]"
+   ]
+  }
+ },
+ "net": {
+  "1798293": {
+   "tcp": "  sl  local_address rem_address   st tx_queue rx_queue tr tm->when retrnsmt   uid  timeout inode                                                     \n   0: 0100007F:97E8 00000000:0000 0A 00000000:00000000 00:00000000 00000000 1000 0 21970787 1 0000000000000000 100 0 0 10 0\n   1: 0100007F:8615 00000000:0000 0A 00000000:00000000 00:00000000 00000000 1000 0 21970783 1 0000000000000000 100 0 0 10 0\n   2: 0100007F:AA32 0100007F:97E6 01 00000000:00000000 02:00001296 00000000 1000 0 24469742 2 0000000000000000 20 4 22 10 -1\n   3: 0100007F:DE2A 0100007F:97E6 01 00000000:00000000 00:00000000 00000000 1000 0 21970790 2 0000000000000000 21 4 31 10 49\n",
+   "tcp6": "  sl  local_address                         remote_address                        st tx_queue rx_queue tr tm->when retrnsmt   uid  timeout inode\n   0: B80D0120000000000000000001000000:9C50 B80D0120000000000000000002000000:01BB 01 00000000:00000000 02:00000C8C 00000000 1000 0 24462770 3 0000000000000000 20 4 0 49 -1\n   1: B80D0120000000000000000001000000:A558 B80D0120000000000000000003000000:01BB 01 00000000:00000000 02:00001749 00000000 1000 0 24466000 2 0000000000000000 20 4 30 10 -1\n   2: B80D0120000000000000000001000000:BD54 B80D0120000000000000000002000000:01BB 01 00000000:00000000 02:00001381 00000000 1000 0 24467257 2 0000000000000000 20 4 30 302 -1\n   3: B80D0120000000000000000001000000:DBB8 B80D0120000000000000000002000000:01BB 01 00000000:00000000 02:00001754 00000000 1000 0 24473631 2 0000000000000000 20 4 33 10 -1\n",
+   "udp": "   sl  local_address rem_address   st tx_queue rx_queue tr tm->when retrnsmt   uid  timeout inode ref pointer drops            \n",
+   "udp6": "  sl  local_address                         remote_address                        st tx_queue rx_queue tr tm->when retrnsmt   uid  timeout inode ref pointer drops\n"
+  }
+ }
+}

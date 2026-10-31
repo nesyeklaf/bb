@@ -1,4 +1,4 @@
-import { isAbsolute, sep } from "node:path";
+import { isAbsolute, resolve, sep } from "node:path";
 import { describe, expect, it, vi } from "vitest";
 import {
   collectLogPayloads,
@@ -58,7 +58,7 @@ describe("bb marketplace", () => {
     );
     expect(
       JSON.parse(String(vi.mocked(fetch).mock.calls[0]?.[1]?.body)),
-    ).toEqual({ source: "path:/work/acme-marketplace" });
+    ).toEqual({ source: `path:${resolve("/work/acme-marketplace")}` });
     const output = collectLogPayloads(vi.mocked(console.log)).join("\n");
     expect(output).toContain("Added marketplace acme-plugins");
     expect(output).toContain("Adding a marketplace installs nothing");

@@ -108,7 +108,8 @@ describe("installed runtime", () => {
     expect(await verifyInstalled(release, dir, platform)).toBeNull();
   });
 
-  it("refuses a platform without a recorded digest", async () => {
+  it("refuses a platform without a recorded digest", async ({ skip }) => {
+    skip(process.platform === "win32", "no Windows runtime");
     const dir = await dataDir();
     expect(
       await verifyInstalled({ ...release, artifacts: {} }, dir, platform),
