@@ -1,4 +1,4 @@
-import { execFile, spawn } from "node:child_process";
+import { spawn } from "node:child_process";
 import { expect, it } from "vitest";
 
 const ps = "C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe";
@@ -6,10 +6,10 @@ const pwsh = "C:\\Program Files\\PowerShell\\7\\pwsh.exe";
 const cim = (pid: number) =>
   "Get-CimInstance Win32_Process -Filter 'ProcessId = " + pid + "' | ForEach-Object { $_.CommandLine; $_.CreationDate }";
 
-function run(label: string, file: string, args: string[], stdin: "pipe" | "ignore" = "pipe"): Promise<void> {
+function run(label: string, file: string, args: string[], stdin: "pipe" | "ignore" = "pipe", env: NodeJS.ProcessEnv = process.env): Promise<void> {
   const start = Date.now();
   return new Promise((resolve) => {
-    const child = spawn(file, args, { stdio: [stdin, "pipe", "pipe"], windowsHide: true });
+    const child = spawn(file, args, { stdio: [stdin, "pipe", "pipe"], windowsHide: true, env });
     let out = "";
     child.stdout?.on("data", (d) => (out += d));
     child.stderr?.on("data", (d) => (out += d));
@@ -28,16 +28,13 @@ it.runIf(process.platform === "win32")("diag", async () => {
   const target = spawn(process.execPath, ["-e", "setInterval(() => {}, 1000)"], { stdio: "ignore" });
   const pid = target.pid ?? 0;
   const base = ["-NoProfile", "-NonInteractive"];
-  await Promise.all([
-    run("ps-cim-stdin-ignore", ps, [...base, "-Command", cim(pid)], "ignore"),
-    run("ps-cim-inputformat-none", ps, [...base, "-InputFormat", "None", "-Command", cim(pid)]),
-    run("ps-wmiobject", ps, [...base, "-Command", "Get-WmiObject Win32_Process -Filter 'ProcessId = " + pid + "' | ForEach-Object { $_.CommandLine; $_.CreationDate }"]),
-    run("pwsh7-cim", pwsh, [...base, "-Command", cim(pid)]),
-    run("ps-getprocess", ps, [...base, "-Command", "(Get-Process -Id " + pid + ").StartTime.ToString('o')"]),
-    run("ps-cim-nofilter-select", ps, [...base, "-Command", "Get-CimInstance -ClassName Win32_Process | Select-Object -First 2 ProcessId"]),
-    run("ps-cim-os", ps, [...base, "-Command", "(Get-CimInstance Win32_OperatingSystem).Caption"]),
-    run("cmd-wmic", "cmd.exe", ["/c", "wmic process where processid=" + pid + " get commandline,creationdate"]),
-  ]);
+  const cleanEnv = { ...process.env, PSModulePath: "C:\\Windows\\system32\\WindowsPowerShell\\v1.0\\Modules" };
+  await run("ps-psmodulepath-print", ps, [...base, "-Command", "$env:PSModulePath"]);
+  await run("ps-wmisearcher", ps, [...base, "-Command", "([wmisearcher]\"select CommandLine,CreationDate from Win32_Process where ProcessId=" + pid + "\").Get() | ForEach-Object { $_.CommandLine; $_.CreationDate }"]);
+  await run("ps-dotnet-starttime", ps, [...base, "-Command", "[System.Diagnostics.Process]::GetProcessById(" + pid + ").StartTime.ToString('o')"]);
+  await run("ps-getprocess-cleanmodules", ps, [...base, "-Command", "(Get-Process -Id " + pid + ").StartTime.ToString('o')"], "pipe", cleanEnv);
+  await run("ps-cim-cleanmodules", ps, [...base, "-Command", cim(pid)], "pipe", cleanEnv);
+  await run("ps-getprocess-plain", ps, [...base, "-Command", "(Get-Process -Id " + pid + ").StartTime.ToString('o')"]);
   target.kill();
   expect(true).toBe(true);
 }, 120_000);
