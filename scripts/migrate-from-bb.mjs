@@ -66,7 +66,20 @@ const apply = args.includes("--apply");
 const backup = !args.includes("--no-backup");
 const homeIndex = args.indexOf("--home");
 const home = homeIndex >= 0 ? args[homeIndex + 1] : homedir();
+const repoIndex = args.indexOf("--repo");
+const repo = repoIndex >= 0 ? args[repoIndex + 1] : join(home, "projects", "sandy");
 const log = (message) => console.log(`${apply ? "" : "[dry] "}${message}`);
+
+// Where a plugin that was installed from a path lives after the move into the repo.
+export function newPluginSourcePath(path, repoRoot) {
+  const unit = /\/plugins\/bb\/([^/]+)$/.exec(path);
+  if (unit) {
+    return `${repoRoot}/extensions/sandy/${unit[1].startsWith("bb-") ? `sandy-${unit[1].slice(3)}` : unit[1]}`;
+  }
+  if (/\/plugins-wt\/work\/bb\/work$/.test(path))
+    return `${repoRoot}/extensions/sandy/work`;
+  return null;
+}
 
 export function newPluginId(id) {
   return id.startsWith("bb-") ? `sandy-${id.slice(3)}` : id;
@@ -103,6 +116,27 @@ function textColumns(db, table) {
     .all()
     .filter((c) => ["TEXT", ""].includes((c.type ?? "").toUpperCase()))
     .map((c) => c.name);
+}
+
+// The plugin SDK keeps applied storage migrations in a table named after the product.
+// Without this rename the new SDK would find no record and run every migration again.
+export function migratePluginDatabase(dbFile) {
+  const db = new DatabaseSync(dbFile, { readOnly: !apply });
+  try {
+    const has = db
+      .prepare("select name from sqlite_master where type = 'table' and name = '_bb_migrations'")
+      .get();
+    if (!has) return false;
+    log(`rename _bb_migrations in ${dbFile}`);
+    if (apply) {
+      db.exec("alter table _bb_migrations rename to _sandy_migrations");
+      // statement hashes are re-adopted from the current plugin code on its first start
+      db.exec("update _sandy_migrations set statement_hash = null");
+    }
+    return true;
+  } finally {
+    db.close();
+  }
 }
 
 function migrateDatabase(dbFile) {
@@ -198,6 +232,21 @@ function migrateDatabase(dbFile) {
       [],
     );
   }
+  // 2b. plugins installed from a path now live in the repo's extensions/
+  if (tables.includes("plugins") && textColumns(db, "plugins").includes("source_path")) {
+    const rows = db
+      .prepare("select id, source_path from plugins where source_kind = 'path'")
+      .all();
+    for (const row of rows) {
+      const next = newPluginSourcePath(row.source_path ?? "", repo);
+      if (!next) continue;
+      counts.push(`plugins path ${row.id}: ${row.source_path} -> ${next}`);
+      if (apply)
+        db.prepare(
+          "update plugins set source = ?, source_path = ?, root_dir = ? where id = ?",
+        ).run(`path:${next}`, next, next, row.id);
+    }
+  }
   // 3. machine-auth system user, wherever its id appears as a whole value
   for (const table of tables) {
     if (HISTORY_TABLES.has(table)) continue;
@@ -261,6 +310,13 @@ function migrateMachine(machinesOld, machinesNew, host) {
     for (const name of readdirSync(base)) {
       if (name.startsWith("bb-"))
         move(join(base, name), join(base, newPluginId(name)));
+    }
+  }
+  const pluginsDir = join(dir, "plugins");
+  if (existsSync(pluginsDir)) {
+    for (const name of readdirSync(pluginsDir)) {
+      const file = join(pluginsDir, name, "data.db");
+      if (existsSync(file)) migratePluginDatabase(file);
     }
   }
   rewriteKeys(join(dir, "config.json"));

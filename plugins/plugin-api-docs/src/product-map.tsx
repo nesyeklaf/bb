@@ -618,7 +618,7 @@ function SlideTitle({
   title: string;
   brandMark?: ReactNode;
 }) {
-  const parts = title.split(/\bbb\b/);
+  const parts = title.split(/\bsandy\b/);
   if (parts.length === 1) {
     return <>{title}</>;
   }

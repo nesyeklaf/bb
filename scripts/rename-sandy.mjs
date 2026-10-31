@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// One-shot rename of the hard fork: bb -> sandy. Usage: node scripts/rename-sandy.mjs [--apply]
+// One-shot rename of the hard fork: bb -> sandy. Usage: node scripts/rename-sandy.mjs [--apply] [--only=<path prefix>]
 // Matches whole segments only, so hashes, ids and words like bbox or bubbles stay untouched.
 import { execFileSync } from "node:child_process";
 import { readFileSync, writeFileSync, mkdirSync, renameSync, existsSync } from "node:fs";
@@ -38,7 +38,8 @@ export const rename = (s) => {
   return out + applyRules(s.slice(last));
 };
 
-const files = execFileSync("git", ["ls-files", "-z"], { maxBuffer: 1 << 28 }).toString().split("\0").filter(Boolean);
+const only = process.argv.find((a) => a.startsWith("--only="))?.slice(7);
+const files = execFileSync("git", ["ls-files", "-z"], { maxBuffer: 1 << 28 }).toString().split("\0").filter(Boolean).filter((f) => !only || f.startsWith(only));
 const isText = (buf) => !buf.subarray(0, 8000).includes(0);
 let contentFiles = 0, hits = 0, moves = [];
 for (const f of files) {

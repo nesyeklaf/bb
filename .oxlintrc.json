@@ -13,6 +13,7 @@
   },
   "ignorePatterns": [
     "**/node_modules/**",
+    "extensions/**",
     "**/dist/**",
     "**/coverage/**",
     "**/routeTree.gen.ts",
