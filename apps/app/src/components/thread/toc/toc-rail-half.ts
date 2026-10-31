@@ -1,6 +1,5 @@
 export type TocRailHalf = "messages" | "topics";
 
-/** The rail has a message half on the left and a topic half on the right. */
 export function railHalfAt(
   clientX: number,
   rect: { left: number; width: number },
@@ -16,5 +15,4 @@ export function railHalfTint(half: TocRailHalf): string {
     : `linear-gradient(to right, ${TINT} 50%, transparent 50%)`;
 }
 
-/** Crossing the message half on the way to the panel must not flip the view. */
 export const TOC_HALF_SWITCH_DELAY_MS = 140;

@@ -29,7 +29,7 @@ const enrollmentEntry = join(
 const cleanups: Array<() => void | Promise<void>> = [];
 
 beforeAll(() => {
-  fixtureRoot = mkdtempSync(join(packageRoot, ".managed-json-cli-"));
+  fixtureRoot = mkdtempSync(join(packageRoot, "test", ".managed-json-cli-"));
   entry = join(fixtureRoot, "bb-app.mjs");
   execFileSync(
     process.execPath,
