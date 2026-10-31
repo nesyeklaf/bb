@@ -43,3 +43,17 @@ docker compose -f ops/observability/compose.yaml up -d
   - Web app errors: `{service_name="bb-server"} |= "Client error"`.
   - One plugin: `{service_name="bb-server"} | pluginId="<id>"`.
   - Slow or failing requests: Explore → Tempo, service `bb-server`; Prometheus, `http_server_request_duration_seconds_count`.
+
+## Dashboards
+
+The compose file provisions every JSON file in `ops/observability/grafana/dashboards/` into the Grafana folder `bb`. The dashboards are read-only in Grafana: edit the JSON, and Grafana reloads it within 30 seconds. Each dashboard links to the others through the "bb dashboards" menu, which keeps the time range.
+
+| Dashboard              | uid            | Shows                                                                                                                                                                                                                                         |
+| ---------------------- | -------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| bb errors              | `bb-errors`    | Error and warning totals, 5xx responses per route, the most frequent error messages, error responses by code, plugin errors, failed traces, the error log and web app errors. The `service` variable narrows the log panels to one component. |
+| bb API performance     | `bb-api`       | Request rate by status class, latency percentiles, the busiest and slowest routes, a per-route table and all non-2xx responses. Event streams stay open by design and are left out of the latency panels.                                     |
+| bb host RPC and traces | `bb-host-rpc`  | Calls from the server to host daemons per method from the span metrics: rate, failures and p95 latency, the server to daemon edge of the service graph, the service map, and slow or failed host RPC traces.                                  |
+| bb plugins             | `bb-plugins`   | Log lines, warnings and errors per `pluginId`, host plugin worker events, plugin RPC latency and status codes, and the plugin log.                                                                                                            |
+| bb telemetry pipeline  | `bb-telemetry` | What the collector receives and exports per signal, refused or failed data, exporter queues, log volume per service and collector memory. Use it when a dashboard looks empty.                                                                |
+
+The host RPC dashboard counts calls the server sends. Calls to daemons that export to a different collector, or none, appear only on the server side.
