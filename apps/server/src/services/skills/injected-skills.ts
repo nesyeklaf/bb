@@ -6,6 +6,7 @@ import path from "node:path";
 import { scanSkillFiles, SKILL_FILE_NAME } from "@bb/skill-index";
 import { parseSkillMetadata } from "@bb/skill-index/metadata";
 import { resolveDataDirSkillsRootPath } from "@bb/config/skill-storage-paths";
+import type { BbSkillSourceId } from "@bb/domain";
 import type {
   HostDaemonInjectedSkillSource,
   HostDaemonSkillTreeFile,
@@ -40,6 +41,7 @@ const skillFrontmatterSchema = z
 export interface ResolveInjectedSkillSourcesArgs {
   additionalSkillsRootPaths?: readonly string[];
   dataDir: string;
+  disabledSources?: ReadonlySet<BbSkillSourceId>;
   pluginSkillRoots?: readonly PluginSkillRoot[];
   pluginSkillSelections?: ReadonlyMap<string, ReadonlySet<string>>;
   projectSkillSources?: readonly ProjectInjectedSkillSource[];
@@ -557,20 +559,28 @@ export async function resolveSkillCatalogEntries(
   args: ResolveInjectedSkillSourcesArgs,
 ): Promise<ResolvedSkillCatalogEntry[]> {
   const { skillTreeRegistry } = args;
-  const projectSources = [...(args.projectSkillSources ?? [])];
-  const sharedProjectSources = (args.sharedSkillSources ?? []).filter(
+  const disabledSources = args.disabledSources ?? new Set<BbSkillSourceId>();
+  const projectSources = disabledSources.has("bb-project")
+    ? []
+    : [...(args.projectSkillSources ?? [])];
+  const sharedSources = disabledSources.has("shared")
+    ? []
+    : (args.sharedSkillSources ?? []);
+  const sharedProjectSources = sharedSources.filter(
     (source) => source.sourceType === "shared-project",
   );
-  const sharedUserSources = (args.sharedSkillSources ?? []).filter(
+  const sharedUserSources = sharedSources.filter(
     (source) => source.sourceType === "shared-user",
   );
 
-  const dataDirSources = await readSkillsRoot({
-    logger,
-    skillTreeRegistry,
-    skillsRootPath: resolveDataDirSkillsRootPath(args.dataDir),
-    sourceType: "data-dir",
-  });
+  const dataDirSources = disabledSources.has("bb-user")
+    ? []
+    : await readSkillsRoot({
+        logger,
+        skillTreeRegistry,
+        skillsRootPath: resolveDataDirSkillsRootPath(args.dataDir),
+        sourceType: "data-dir",
+      });
   const inheritedSourceGroups = await Promise.all(
     (args.additionalSkillsRootPaths ?? []).map((skillsRootPath) =>
       readSkillsRoot({
@@ -602,7 +612,10 @@ export async function resolveSkillCatalogEntries(
     configuredUserSources,
   );
   const pluginSourceGroups = await Promise.all(
-    (args.pluginSkillRoots ?? []).map(async ({ pluginId, rootPath }) => ({
+    (disabledSources.has("bb-plugins")
+      ? []
+      : (args.pluginSkillRoots ?? [])
+    ).map(async ({ pluginId, rootPath }) => ({
       pluginId,
       sources: (
         await readSkillsRoot({

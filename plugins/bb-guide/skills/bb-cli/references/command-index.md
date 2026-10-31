@@ -288,6 +288,7 @@ Use `--selected-model <model-id>` to discover its reasoning choices and include 
 - `bb skill files`
 - `bb skill update`
 - `bb skill delete`
+- `bb skill sources`
 - `bb skill cli-skills-status`
 - `bb skill install-cli-skills`
 

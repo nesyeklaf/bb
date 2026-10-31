@@ -56,6 +56,7 @@ import { useAppThemePreview } from "@/hooks/useAppThemePreview";
 import { ProvidersSettingsSection } from "@/components/settings/ProvidersSettingsSection";
 import { CodeRendererSettings } from "@/components/settings/CodeRendererSettings";
 import { SidebarThreadListSetting } from "@/components/settings/SidebarThreadListSetting";
+import { SkillSourcesSettings } from "@/components/settings/SkillSourcesSettings";
 import { SidebarNavigationProviderSetting } from "@/components/settings/SidebarNavigationProviderSetting";
 import { SidebarFooterSettings } from "@/components/settings/SidebarFooterSettings";
 import { SplitDimmingSetting } from "@/components/settings/SplitDimmingSetting";
@@ -1001,6 +1002,8 @@ export function GeneralSettingsSection({
           </SettingsWithControl>
         </div>
       </SettingsSection>
+      <SkillSourcesSettings />
+
       <SettingsSection title="Links">
         <div className="space-y-5">
           {desktopBrowserAvailable ? (
@@ -1393,9 +1396,7 @@ export function SettingsView() {
   } else if (activeSection === "environment-variables") {
     content = <MachineEnvironmentSettings />;
   } else if (activeSection === "updates") {
-    content = (
-      <UpdatesSettingsSection />
-    );
+    content = <UpdatesSettingsSection />;
   } else if (activeSection === "mobile") {
     content = <MobileAppSection />;
   } else if (activeSection === "experiments") {

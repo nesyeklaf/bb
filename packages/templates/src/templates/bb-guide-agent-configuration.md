@@ -60,7 +60,11 @@ Skills (.bb/skills/):
   skill as a structured name/path input, including when steering an active turn.
 
   Use `bb skill list` to inspect installed and discovered skills and copy the
-  opaque skill ID. `bb skill show|files <skill-id>` reads that exact skill;
+  opaque skill ID. Each entry lists the agents that load it (`providers`) and
+  its `duplicates` (same-file, same-content or same-name); `--duplicates`
+  keeps only skills found more than once. `bb skill sources <source> on|off`
+  switches the bb-owned sources bb-plugins, bb-user, bb-project and shared
+  (Settings → General → Skill sources); native agent roots stay as they are. `bb skill show|files <skill-id>` reads that exact skill;
   `bb skill show <skill-id> --json` returns the revision required by `bb skill
   update <skill-id> --revision <sha256>`. `bb skill delete <skill-id>` and
   update are restricted to editable, user-owned skills. These workspace-scoped

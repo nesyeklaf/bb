@@ -33,15 +33,19 @@ afterEach(() => {
 });
 
 function makeSkill(overrides: Partial<SkillSummary> = {}): SkillSummary {
+  const provider =
+    overrides.provider === undefined ? "claude-code" : overrides.provider;
   return {
     id: `skill_${"a".repeat(64)}`,
     name: "code-review",
     description: "Review the current diff.",
-    provider: "claude-code",
+    provider,
     scope: "provider-user",
     pluginId: null,
     filePath: "/home/u/.claude/skills/code-review/SKILL.md",
     manageable: true,
+    providers: provider === null ? [] : [provider],
+    duplicates: [],
     ...overrides,
   };
 }

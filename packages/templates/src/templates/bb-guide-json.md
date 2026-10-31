@@ -112,7 +112,7 @@ are Unix epoch milliseconds, numbers, never ISO strings. In jq,
     {plugins: [{id, version, enabled, status, source, rootDir}]}    (wrapped in .plugins)
 
   bb skill list --json
-    {skills: [{id, name, description, scope, provider, filePath}]}    (wrapped in .skills)
+    {skills: [{id, name, description, scope, provider, providers, pluginId, filePath, manageable, duplicates: [{id, scope, provider, pluginId, filePath, relation}]}]}    (wrapped in .skills; relation is same-file, same-content or same-name)
 
   bb marketplace list --json
     bare array

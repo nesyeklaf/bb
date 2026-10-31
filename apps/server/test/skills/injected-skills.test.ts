@@ -420,6 +420,65 @@ describe("injected skill source discovery", () => {
     expect(warnings).toEqual([]);
   });
 
+  it("drops every bb skill source the owner turned off", async () => {
+    const dataDir = await makeTempDir();
+    const workspacePath = await makeTempDir();
+    const pluginRootPath = path.join(dataDir, "plugin-skills");
+    await writeSkill({ rootPath: path.join(dataDir, "skills"), name: "mine" });
+    await writeSkill({ rootPath: pluginRootPath, name: "bundled" });
+    const projectSkillRoot = await writeSkill({
+      rootPath: path.join(workspacePath, ".bb", "skills"),
+      name: "local",
+    });
+    const sharedRoot = path.join(dataDir, "external", "team");
+    const { logger } = createCapturingLogger();
+    const projectSkillSource = resolveProjectSkillSourceFromContent(logger, {
+      candidatePath: projectSkillRoot,
+      content: await readFile(path.join(projectSkillRoot, "SKILL.md"), "utf8"),
+      directoryName: "local",
+    });
+    if (projectSkillSource === null) throw new Error("project skill invalid");
+    const args = {
+      dataDir,
+      pluginSkillRoots: [{ pluginId: "example", rootPath: pluginRootPath }],
+      projectSkillSources: [projectSkillSource],
+      sharedSkillSources: [
+        {
+          kind: "host-path" as const,
+          sourceType: "shared-user" as const,
+          name: "team",
+          description: "Shared team skill.",
+          sourceRootPath: sharedRoot,
+          skillFilePath: path.join(sharedRoot, "SKILL.md"),
+        },
+      ],
+    };
+    const namesWith = async (
+      disabled: NonNullable<ResolveInjectedSkillSourcesArgs["disabledSources"]>,
+    ) =>
+      (
+        await resolveInjectedSkillSources(logger, {
+          ...args,
+          disabledSources: disabled,
+        })
+      ).map((source) => source.name);
+
+    expect(await namesWith(new Set())).toEqual([
+      "bundled",
+      "local",
+      "mine",
+      "team",
+    ]);
+    expect(await namesWith(new Set(["bb-user", "bb-plugins"]))).toEqual([
+      "local",
+      "team",
+    ]);
+    expect(await namesWith(new Set(["bb-project", "shared"]))).toEqual([
+      "bundled",
+      "mine",
+    ]);
+  });
+
   it("resolves the bundled built-in skills root with valid built-in skills", async () => {
     const dataDir = await makeTempDir();
     const { logger, warnings } = createCapturingLogger();

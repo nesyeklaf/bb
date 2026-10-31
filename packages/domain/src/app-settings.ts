@@ -21,6 +21,15 @@ export const managedBranchPrefixSchema = z
     message: "Prefix must start a valid git branch name",
   });
 
+export const BB_SKILL_SOURCE_IDS = [
+  "bb-plugins",
+  "bb-user",
+  "bb-project",
+  "shared",
+] as const;
+export const bbSkillSourceIdSchema = z.enum(BB_SKILL_SOURCE_IDS);
+export type BbSkillSourceId = z.infer<typeof bbSkillSourceIdSchema>;
+
 export const appSettingsSchema = z
   .object({
     showKeyboardHints: z.boolean(),
@@ -56,6 +65,7 @@ export const appSettingsSchema = z
     defaultMachineAccess: z.string().min(1).nullable(),
     onboardingCompletedAt: z.string().min(1).nullable(),
     earlyAdopter: z.boolean(),
+    disabledSkillSources: z.array(bbSkillSourceIdSchema),
   })
   .strict();
 export type AppSettings = z.infer<typeof appSettingsSchema>;
@@ -80,6 +90,7 @@ export const defaultAppSettings: AppSettings = {
   machineGitCredentialsEnabled: true,
   onboardingCompletedAt: null,
   earlyAdopter: false,
+  disabledSkillSources: [],
 };
 
 export const disabledProviderIdsSchema = z.array(z.string().min(1));
@@ -96,6 +107,7 @@ export const appSettingsUpdateSchema = z.union([
     showUnhandledProviderEvents: z.boolean().optional(),
     onboardingCompletedAt: z.string().min(1).nullable().optional(),
     earlyAdopter: z.boolean().optional(),
+    disabledSkillSources: z.array(bbSkillSourceIdSchema).optional(),
   }),
   appSettingsSchema.omit({ showDiagnosticEvents: true }).extend({
     idleProviderSessionTimeoutMinutes:
@@ -108,6 +120,7 @@ export const appSettingsUpdateSchema = z.union([
     showUnhandledProviderEvents: z.boolean(),
     onboardingCompletedAt: z.string().min(1).nullable().optional(),
     earlyAdopter: z.boolean().optional(),
+    disabledSkillSources: z.array(bbSkillSourceIdSchema).optional(),
   }),
 ]);
 export type AppSettingsUpdate = z.infer<typeof appSettingsUpdateSchema>;

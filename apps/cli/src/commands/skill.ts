@@ -1,6 +1,11 @@
 import { readFile } from "node:fs/promises";
 import { Command } from "commander";
-import { PERSONAL_PROJECT_ID } from "@bb/domain";
+import {
+  BB_SKILL_SOURCE_IDS,
+  bbSkillSourceIdSchema,
+  PERSONAL_PROJECT_ID,
+  type BbSkillSourceId,
+} from "@bb/domain";
 import { action } from "../action.js";
 import { createCliBbSdk } from "../client.js";
 import { resolveMachineId, selectMachines } from "./machine.js";
@@ -16,6 +21,10 @@ import {
 interface SkillWorkspaceOptions extends JsonOutputOptions {
   environment?: string;
   project?: string;
+}
+
+interface SkillListOptions extends SkillWorkspaceOptions {
+  duplicates?: boolean;
 }
 
 interface SkillDeleteOptions extends SkillWorkspaceOptions {
@@ -52,6 +61,22 @@ function addWorkspaceOptions(command: Command): Command {
     .option("--json", "Print machine-readable JSON output");
 }
 
+const SKILL_SOURCE_DESCRIPTIONS: Readonly<Record<BbSkillSourceId, string>> = {
+  "bb-plugins":
+    "Skills that installed bb plugins contribute, including generated plugin command skills",
+  "bb-user": "Skills in bb's data directory and inherited skill roots",
+  "bb-project": "Skills in the project's .bb/skills directory",
+  shared: "Skills from the sharedSkillRoots in config.json",
+};
+
+function parseSkillSource(value: string): BbSkillSourceId {
+  const parsed = bbSkillSourceIdSchema.safeParse(value);
+  if (parsed.success) return parsed.data;
+  throw new Error(
+    `Unknown skill source '${value}'. Known sources: ${BB_SKILL_SOURCE_IDS.join(", ")}.`,
+  );
+}
+
 export function registerSkillCommands(
   program: Command,
   getUrl: () => string,
@@ -62,31 +87,64 @@ export function registerSkillCommands(
     .description("List, inspect, edit, and remove skills");
 
   addWorkspaceOptions(skill.command("list"))
-    .description("List installed and discovered skills")
+    .description(
+      "List installed and discovered skills, the agents that load each one, and its duplicates",
+    )
+    .option(
+      "--duplicates",
+      "Only list skills found more than once (same file, same content, or same name)",
+    )
     .action(
-      action(async (options: SkillWorkspaceOptions) => {
-        const result = await createCliBbSdk(getUrl()).skills.list({
+      action(async (options: SkillListOptions) => {
+        const listed = await createCliBbSdk(getUrl()).skills.list({
           projectId: projectId(options, getContext()),
           environmentId: environmentId(options),
         });
+        const result =
+          options.duplicates === true
+            ? {
+                ...listed,
+                skills: listed.skills.filter(
+                  (entry) => entry.duplicates.length > 0,
+                ),
+              }
+            : listed;
         if (outputJson(options, result)) return;
         console.log(
           renderBorderlessTable(
             {
-              head: ["ID", "NAME", "SCOPE", "PROVIDER", "EDITABLE", "PATH"],
-              colWidths: [72, 24, 18, 14, 10, 48],
+              head: [
+                "ID",
+                "NAME",
+                "SCOPE",
+                "AGENTS",
+                "DUPLICATES",
+                "EDITABLE",
+                "PATH",
+              ],
+              colWidths: [72, 24, 18, 24, 12, 10, 48],
               trimTrailingWhitespace: true,
             },
             result.skills.map((entry) => [
               entry.id,
               entry.name,
               entry.scope,
-              entry.provider ?? "bb",
+              entry.providers.length > 0 ? entry.providers.join(", ") : "all",
+              String(entry.duplicates.length),
               entry.manageable ? "yes" : "no",
               entry.filePath,
             ]),
           ),
         );
+        if (options.duplicates !== true) return;
+        for (const entry of result.skills) {
+          console.log(`\n${entry.name}  ${entry.filePath}`);
+          for (const duplicate of entry.duplicates) {
+            console.log(
+              `  ${duplicate.relation.padEnd(12)} ${duplicate.provider ?? "bb"}  ${duplicate.filePath}`,
+            );
+          }
+        }
       }),
     );
 
@@ -170,6 +228,63 @@ export function registerSkillCommands(
         if (outputJson(options, result)) return;
         console.log(`Deleted ${result.deletedPath}`);
       }),
+    );
+
+  skill
+    .command("sources [source] [state]")
+    .description(
+      `Show or switch which bb-owned skill sources bb injects into agents and lists (${BB_SKILL_SOURCE_IDS.join(", ")}; state on or off)`,
+    )
+    .option("--json", "Print machine-readable JSON output")
+    .action(
+      action(
+        async (
+          source: string | undefined,
+          state: string | undefined,
+          options: JsonOutputOptions,
+        ) => {
+          const sdk = createCliBbSdk(getUrl());
+          const config = await sdk.system.config();
+          let disabled = config.generalSettings.disabledSkillSources;
+          if (source !== undefined) {
+            const sourceId = parseSkillSource(source);
+            if (state !== "on" && state !== "off") {
+              throw new Error(
+                `Expected on or off after '${sourceId}', got '${state ?? ""}'.`,
+              );
+            }
+            disabled = BB_SKILL_SOURCE_IDS.filter((id) =>
+              id === sourceId ? state === "off" : disabled.includes(id),
+            );
+            await sdk.system.updateGeneralSettings({
+              ...config.generalSettings,
+              disabledSkillSources: disabled,
+            });
+          }
+          const result = {
+            sources: BB_SKILL_SOURCE_IDS.map((id) => ({
+              id,
+              enabled: !disabled.includes(id),
+              description: SKILL_SOURCE_DESCRIPTIONS[id],
+            })),
+          };
+          if (outputJson(options, result)) return;
+          console.log(
+            renderBorderlessTable(
+              {
+                head: ["SOURCE", "STATE", "DESCRIPTION"],
+                colWidths: [14, 8, 72],
+                trimTrailingWhitespace: true,
+              },
+              result.sources.map((entry) => [
+                entry.id,
+                entry.enabled ? "on" : "off",
+                entry.description,
+              ]),
+            ),
+          );
+        },
+      ),
     );
 
   skill

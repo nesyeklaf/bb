@@ -117,7 +117,8 @@ bb indexes the native user and project skill roots for Codex, Claude Code, Pi,
 Cursor, OpenCode, omp, Grok Build, and Hermes Agent. This includes compatibility
 roots such as .agents/skills and .claude/skills when the provider supports them.
 It also includes project ancestor roots for providers that search to the Git
-repository root. Configured Pi, omp, Grok, and Hermes directories are included.
+repository root. Configured Pi, omp, Grok, and Hermes directories are included;
+for Pi this covers the skills of installed Pi packages after Pi's own filters.
 Enabled provider plugins also contribute skills to the selected provider's `/`
 command menu. `bb skill list` shows native skills for Claude Code, Codex, and
 Cursor.

@@ -57,8 +57,42 @@ function providerLabel(
   return providerRoster.get(provider)?.displayName ?? provider;
 }
 
-function skillProviderFilterId(skill: SkillSummary): ResourceProviderFilter {
-  return skill.provider ?? "bb";
+function skillProviderFilterIds(skill: SkillSummary): ResourceProviderFilter[] {
+  return skill.provider === null || skill.providers.length === 0
+    ? ["bb", ...skill.providers]
+    : skill.providers;
+}
+
+const DUPLICATE_RELATION_LABELS: Readonly<
+  Record<SkillSummary["duplicates"][number]["relation"], string>
+> = {
+  "same-file": "Same file",
+  "same-content": "Same content",
+  "same-name": "Same name",
+};
+
+function SkillDuplicatesTooltip({
+  skill,
+  providerRoster,
+}: {
+  skill: SkillSummary;
+  providerRoster: ProviderRoster;
+}) {
+  return (
+    <div className="flex max-w-md flex-col gap-1">
+      {skill.duplicates.map((duplicate) => (
+        <div key={duplicate.id} className="flex flex-col">
+          <span className="font-medium">
+            {DUPLICATE_RELATION_LABELS[duplicate.relation]} ·{" "}
+            {providerLabel(duplicate.provider, providerRoster)}
+          </span>
+          <span className="break-all text-muted-foreground">
+            {duplicate.filePath}
+          </span>
+        </div>
+      ))}
+    </div>
+  );
 }
 
 function providerFilterLabel(
@@ -264,26 +298,23 @@ function SkillRow({
         leading={<SkillLeading skill={skill} providerRoster={providerRoster} />}
         title={skill.name}
         titleMeta={
-          skill.scope === "bb-builtin" ? (
-            <ProvenancePill label="BB Official" />
-          ) : skill.scope === "plugin" ? (
-            <ProvenancePill
-              label="Included"
-              tooltip={
-                <SkillProvenanceTooltip
-                  prefix="Included with"
-                  providerId={skill.provider}
-                  provider={
-                    skill.provider === null
-                      ? undefined
-                      : providerRoster.get(skill.provider)
-                  }
-                  name={`${providerPluginDisplayName(skill)} plugin.`}
-                />
-              }
-              accessibleLabel={`${skill.name} is included with ${includedPluginDescription(skill, providerRoster)}`}
-            />
-          ) : undefined
+          skill.duplicates.length === 0 ? (
+            (skillProvenancePill(skill, providerRoster) ?? undefined)
+          ) : (
+            <span className="inline-flex items-baseline gap-1">
+              {skillProvenancePill(skill, providerRoster)}
+              <ProvenancePill
+                label={`${skill.duplicates.length} ${skill.duplicates.length === 1 ? "duplicate" : "duplicates"}`}
+                tooltip={
+                  <SkillDuplicatesTooltip
+                    skill={skill}
+                    providerRoster={providerRoster}
+                  />
+                }
+                accessibleLabel={`${skill.name} is also found at ${skill.duplicates.map((duplicate) => duplicate.filePath).join(", ")}`}
+              />
+            </span>
+          )
         }
         description={description}
         onOpen={onSelect}
@@ -291,6 +322,32 @@ function SkillRow({
       />
     </div>
   );
+}
+
+function skillProvenancePill(
+  skill: SkillSummary,
+  providerRoster: ProviderRoster,
+) {
+  return skill.scope === "bb-builtin" ? (
+    <ProvenancePill label="BB Official" />
+  ) : skill.scope === "plugin" ? (
+    <ProvenancePill
+      label="Included"
+      tooltip={
+        <SkillProvenanceTooltip
+          prefix="Included with"
+          providerId={skill.provider}
+          provider={
+            skill.provider === null
+              ? undefined
+              : providerRoster.get(skill.provider)
+          }
+          name={`${providerPluginDisplayName(skill)} plugin.`}
+        />
+      }
+      accessibleLabel={`${skill.name} is included with ${includedPluginDescription(skill, providerRoster)}`}
+    />
+  ) : null;
 }
 
 interface SkillsOverviewProps {
@@ -344,8 +401,9 @@ export function SkillsOverview({
   const providerCounts = useMemo(() => {
     const counts = new Map<ResourceProviderFilter, number>();
     for (const skill of skills) {
-      const provider = skillProviderFilterId(skill);
-      counts.set(provider, (counts.get(provider) ?? 0) + 1);
+      for (const provider of skillProviderFilterIds(skill)) {
+        counts.set(provider, (counts.get(provider) ?? 0) + 1);
+      }
     }
     return counts;
   }, [skills]);
@@ -394,7 +452,9 @@ export function SkillsOverview({
       }
       if (
         providerFilters.length > 0 &&
-        !providerFilters.includes(skillProviderFilterId(skill))
+        !skillProviderFilterIds(skill).some((provider) =>
+          providerFilters.includes(provider),
+        )
       ) {
         return false;
       }
