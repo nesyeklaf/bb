@@ -16,9 +16,22 @@ concurrency:
   cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 jobs:
+  fork-egress:
+    name: Fork egress and package-manager checks
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: No forbidden external hosts
+        run: bash scripts/fork/check-egress-hosts.sh
+      - name: No package-manager calls outside the allowed list
+        run: bash scripts/fork/check-package-manager-calls.sh
+
   plan:
     name: Select CI checks
-    runs-on: blacksmith-4vcpu-ubuntu-2404
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
     permissions:
       contents: read
@@ -73,7 +86,7 @@ jobs:
     name: Validate dependencies
     needs: plan
     if: ${{ needs.plan.outputs.dependencies == 'true' }}
-    runs-on: blacksmith-4vcpu-ubuntu-2404
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
     permissions:
       contents: read
@@ -90,7 +103,7 @@ jobs:
   windows-dependency-cache:
     name: Warm Windows dependencies
     if: ${{ github.event_name != 'pull_request' }}
-    runs-on: blacksmith-4vcpu-windows-2025
+    runs-on: windows-2025
     timeout-minutes: 10
     continue-on-error: true
     permissions:
@@ -130,7 +143,7 @@ jobs:
     needs: plan
     if: ${{ fromJSON(needs.plan.outputs.selection).foundation }}
     name: Windows host packages (Node 22.x)
-    runs-on: blacksmith-4vcpu-windows-2025
+    runs-on: windows-2025
     timeout-minutes: 15
     permissions:
       contents: read
@@ -182,7 +195,7 @@ jobs:
     needs: plan
     if: ${{ fromJSON(needs.plan.outputs.selection).packaging }}
     name: Windows app smoke (Node 22.x)
-    runs-on: blacksmith-4vcpu-windows-2025
+    runs-on: windows-2025
     timeout-minutes: 40
     permissions:
       contents: read
@@ -267,7 +280,7 @@ jobs:
     needs: plan
     if: ${{ fromJSON(needs.plan.outputs.selection).packaging }}
     name: Windows desktop smoke (Node 22.x)
-    runs-on: blacksmith-4vcpu-windows-2025
+    runs-on: windows-2025
     timeout-minutes: 40
     permissions:
       contents: read
@@ -338,7 +351,7 @@ jobs:
     name: Windows tests (${{ matrix.shard }}, Node 22.x)
     needs: plan
     if: ${{ fromJSON(needs.plan.outputs.selection)['windows-tests'].include[0] != null }}
-    runs-on: blacksmith-4vcpu-windows-2025
+    runs-on: windows-2025
     timeout-minutes: 30
     permissions:
       contents: read
@@ -463,7 +476,7 @@ jobs:
     name: Lint and typecheck (ubuntu-latest, Node 22.x)
     needs: plan
     if: ${{ fromJSON(needs.plan.outputs.selection).staticNeeded }}
-    runs-on: blacksmith-4vcpu-ubuntu-2404
+    runs-on: ubuntu-24.04
     timeout-minutes: 20
     permissions:
       contents: read
@@ -512,7 +525,7 @@ jobs:
     needs: plan
     if: ${{ fromJSON(needs.plan.outputs.selection).buildNeeded }}
     name: Checks (ubuntu-latest, Node 22.x)
-    runs-on: blacksmith-4vcpu-ubuntu-2404
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
 
     # `actions: read` is what lets the cache-usage check call the Actions API;
@@ -616,7 +629,7 @@ jobs:
     name: Tests (${{ matrix.shard }}, ubuntu-latest, Node 22.x)
     needs: plan
     if: ${{ fromJSON(needs.plan.outputs.selection)['tests'].include[0] != null }}
-    runs-on: blacksmith-4vcpu-ubuntu-2404
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
 
     strategy:
@@ -721,7 +734,7 @@ jobs:
     needs: plan
     if: ${{ fromJSON(needs.plan.outputs.selection).forks }}
     name: Plugin Fork Check (${{ matrix.shard }}, ubuntu-latest, Node 22.x)
-    runs-on: blacksmith-4vcpu-ubuntu-2404
+    runs-on: ubuntu-24.04
     timeout-minutes: 20
 
     strategy:
@@ -812,12 +825,12 @@ jobs:
   provider-model-listing:
     needs: plan
     name: Provider Model Listing
-    runs-on: blacksmith-4vcpu-ubuntu-2404
+    runs-on: ubuntu-24.04
     timeout-minutes: 20
 
     # Fork pull requests cannot read secrets, so the probe would fail
     # unauthenticated for reasons unrelated to bb.
-    if: ${{ fromJSON(needs.plan.outputs.selection).providers && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) }}
+    if: ${{ vars.RUN_PROVIDER_PROBE == 'true' && fromJSON(needs.plan.outputs.selection).providers && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) }}
 
     steps:
       - name: Checkout repository
@@ -894,9 +907,9 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - os: blacksmith-4vcpu-ubuntu-2404
+          - os: ubuntu-24.04
             node-version: "22.x"
-          - os: blacksmith-6vcpu-macos-15
+          - os: macos-15
             node-version: "22.x"
 
     steps:
@@ -969,13 +982,13 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - os: blacksmith-4vcpu-ubuntu-2404
+          - os: ubuntu-24.04
             node-version: "24.x"
-          - os: blacksmith-4vcpu-ubuntu-2404
+          - os: ubuntu-24.04
             node-version: "26.x"
-          - os: blacksmith-6vcpu-macos-15
+          - os: macos-15
             node-version: "24.x"
-          - os: blacksmith-6vcpu-macos-15
+          - os: macos-15
             node-version: "26.x"
 
     steps:
