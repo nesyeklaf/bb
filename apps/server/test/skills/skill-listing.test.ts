@@ -227,7 +227,7 @@ describe("summarizeSkillRegistrations", () => {
     };
   }
 
-  it("lists a symlinked skill once with every agent that loads it and the other path as a same-file duplicate", () => {
+  it("lists a symlinked skill once with every agent that loads it and the other path once as a same-file duplicate", () => {
     const real = "/home/.pi/agent/git/forge-skills/skills/debug/SKILL.md";
     const piPackage = registration({
       name: "debug",
@@ -261,11 +261,10 @@ describe("summarizeSkillRegistrations", () => {
     expect(result[0]).toMatchObject({
       id: piPackage.id,
       providers: ["acp-cursor", "pi"],
-      duplicates: [
-        expect.objectContaining({ id: piLinked.id, relation: "same-file" }),
-        expect.objectContaining({ id: cursorLinked.id, relation: "same-file" }),
-      ],
     });
+    expect(
+      result[0]?.duplicates.map((d) => [d.id, d.filePath, d.relation]),
+    ).toEqual([[piLinked.id, piLinked.filePath, "same-file"]]);
     expect(result[0]).not.toHaveProperty("realPath");
     expect(result[0]).not.toHaveProperty("contentSha256");
   });
@@ -310,6 +309,22 @@ describe("summarizeSkillRegistrations", () => {
       [copy.id, "same-name"],
     ]);
     expect(byId.get(other.id)?.providers).toEqual([]);
+  });
+
+  it("does not count one path loaded by several agents as a duplicate", () => {
+    const filePath = "/home/.agents/skills/architect/SKILL.md";
+    const forCodex = registration({
+      name: "architect",
+      provider: "codex",
+      filePath,
+    });
+    const forPi = registration({ name: "architect", provider: "pi", filePath });
+
+    const result = summarizeSkillRegistrations([forCodex, forPi]);
+
+    expect(result).toHaveLength(1);
+    expect(result[0]?.providers).toEqual(["codex", "pi"]);
+    expect(result[0]?.duplicates).toEqual([]);
   });
 
   it("leaves a unique skill without duplicates", () => {

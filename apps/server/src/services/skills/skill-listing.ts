@@ -388,7 +388,7 @@ export function summarizeSkillRegistrations(
           ),
         ),
       ].sort(),
-      duplicates: [
+      duplicates: otherLocations(entry, [
         ...copies.map((skill) =>
           toSkillDuplicate(
             skill,
@@ -396,10 +396,22 @@ export function summarizeSkillRegistrations(
           ),
         ),
         ...sameName.map((skill) => toSkillDuplicate(skill, "same-name")),
-      ],
+      ]),
     });
   }
   return summaries.sort(compareSkillSummaries);
+}
+
+function otherLocations(
+  entry: IndexedSkillRegistration,
+  duplicates: readonly SkillDuplicate[],
+): SkillDuplicate[] {
+  const seen = new Set([entry.filePath]);
+  return duplicates.filter((duplicate) => {
+    if (seen.has(duplicate.filePath)) return false;
+    seen.add(duplicate.filePath);
+    return true;
+  });
 }
 
 export async function listProjectSkills(
