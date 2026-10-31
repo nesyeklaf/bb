@@ -1,5 +1,6 @@
 import { fstatSync, mkdirSync, readdirSync, rmSync, statSync } from "node:fs";
 import { join } from "node:path";
+import { isSpanContextValid, trace } from "@opentelemetry/api";
 import pino from "pino";
 import type { Logger } from "pino";
 import { loadLoggerConfig } from "@bb/config/logger";
@@ -22,6 +23,18 @@ function sanitizeComponentName(component: string): string {
   }
 
   return trimmed.replace(/[^a-zA-Z0-9._-]+/gu, "-");
+}
+
+function activeTraceFields(): Record<string, string | number> {
+  const spanContext = trace.getActiveSpan()?.spanContext();
+  if (spanContext === undefined || !isSpanContextValid(spanContext)) {
+    return {};
+  }
+  return {
+    trace_id: spanContext.traceId,
+    span_id: spanContext.spanId,
+    trace_flags: spanContext.traceFlags,
+  };
 }
 
 function stdoutIsPlainFile(): boolean {
@@ -63,6 +76,7 @@ export function createLogger(options: CreateLoggerOptions): Logger {
       component,
       ...(options.base ?? {}),
     },
+    mixin: activeTraceFields,
     serializers: {
       err: pino.stdSerializers.errWithCause,
       error: pino.stdSerializers.errWithCause,

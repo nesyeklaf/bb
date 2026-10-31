@@ -19,6 +19,8 @@ import {
 } from "./install-machine-asset.js";
 import { getExperiments } from "@bb/db";
 import { createNodeWebSocket } from "@hono/node-ws";
+import { httpInstrumentationMiddleware } from "@hono/otel";
+import { otlpServiceName } from "@bb/config/otlp";
 import {
   declineWebSocketCompression,
   WEB_SOCKET_COMPRESSION,
@@ -492,6 +494,15 @@ export function createApp(
   };
   const pendingServerMove = serverMoveOptions.pending;
 
+  const httpTelemetry = httpInstrumentationMiddleware({
+    serviceName: otlpServiceName("server"),
+    getUrlFull: (context) => {
+      const url = new URL(context.req.url);
+      return `${url.origin}${url.pathname}`;
+    },
+  });
+  app.use("/api/*", httpTelemetry);
+  app.use("/internal/*", httpTelemetry);
   app.use("*", requestPeers.middleware);
   app.use("*", serverTiming());
   app.use("*", async (context, next) => {

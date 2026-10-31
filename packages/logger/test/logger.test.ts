@@ -1,10 +1,11 @@
 import { spawn } from "node:child_process";
 import fs from "node:fs";
-import { createServer } from "node:http";
-import type { AddressInfo } from "node:net";
 import os from "node:os";
 import path from "node:path";
 import { afterAll, afterEach, describe, expect, it, vi } from "vitest";
+import { context, metrics, propagation, trace } from "@opentelemetry/api";
+import { startTelemetry } from "@bb/telemetry";
+import { startOtlpReceiver } from "@bb/telemetry/testing";
 
 const LOGGER_IMPORT_SPECIFIER = "@bb/logger";
 
@@ -136,46 +137,6 @@ function readComponentLogLines(
       .filter(Boolean)
       .map((line) => JSON.parse(line) as Record<string, unknown>);
   });
-}
-
-interface OtlpRequest {
-  body: Buffer;
-  contentType: string | undefined;
-  path: string | undefined;
-}
-
-async function startOtlpReceiver(): Promise<{
-  close: () => Promise<void>;
-  endpoint: string;
-  requests: OtlpRequest[];
-}> {
-  const requests: OtlpRequest[] = [];
-  const server = createServer((request, response) => {
-    const chunks: Buffer[] = [];
-    request.on("data", (chunk: Buffer) => chunks.push(chunk));
-    request.on("end", () => {
-      requests.push({
-        body: Buffer.concat(chunks),
-        contentType: request.headers["content-type"],
-        path: request.url,
-      });
-      response.writeHead(200, { "content-type": "application/x-protobuf" });
-      response.end();
-    });
-  });
-  await new Promise<void>((resolve) =>
-    server.listen(0, "127.0.0.1", () => resolve()),
-  );
-  const { port } = server.address() as AddressInfo;
-  return {
-    close: () =>
-      new Promise<void>((resolve) => {
-        server.closeAllConnections();
-        server.close(() => resolve());
-      }),
-    endpoint: `http://127.0.0.1:${port}/`,
-    requests,
-  };
 }
 
 afterEach(() => {
@@ -373,6 +334,48 @@ describe("createLogger", () => {
         readComponentLogLines(path.join(dataDir, "logs"), "server"),
       ).toMatchObject([{ msg: message, pluginId: "otlp-fixture" }]);
     } finally {
+      await receiver.close();
+    }
+  });
+
+  it("adds the active span's ids to log lines", async () => {
+    const dataDir = createTempDir();
+    vi.stubEnv("NODE_ENV", "production");
+    vi.stubEnv("BB_DATA_DIR", dataDir);
+    const receiver = await startOtlpReceiver();
+    const telemetry = startTelemetry({
+      component: "server",
+      env: { BB_OTLP_ENDPOINT: receiver.endpoint },
+    });
+
+    try {
+      const { createLogger } = await importFreshLogger();
+      const logger = createLogger({ component: "server" });
+      const ids = trace
+        .getTracer("logger-test")
+        .startActiveSpan("logged-work", (span) => {
+          logger.info({}, "inside span");
+          span.end();
+          return span.spanContext();
+        });
+      logger.info({}, "outside span");
+      const logDir = path.join(dataDir, "logs");
+      await waitFor(() => readComponentLogLines(logDir, "server").length === 2);
+
+      const [inside, outside] = readComponentLogLines(logDir, "server");
+      expect(inside).toMatchObject({
+        msg: "inside span",
+        span_id: ids.spanId,
+        trace_flags: 1,
+        trace_id: ids.traceId,
+      });
+      expect(outside).not.toHaveProperty("trace_id");
+    } finally {
+      await telemetry.shutdown();
+      trace.disable();
+      metrics.disable();
+      context.disable();
+      propagation.disable();
       await receiver.close();
     }
   });
