@@ -170,7 +170,6 @@ const launcher = spawn(
     String(serverPort),
     "--host-daemon-port",
     String(daemonPort),
-    "--bundled",
   ],
   {
     detached: process.platform !== "win32",
