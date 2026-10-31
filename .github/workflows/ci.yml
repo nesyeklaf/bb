@@ -185,8 +185,8 @@ jobs:
         run: bash .github/actions/setup-workspace/install-dependencies.sh --ignore-scripts --filter bb --filter "@bb/process-utils..." --filter "@bb/host-workspace..." --filter "@bb/host-watcher..." --filter "@bb/agent-runtime..." --filter "@bb/provider-bridge-protocol..." --filter "@bb/provider-bridge-acp..." --filter "@bb/host-daemon-contract..." --filter "@bb/config..." --filter "@bb/db..." --filter "bb-plugin-provider-acp..." --filter "bb-plugin-provider-codex..." --filter "bb-plugin-provider-claude-code..." --filter "bb-plugin-echo-provider..." --filter "@bb/app..."
 
       - name: Warm up WMI for process identity reads
-        shell: pwsh
-        run: Get-CimInstance Win32_Process -Filter "ProcessId = $PID" | Out-Null
+        shell: powershell
+        run: Measure-Command { Get-CimInstance Win32_Process -Filter "ProcessId = $PID" | Out-Null } | Select-Object TotalSeconds
 
       - name: Lint and test foundation packages
         shell: bash
