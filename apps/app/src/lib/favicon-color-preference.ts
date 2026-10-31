@@ -5,15 +5,15 @@ import {
   faviconColorPreferenceSchema,
   type FaviconColor,
   type FaviconColorPreference,
-} from "@bb/domain";
+} from "@sandy/domain";
 import {
   DARK_COLOR_SCHEME_QUERY,
   getMediaQuerySnapshot,
   subscribeMediaQuery,
-} from "@bb/shared-ui/hooks/use-media-query";
+} from "@sandy/shared-ui/hooks/use-media-query";
 import { useSystemConfig } from "@/hooks/queries/system-queries";
 
-export const FAVICON_COLOR_STORAGE_KEY = "bb.faviconColor";
+export const FAVICON_COLOR_STORAGE_KEY = "sandy.faviconColor";
 
 const FAVICON_BADGES = ["none", "unread"] as const;
 type FaviconBadge = (typeof FAVICON_BADGES)[number];

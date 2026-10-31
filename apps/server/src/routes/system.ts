@@ -18,7 +18,7 @@ import {
   setAppKeybindingOverrides,
   setExperiments,
   setStoredAppearance,
-} from "@bb/db";
+} from "@sandy/db";
 import {
   applyAppKeybindingOverrides,
   appSettingsSchema,
@@ -28,13 +28,13 @@ import {
   resolveCodeTheme,
   type AppKeybindingOverrides,
   type AppTheme,
-} from "@bb/domain";
+} from "@sandy/domain";
 import {
   publicApiRoutes,
   typedRoutes,
   type PublicApiSchema,
   type SystemEnvironmentProvider,
-} from "@bb/server-contract";
+} from "@sandy/server-contract";
 import type { Hono } from "hono";
 import {
   hashedAssetCacheControl,
@@ -376,7 +376,7 @@ export function registerSystemRoutes(
 
   post(routes.reloadConfig, async (context) => {
     try {
-      await deps.bbAppManagedConfig.reload({ notify: true });
+      await deps.sandyAppManagedConfig.reload({ notify: true });
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       throw new ApiError(422, "invalid_config", message);

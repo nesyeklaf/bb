@@ -2,7 +2,7 @@ import type {
   ComposerCustomization,
   ComposerPlusMenuItem,
   PluginComposerScope,
-} from "@get-bb/plugin-sdk";
+} from "@sandy-sdk/plugin-sdk";
 import type {
   PluginCodeFenceRendererSlot,
   PluginComposerCustomizationSlot,

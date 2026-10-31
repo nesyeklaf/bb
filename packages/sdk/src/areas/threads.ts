@@ -11,11 +11,11 @@ import {
   type ThreadQueuedMessage,
   type ThreadStatus,
   validatePluginMetadata,
-} from "@bb/domain";
+} from "@sandy/domain";
 import {
   DEFAULT_TURN_RETRY_REASON,
   threadTabsResponseSchema,
-} from "@bb/server-contract";
+} from "@sandy/server-contract";
 import type {
   CreateQueuedMessageRequest,
   CreateThreadRequest,
@@ -84,7 +84,7 @@ import type {
   UpdateThreadTabsRequest,
   UpdateThreadRequest,
   UpdateQueuedMessageRequest,
-} from "@bb/server-contract";
+} from "@sandy/server-contract";
 import { signalRequestArgs, type CreateSdkAreaArgs } from "./common.js";
 
 export const DEFAULT_THREAD_WAIT_TIMEOUT_MS = 20 * 60 * 1000;
@@ -379,7 +379,7 @@ export interface ThreadQueuedMessageGroupBoundaryArgs extends SetQueuedMessageGr
 
 /**
  * Both filters are genuinely absent by default: no filter lists every live
- * queued row in the workspace, which is what `bb thread queue list` with no
+ * queued row in the workspace, which is what `sandy thread queue list` with no
  * thread and a limiter plugin's own bookkeeping ask for.
  */
 export interface ThreadQueueListArgs {
@@ -533,7 +533,7 @@ export class ThreadWaitUnreachableError extends Error {
   }) {
     super(
       `Thread ${args.threadId} is in status ${args.currentStatus} and will not reach idle by waiting alone. ` +
-        `Inspect it with 'bb thread show ${args.threadId}' and recover by sending a follow-up.`,
+        `Inspect it with 'sandy thread show ${args.threadId}' and recover by sending a follow-up.`,
     );
     this.name = "ThreadWaitUnreachableError";
     this.currentStatus = args.currentStatus;

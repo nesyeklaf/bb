@@ -12,7 +12,7 @@ import {
   dropQueuedMessageEditHeldUntilColumn,
   rewindQueuedMessageStateMigration,
 } from "./helpers/rewind.js";
-import { defaultAppSettings } from "@bb/domain";
+import { defaultAppSettings } from "@sandy/domain";
 import {
   createQueuedThreadMessage,
   createThread,
@@ -335,9 +335,9 @@ function dropRewindAddedTables(db: DbConnection): void {
       .prepare("ALTER TABLE system_experiments DROP COLUMN plugins")
       .run();
   }
-  if (experimentColumns.has("bb_connect")) {
+  if (experimentColumns.has("sandy_connect")) {
     db.$client
-      .prepare("ALTER TABLE system_experiments DROP COLUMN bb_connect")
+      .prepare("ALTER TABLE system_experiments DROP COLUMN sandy_connect")
       .run();
   }
   if (experimentColumns.has("multi_machine")) {
@@ -1807,7 +1807,7 @@ describe("migrate", () => {
         machineGitCredentialsEnabled: true,
         streamerMode: false,
         allowFastServiceTier: true,
-        managedBranchPrefix: "bb/",
+        managedBranchPrefix: "sandy/",
         idleProviderSessionTimeoutMinutes: 30,
         onboardingCompletedAt: "2026-08-01T00:00:00.000Z",
         earlyAdopter: false,
@@ -1963,13 +1963,13 @@ describe("migrate", () => {
           .all(),
       ).toEqual([
         {
-          pluginId: "bb--git",
+          pluginId: "sandy--git",
           key: "showGitChanges",
           value: "false",
           updatedAt: 11,
         },
         {
-          pluginId: "bb--github-pr-status",
+          pluginId: "sandy--github-pr-status",
           key: "showPullRequest",
           value: "false",
           updatedAt: 11,
@@ -4132,10 +4132,10 @@ describe("migrate", () => {
           updated_at integer NOT NULL
         );
         INSERT INTO marketplaces VALUES
-          ('bb-official', 'git', 'https://github.com/ymichael/bb.git', 'main', '{"schemaVersion":1,"name":"bb-official","displayName":"BB Official","plugins":[]}', 10, 20, NULL, 1, 20),
+          ('sandy-official', 'git', 'https://github.com/ymichael/sandy.git', 'main', '{"schemaVersion":1,"name":"sandy-official","displayName":"SANDY Official","plugins":[]}', 10, 20, NULL, 1, 20),
           ('other', 'git', 'https://example.test/catalog.git', 'main', '{"schemaVersion":1}', 30, 40, NULL, 2, 40);
         INSERT INTO plugins VALUES
-          ('official', 'marketplace', 'bb-official', 'notes', 'npm:notes@^1'),
+          ('official', 'marketplace', 'sandy-official', 'notes', 'npm:notes@^1'),
           ('third-party', 'marketplace', 'other', 'tasks', 'git:https://example.test/tasks@main'),
           ('already-direct', 'direct', NULL, NULL, 'path:/tmp/plugin');
       `);
@@ -4192,7 +4192,7 @@ describe("migrate", () => {
     }
   });
 
-  it("does not grant catalog provenance to a custom marketplace named bb-official", () => {
+  it("does not grant catalog provenance to a custom marketplace named sandy-official", () => {
     const db = createConnection(":memory:");
     try {
       db.$client.exec(`
@@ -4216,7 +4216,7 @@ describe("migrate", () => {
           updated_at integer NOT NULL
         );
         INSERT INTO marketplaces VALUES (
-          'bb-official',
+          'sandy-official',
           'git',
           'https://example.test/custom.git',
           'main',
@@ -4230,9 +4230,9 @@ describe("migrate", () => {
         INSERT INTO plugins VALUES (
           'custom',
           'marketplace',
-          'bb-official',
+          'sandy-official',
           'custom-entry',
-          'npm:bb-plugin-custom@^1'
+          'npm:sandy-plugin-custom@^1'
         );
       `);
 
@@ -4284,13 +4284,13 @@ describe("migrate", () => {
           catalog_marketplace_name text
         );
         INSERT INTO plugin_marketplaces VALUES
-          ('bb-official', 'W/\"abc\"', 'Wed, 01 Jan 2025 00:00:00 GMT'),
+          ('sandy-official', 'W/\"abc\"', 'Wed, 01 Jan 2025 00:00:00 GMT'),
           ('acme', 'W/\"xyz\"', 'Thu, 02 Jan 2025 00:00:00 GMT');
         INSERT INTO plugin_marketplace_icons VALUES
-          ('bb-official', 'notes'),
+          ('sandy-official', 'notes'),
           ('acme', 'tasks');
         INSERT INTO plugins VALUES
-          ('notes', 'bb-official'),
+          ('notes', 'sandy-official'),
           ('tasks', 'acme'),
           ('local', NULL);
       `);
@@ -4307,7 +4307,7 @@ describe("migrate", () => {
             { name: string }
           >("SELECT name FROM plugin_marketplaces ORDER BY name")
           .all(),
-      ).toEqual([{ name: "acme" }, { name: "bb-community" }]);
+      ).toEqual([{ name: "acme" }, { name: "sandy-community" }]);
       expect(
         db.$client
           .prepare<
@@ -4317,7 +4317,7 @@ describe("migrate", () => {
           .all(),
       ).toEqual([
         { marketplaceName: "acme" },
-        { marketplaceName: "bb-community" },
+        { marketplaceName: "sandy-community" },
       ]);
       expect(
         db.$client
@@ -4328,7 +4328,7 @@ describe("migrate", () => {
           .all(),
       ).toEqual([
         { id: "local", catalogMarketplaceName: null },
-        { id: "notes", catalogMarketplaceName: "bb-community" },
+        { id: "notes", catalogMarketplaceName: "sandy-community" },
         { id: "tasks", catalogMarketplaceName: "acme" },
       ]);
 
@@ -4345,14 +4345,14 @@ describe("migrate", () => {
           etag: 'W/"xyz"',
           lastModified: "Thu, 02 Jan 2025 00:00:00 GMT",
         },
-        { name: "bb-community", etag: null, lastModified: null },
+        { name: "sandy-community", etag: null, lastModified: null },
       ]);
     } finally {
       closeConnection(db);
     }
   });
 
-  it("moves the bundled provider usage plugin and its footer preferences to the bb-- id", () => {
+  it("moves the bundled provider usage plugin and its footer preferences to the sandy-- id", () => {
     const db = createConnection(":memory:");
     try {
       migrate(db);
@@ -4380,7 +4380,7 @@ describe("migrate", () => {
           >("SELECT id, enabled, removed_at AS removedAt FROM plugins ORDER BY id")
           .all(),
       ).toEqual([
-        { id: "bb--provider-usage", enabled: 0, removedAt: 7 },
+        { id: "sandy--provider-usage", enabled: 0, removedAt: 7 },
         { id: "usage", enabled: 1, removedAt: null },
       ]);
       expect(
@@ -4394,12 +4394,12 @@ describe("migrate", () => {
         {
           key: "sidebar.footerOrder",
           valueJson:
-            '["builtin:settings","plugin:bb--provider-usage/usage","plugin:usage/usage"]',
+            '["builtin:settings","plugin:sandy--provider-usage/usage","plugin:usage/usage"]',
           revision: 4,
         },
         {
           key: "sidebar.hiddenFooterItems",
-          valueJson: '["plugin:bb--provider-usage/usage"]',
+          valueJson: '["plugin:sandy--provider-usage/usage"]',
           revision: 6,
         },
         {
@@ -4419,7 +4419,7 @@ describe("migrate", () => {
       migrate(db);
       db.$client.exec(`
         INSERT INTO plugins (id, source, root_dir, version, enabled, installed_at, updated_at, provenance, source_kind)
-        VALUES ('provider-usage', 'git:https://github.com/braedonsaunders/bb-plugin-provider-usage.git', '/managed/provider-usage', '0.4.0', 1, 1, 1, 'catalog', 'git');
+        VALUES ('provider-usage', 'git:https://github.com/braedonsaunders/sandy-plugin-provider-usage.git', '/managed/provider-usage', '0.4.0', 1, 1, 1, 'catalog', 'git');
       `);
 
       runMigrationFile({
@@ -4468,7 +4468,7 @@ describe("migrate", () => {
           .all(),
       ).toEqual([
         { id: "builtin-plugin", catalogMarketplaceName: null },
-        { id: "catalog-plugin", catalogMarketplaceName: "bb-official" },
+        { id: "catalog-plugin", catalogMarketplaceName: "sandy-official" },
         { id: "direct-plugin", catalogMarketplaceName: null },
       ]);
     } finally {
@@ -4760,7 +4760,7 @@ describe("environment providers migration", () => {
         environmentIntent: {
           type: "direct-managed",
           hostId: "host_ep",
-          sourcePath: "/checkouts/bb",
+          sourcePath: "/checkouts/sandy",
           baseBranch: { kind: "named", name: "release/1.2" },
           workspaceProvisionType: "managed-worktree",
         },
@@ -5099,7 +5099,7 @@ describe("machine providers migration", () => {
           id text PRIMARY KEY NOT NULL,
           host_type text NOT NULL
         );
-        CREATE TEMP TABLE bb_migration_local_host (id text PRIMARY KEY NOT NULL);
+        CREATE TEMP TABLE sandy_migration_local_host (id text PRIMARY KEY NOT NULL);
         INSERT INTO hosts VALUES
           ('legacy', 'Legacy', 'persistent', 'cloud-machine', NULL),
           ('direct', 'Direct', 'persistent', NULL, NULL);

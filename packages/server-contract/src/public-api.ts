@@ -71,8 +71,8 @@ import {
   appKeybindingOverridesSchema,
   appThemeSelectionSchema,
   experimentUpdatesSchema,
-} from "@bb/domain";
-import type { ProviderUsageResponse } from "@bb/host-daemon-contract";
+} from "@sandy/domain";
+import type { ProviderUsageResponse } from "@sandy/host-daemon-contract";
 import {
   binaryResponse,
   defineRoute,
@@ -84,7 +84,7 @@ import {
   queryRequest,
   type ApiSchemaFromRouteDescriptors,
   type EmptyInput,
-} from "@bb/hono-typed-routes";
+} from "@sandy/hono-typed-routes";
 import type {
   PathId,
   PathProjectId,
@@ -1829,7 +1829,7 @@ export const publicApiRoutes = {
     /**
      * Every live queued row, optionally narrowed to one thread or one
      * wait holder. Cross-thread because "what is queued right now" is a
-     * whole-workspace question (`bb thread queue list` with no thread, a
+     * whole-workspace question (`sandy thread queue list` with no thread, a
      * limiter plugin's own bookkeeping, a router recovering its rows after a
      * restart) that no single thread's list can answer.
      */
@@ -1987,7 +1987,7 @@ export const publicApiRoutes = {
     /**
      * Resolve a built-in, custom, or plugin theme exactly as activating it
      * would, without persisting anything. The Settings palette hover preview
-     * and `bb theme show <id>` read it; `faviconColor` echoes the stored
+     * and `sandy theme show <id>` read it; `faviconColor` echoes the stored
      * appearance because the response is a full `AppTheme`.
      */
     resolveTheme: defineRoute({

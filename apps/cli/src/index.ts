@@ -1,30 +1,30 @@
 #!/usr/bin/env node
 import { Command, CommanderError } from "commander";
-import { maybeReexecViaBbCli } from "./bb-cli-reexec.js";
+import { maybeReexecViaSandyCli } from "./sandy-cli-reexec.js";
 import {
   CORE_COMMAND_GROUPS,
   type CommandGroupDeps,
   pluginProxyCandidate,
   selectCommandGroups,
 } from "./command-groups.js";
-import { resolveBbCliVersion } from "./version.js";
+import { resolveSandyCliVersion } from "./version.js";
 import type { CliRuntimeContext } from "./context-env.js";
 
 if (process.env.FORCE_COLOR !== undefined) {
   delete process.env.NO_COLOR;
 }
 
-maybeReexecViaBbCli();
+maybeReexecViaSandyCli();
 
 const program = new Command();
 
 program
-  .name("bb")
-  .description("BB CLI - manage your AI coding agents")
+  .name("sandy")
+  .description("SANDY CLI - manage your AI coding agents")
   .enablePositionalOptions()
   .exitOverride()
   .showSuggestionAfterError(false)
-  .version(resolveBbCliVersion());
+  .version(resolveSandyCliVersion());
 
 const KNOWN_COMMAND_NAMES: ReadonlySet<string> = new Set([
   ...CORE_COMMAND_GROUPS.map((group) => group.name),
@@ -78,8 +78,8 @@ async function tryPluginCommandProxy(
     );
     if (disabledId !== null) {
       console.error(
-        `bb ${candidate} is provided by the "${disabledId}" plugin, which is disabled — ` +
-          `run \`bb plugin enable ${disabledId}\` or enable it in Plugins.`,
+        `sandy ${candidate} is provided by the "${disabledId}" plugin, which is disabled — ` +
+          `run \`sandy plugin enable ${disabledId}\` or enable it in Plugins.`,
       );
       process.exit(1);
     }
@@ -123,11 +123,11 @@ async function logCliError(args: {
   ]);
   appendCliErrorLogEntry({
     at: new Date().toISOString(),
-    cliVersion: resolveBbCliVersion(),
+    cliVersion: resolveSandyCliVersion(),
     code: args.code,
     command: args.command ?? commandPathLabel(program, process.argv),
     exitCode: args.exitCode,
-    threadId: process.env.BB_THREAD_ID ?? null,
+    threadId: process.env.SANDY_THREAD_ID ?? null,
     token: args.token,
   });
 }
@@ -195,7 +195,7 @@ async function addJsonShapeHelp(): Promise<void> {
   for (const commandPath of Object.keys(JSON_SHAPE_BY_COMMAND_PATH)) {
     const invocation = resolution.resolveInvocation(program, [
       "node",
-      "bb",
+      "sandy",
       ...commandPath.split(" "),
     ]);
     const help = jsonShapeHelp(commandPath);
@@ -226,15 +226,15 @@ async function main(): Promise<void> {
     return `
 
 Current context:
-  BB_PROJECT_ID: ${project}
-  BB_THREAD_ID: ${thread}
-  BB_SERVER_URL: ${context.serverUrl}
+  SANDY_PROJECT_ID: ${project}
+  SANDY_THREAD_ID: ${thread}
+  SANDY_SERVER_URL: ${context.serverUrl}
 
 Quick start:
-  bb status
-  bb project list
-  bb thread show <id>
-  bb thread spawn --project <id> --provider codex --prompt "..."
+  sandy status
+  sandy project list
+  sandy thread show <id>
+  sandy thread spawn --project <id> --provider codex --prompt "..."
 `;
   });
 

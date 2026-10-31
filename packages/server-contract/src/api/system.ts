@@ -18,9 +18,9 @@ import {
   permissionModeSchema,
   pluginThemeMetaSchema,
   providerInfoSchema,
-} from "@bb/domain";
-import { providerHealthSchema as providerHealthSchema } from "@bb/provider-bridge-protocol/provider-maintenance";
-import { hostPlatformSchema } from "@bb/host-daemon-contract/local";
+} from "@sandy/domain";
+import { providerHealthSchema as providerHealthSchema } from "@sandy/provider-bridge-protocol/provider-maintenance";
+import { hostPlatformSchema } from "@sandy/host-daemon-contract/local";
 import { machineEnvironmentSetSchema } from "./machine-environment.js";
 import { systemVoiceTranscriptionResponseSchema } from "./system-voice.js";
 import {
@@ -138,8 +138,8 @@ export interface SystemVoiceTranscriptionForm {
   [key: string]: string | Blob;
 }
 
-export { providerInfoSchema as systemProviderInfoSchema } from "@bb/domain";
-export type { ProviderInfo as SystemProviderInfo } from "@bb/domain";
+export { providerInfoSchema as systemProviderInfoSchema } from "@sandy/domain";
+export type { ProviderInfo as SystemProviderInfo } from "@sandy/domain";
 
 export type SystemVoiceTranscriptionResponse = z.infer<
   typeof systemVoiceTranscriptionResponseSchema
@@ -254,7 +254,7 @@ export const serverAccessStatusSchema = z.object({
   ),
   defaultProviderId: z.string(),
   effectiveUrl: z.string().nullable(),
-  urlSource: z.enum(["setting", "BB_EXTERNAL_URL"]).nullable(),
+  urlSource: z.enum(["setting", "SANDY_EXTERNAL_URL"]).nullable(),
 });
 export type ServerAccessStatus = z.infer<typeof serverAccessStatusSchema>;
 

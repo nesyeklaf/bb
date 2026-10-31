@@ -28,8 +28,8 @@ import type {
   ExperimentalComposerVoice,
   PluginComposerScope,
   PluginMentionTrigger,
-} from "@get-bb/plugin-sdk";
-import type { ThreadResponse } from "@bb/server-contract";
+} from "@sandy-sdk/plugin-sdk";
+import type { ThreadResponse } from "@sandy/server-contract";
 import {
   composerDraftFromPromptDraft,
   DEFAULT_PLUGIN_MENTION_TRIGGER,
@@ -37,10 +37,10 @@ import {
   type PromptDraftAttachment,
   type PromptDraftState,
   type PromptMentionLinkResolver,
-} from "@bb/client-core";
+} from "@sandy/client-core";
 import { isProjectAttachmentPath } from "@/lib/file-content-urls";
 import { getThreadDisplayTitle } from "@/lib/thread-title";
-import type { PromptTextMention } from "@bb/domain";
+import type { PromptTextMention } from "@sandy/domain";
 import { composerMentionResource } from "./mentions/prompt-mention-pill";
 import {
   PluginSlotMount,
@@ -85,7 +85,7 @@ import type {
   ComposerEditorState,
   ComposerEditorSubmission,
   ComposerSubmitExtras,
-} from "@get-bb/plugin-sdk/internal/composer-handle";
+} from "@sandy-sdk/plugin-sdk/internal/composer-handle";
 import {
   readMessageClipboardHtml,
   readMessageClipboardImage,

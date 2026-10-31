@@ -16,15 +16,15 @@ import {
   type ReorderPinnedThreadResult,
   type ReorderQueuedThreadMessageResult,
   type SetQueuedThreadMessageGroupBoundaryResult,
-} from "@bb/db";
+} from "@sandy/db";
 import {
   publicApiRoutes,
   typedRoutes,
   type ThreadListResponse,
   type PublicApiSchema,
-} from "@bb/server-contract";
+} from "@sandy/server-contract";
 import type { Hono } from "hono";
-import { type ThreadQueuedMessage } from "@bb/domain";
+import { type ThreadQueuedMessage } from "@sandy/domain";
 import type { AppDeps } from "../../types.js";
 import { ApiError } from "../../errors.js";
 import {

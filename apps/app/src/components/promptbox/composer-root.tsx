@@ -10,7 +10,7 @@ import type {
   ExperimentalComposerEditor,
   ExperimentalComposerMenuEntryProps,
   ExperimentalComposerRootProps,
-} from "@get-bb/plugin-sdk";
+} from "@sandy-sdk/plugin-sdk";
 import {
   ComposerActionsSlot,
   PluginComposerPlusMenuEntry,
