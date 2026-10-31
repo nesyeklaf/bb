@@ -187,6 +187,27 @@ export type SetAiServiceSelectionRequest = z.infer<
   typeof setAiServiceSelectionRequestSchema
 >;
 
+export const CLIENT_ERROR_SOURCES = [
+  "react-caught",
+  "react-uncaught",
+  "window-error",
+  "unhandled-rejection",
+] as const;
+export type ClientErrorSource = (typeof CLIENT_ERROR_SOURCES)[number];
+export const CLIENT_ERROR_MESSAGE_MAX_LENGTH = 2_000;
+export const CLIENT_ERROR_STACK_MAX_LENGTH = 16_000;
+
+export const clientErrorReportSchema = z
+  .object({
+    source: z.enum(CLIENT_ERROR_SOURCES),
+    message: z.string().min(1).max(CLIENT_ERROR_MESSAGE_MAX_LENGTH),
+    stack: z.string().max(CLIENT_ERROR_STACK_MAX_LENGTH).nullable(),
+    componentStack: z.string().max(CLIENT_ERROR_STACK_MAX_LENGTH).nullable(),
+    path: z.string().min(1).max(CLIENT_ERROR_MESSAGE_MAX_LENGTH),
+  })
+  .strict();
+export type ClientErrorReport = z.infer<typeof clientErrorReportSchema>;
+
 export const testAiServiceRequestSchema = z
   .object({ task: aiTextTaskSchema })
   .strict();

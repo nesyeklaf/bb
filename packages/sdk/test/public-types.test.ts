@@ -357,6 +357,7 @@ type ExpectedSystemKey =
   | "experimental_cliCommand"
   | "experimental_installCliCommand"
   | "experimental_removeCliCommand"
+  | "experimental_reportClientError"
   | "reloadConfig"
   | "setAiServiceSelection"
   | "testAiService"

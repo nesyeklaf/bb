@@ -14,6 +14,7 @@ import type {
 } from "@bb/domain";
 import type { ProviderUsageResponse } from "@bb/host-daemon-contract";
 import type {
+  ClientErrorReport,
   SetAiServiceSelectionRequest,
   SystemAiServicesResponse,
   SystemCliCommandStatus,
@@ -77,6 +78,8 @@ export type SystemAttentionResult = SystemAttentionResponse;
 export type SystemConfigResult = SystemConfigResponse;
 export type SystemAiServicesResult = SystemAiServicesResponse;
 export type SystemSetAiServiceSelectionArgs = SetAiServiceSelectionRequest;
+export type SystemReportClientErrorArgs = ClientErrorReport;
+export type SystemReportClientErrorResult = { ok: true };
 export type SystemTestAiServiceArgs = TestAiServiceRequest;
 export type SystemTestAiServiceResult = TestAiServiceResponse;
 
@@ -156,6 +159,9 @@ export interface SystemArea {
   setAiServiceSelection(
     args: SystemSetAiServiceSelectionArgs,
   ): Promise<SystemAiServicesResult>;
+  experimental_reportClientError(
+    args: SystemReportClientErrorArgs,
+  ): Promise<SystemReportClientErrorResult>;
   testAiService(
     args: SystemTestAiServiceArgs,
   ): Promise<SystemTestAiServiceResult>;
@@ -258,6 +264,11 @@ export function createSystemArea(args: CreateSdkAreaArgs): SystemArea {
     async setAiServiceSelection(input) {
       return transport.readJson(
         transport.api.v1.system["ai-services"].selection.$put({ json: input }),
+      );
+    },
+    async experimental_reportClientError(input) {
+      return transport.readJson(
+        transport.api.v1.system["client-errors"].$post({ json: input }),
       );
     },
     async testAiService(input) {

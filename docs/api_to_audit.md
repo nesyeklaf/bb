@@ -3844,6 +3844,25 @@ machine through the host daemon (enrolled machines get `~/.local/bin/bb` from
 `install-machine.sh` today), and after exercising real Windows and macOS
 installs.
 
+## `PluginBbSdk.system.experimental_reportClientError`
+
+`system.experimental_reportClientError({ source, message, stack,
+componentStack, path })` posts a browser error to
+`POST /api/v1/system/client-errors`, which writes it to the server log at
+error level as `Client error: <message>` with `clientErrorSource`,
+`clientPath`, `clientStack`, `clientComponentStack` and `userAgent`, and so
+to OTLP when `BB_OTLP_ENDPOINT` is set. `source` is `react-caught`,
+`react-uncaught`, `window-error` or `unhandled-rejection`; message and path
+are capped at 2,000 characters, stacks at 16,000. Core caller: the web app's
+error reporter (`apps/app/src/lib/client-error-reporting.ts`), which hooks
+React's root error callbacks and the window `error` and
+`unhandledrejection` events, reports each source and message once and at most
+20 errors per page load.
+
+Stabilize after deciding whether plugin frames should report through it under
+their own plugin id, whether the server should rate-limit per client, and
+whether reports should be readable through `bb diagnostics`.
+
 ## `PluginBbSdk.hosts.experimental_discoverRepos`
 
 `hosts.experimental_discoverRepos({ hostId })` lists up to 10 git

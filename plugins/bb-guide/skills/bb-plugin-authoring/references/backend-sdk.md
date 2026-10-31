@@ -76,7 +76,8 @@ signatures (see "Looking up the exact API" in distribution.md).
   `installCliSkills` `machineEnvironment` `replaceMachineEnvironment`
   `setMachineEnvironmentVariable` `deleteMachineEnvironmentVariable`
   `experimental_cliCommand`
-  `experimental_installCliCommand` `experimental_removeCliCommand`; sub-area `uiPreferences` (`list` `set` `reset`)
+  `experimental_installCliCommand` `experimental_removeCliCommand`
+  `experimental_reportClientError`; sub-area `uiPreferences` (`list` `set` `reset`)
 - `experimental_desktopBrowsers`: `listInstances` `listTabs` `createTab`
   `acquireControl` `openConnection` `releaseControl` `revealTab` `closeTab`
   `captureTab` `listImportSources` `importCookies` `subscribe`

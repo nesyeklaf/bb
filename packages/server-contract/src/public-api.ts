@@ -11,6 +11,8 @@ import {
   setAiServiceSelectionRequestSchema,
   systemProviderEnabledRequestSchema,
   testAiServiceRequestSchema,
+  clientErrorReportSchema,
+  type ClientErrorReport,
   type MachineEnvironmentReplace,
   type SetAiServiceSelectionRequest,
   type SystemAiServicesResponse,
@@ -1898,6 +1900,14 @@ export const publicApiRoutes = {
         setAiServiceSelectionRequestSchema,
       ),
       response: jsonResponse<SystemAiServicesResponse>(),
+    }),
+    reportClientError: defineRoute({
+      path: "/system/client-errors",
+      method: "post",
+      request: jsonRequest<EmptyInput, ClientErrorReport>(
+        clientErrorReportSchema,
+      ),
+      response: jsonResponse<{ ok: true }>(),
     }),
     testAiService: defineRoute({
       path: "/system/ai-services/test",
