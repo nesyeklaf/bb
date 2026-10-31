@@ -155,7 +155,7 @@ export const SURFACE_GROUPS: SurfaceGroup[] = [
         bullets: [
           "Group, sort, and draw every row your own way",
           "Read live threads, sections, projects, and run status",
-          "Use optimistic SDK writes and sandy's actions to move, pin, rename, restore, archive, and split threads",
+          "Use optimistic writes and sandy's actions to move, pin, rename, restore, archive, and split threads",
           "Keep sandy's New thread button, search, and footer around it",
         ],
         apiSymbols: [

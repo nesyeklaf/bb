@@ -133,9 +133,9 @@ describe("old copy entries", () => {
 
     expect(entries).toEqual([
       "attachments",
-      "sandy.db",
       "plugins/tasks/data.db",
       "plugins/tasks/secrets",
+      "sandy.db",
     ]);
     expect(
       serverMovedFileSchema.parse({

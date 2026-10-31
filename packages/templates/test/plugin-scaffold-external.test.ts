@@ -517,7 +517,7 @@ describe("external plugin scaffold types", () => {
         "utf8",
       );
       const sandyImports = [
-        ...declarations.matchAll(/from ['"](@(?:get-)?sandy\/[^'"]+)['"]/gu),
+        ...declarations.matchAll(/from ['"](@(?:sandy-sdk|sandy)\/[^'"]+)['"]/gu),
       ].map((match) => match[1]);
       expect(new Set(sandyImports)).toEqual(new Set(["@sandy-sdk/plugin-sdk"]));
       expect(declarations).not.toContain("@sandy/sdk");
