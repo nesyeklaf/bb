@@ -1,8 +1,10 @@
-# This fork
+# Sandy: origin, release, operations
 
-`nesyeklaf/sandy` is [nesyeklaf/sandy](https://github.com/nesyeklaf/sandy) with a small set of local fixes, built and run on a self-hosted server reached over Tailscale.
+Sandy is a hard fork of [BB](https://getbb.app) by Michael Yong (MIT, see `LICENSE`), taken at BB 0.48.1. It has no upstream: nothing is merged from BB any more, and the services behind getbb.app are cut out. Every change is made here.
 
-- `main` is the fork. Changes from get-bb come in only by cherry-picking or reimplementing a single upstream commit by hand. Every adopted commit must pass `scripts/fork/check-egress-hosts.sh`, `scripts/fork/check-package-manager-calls.sh` and the smoke run before deploy.
+It is built and run on a self-hosted server reached over Tailscale. The scripts in `scripts/fork/` build, check and deploy it; `scripts/migrate-from-bb.mjs` moves an existing BB install (data directory, database, plugin ids) to Sandy names.
+
+- Every commit must pass `scripts/fork/check-egress-hosts.sh`, `scripts/fork/check-package-manager-calls.sh` and the smoke run before deploy.
 
 ## Release
 
@@ -24,7 +26,7 @@ The release builds a clean checkout of `main` and nothing else: a dirty tree, an
 
 Build requirements: Node and pnpm from `package.json`, a JDK 17 with `javac` (found under `~/.gradle/jdks` or `/usr/lib/jvm`, or set `JAVA_HOME`), and the Android SDK at `$ANDROID_HOME` (default `~/Android/Sdk`). JDK 21 does not build the APK.
 
-The version number stays get-bb's. Tell a fork build apart by its commit, not by its version.
+The version number carries on from BB 0.48.1 at the fork point. Tell builds apart by their commit.
 
 ## Deploy
 
@@ -52,7 +54,7 @@ It installs the tarball into a temporary npm prefix, copies `sandy.db` (an onlin
 
 Check the result any time with `ssh AI 'bash ~/sandy-fork-remote.sh status'`. It prints the unit state, installed version, `SANDY_APP_URL`, the local and tailnet HTTP status, and the tail of `~/sandy-fork-deploy.log`.
 
-Do not update the server through the sandy UI or npm. That installs the official package and drops the fork fixes. Machine daemons started with `--auto-update` fetch the package from their server, so they follow the fork.
+Do not update the server through the sandy UI or npm. The `sandy-app` package on npm is not ours and would replace this build. Machine daemons started with `--auto-update` fetch the package from their server, so they follow the fork.
 
 ## Rollback
 
@@ -78,8 +80,17 @@ ssh AI 'bash ~/sandy-fork-remote.sh serve'   # sudo tailscale serve --bg --https
 
 Clients: the desktop app points at the tailnet URL through its custom server URL. The phone needs Tailscale running. A machine daemon is re-enrolled from the tailnet URL under Settings, Machines, Add machine.
 
-## Fork changes
+## Differences from BB at the fork point
 
-- `SandyNavigate.toThread(threadId, { experimental_messageSeq })` jumps to a message (`#msg=SEQ`) from plugins, with `split` too. Dropped when get-bb ships an equivalent.
-- `app.slots.experimental_threadTocExtension({ id, title, useBands, tab?, onBandClick?, onBandHover? })` adds topic brackets and a popover tab to the thread TOC rail, with drag-marked ranges (`railSelection`). The tab can be the popover's default (`tab.experimental_default`) and gets `activeSeq`, `hoveredBand` and `setHoveredRange` to link its rows with the brackets. Ticks get their seq from the new `messageSeq` field of the conversation outline item (projection version 3). Dropped when get-bb ships an equivalent.
+- `SandyNavigate.toThread(threadId, { experimental_messageSeq })` jumps to a message (`#msg=SEQ`) from plugins, with `split` too.
+- `app.slots.experimental_threadTocExtension({ id, title, useBands, tab?, onBandClick?, onBandHover? })` adds topic brackets and a popover tab to the thread TOC rail, with drag-marked ranges (`railSelection`). The tab can be the popover's default (`tab.experimental_default`) and gets `activeSeq`, `hoveredBand` and `setHoveredRange` to link its rows with the brackets. Ticks get their seq from the `messageSeq` field of the conversation outline item (projection version 3).
 - sandy connect, the machine tunnel, the account gate and the hosted web app (`apps/web`) are removed. Remote access is Tailscale Serve or `SANDY_SERVER_BIND_HOST` only.
+
+## Migrating an existing BB install
+
+```sh
+node scripts/migrate-from-bb.mjs            # dry run: prints what would change
+node scripts/migrate-from-bb.mjs --apply    # stop the BB server first
+```
+
+It moves `~/.bb`, `~/.bb-dev` and `~/.bb-machines` to the `.sandy*` names, renames `bb.db` and the runtime file, rewrites `BB_*` keys in `config.json` and `env.json`, and updates plugin ids, data-dir paths and the machine-auth user inside the database. Thread history is left as written. It copies the database to `backup-pre-sandy-<timestamp>` first. It does not touch the systemd unit: write the new unit, then `systemctl --user disable --now` the old one and `enable --now` the new one.
