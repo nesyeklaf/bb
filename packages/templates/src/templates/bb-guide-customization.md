@@ -219,8 +219,14 @@ Launcher settings
 
 `bb-app config` and `bb-app env` reload runtime settings in a running server,
 but the CLI identifies settings that are startup-only, including binding/ports,
-data and the dev-app port, inherited skill roots, and
-`BB_LOG_LEVEL`. Use `bb-app config`, not `bb-app env`, to change `BB_APP_URL`
+data and the dev-app port, inherited skill roots, `BB_LOG_LEVEL`, and
+`BB_OTLP_ENDPOINT`.
+
+`npx bb-app env set BB_OTLP_ENDPOINT http://127.0.0.1:4318` makes the server and
+host daemon export logs, traces and metrics to an OTLP/HTTP receiver, such as
+an OpenTelemetry Collector; it is off by default and takes effect after a full
+restart. Errors from the web app reach the server log, and so the receiver, as
+`Client error: <message>` records. Use `bb-app config`, not `bb-app env`, to change `BB_APP_URL`
 live. After a startup-only change, run `bb-app stop && bb-app start` or restart
 the desktop app; until then, changing or unsetting `BB_SERVER_BIND_HOST` does
 not close a listener on a previously listed address.
