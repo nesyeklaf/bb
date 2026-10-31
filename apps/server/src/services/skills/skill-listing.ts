@@ -4,10 +4,15 @@ import { createHash } from "node:crypto";
 import fs from "node:fs/promises";
 import path from "node:path";
 import { resolveDataDirSkillsRootPath } from "@bb/config/skill-storage-paths";
+import { getAppSettings } from "@bb/db";
+import type { BbSkillSourceId } from "@bb/domain";
 import { replaceFile } from "@bb/file-transfer";
 import type { DiscoveredSkill, SkillRootKind } from "@bb/host-daemon-contract";
 import type {
+  SkillDuplicate,
+  SkillDuplicateRelation,
   SkillProvider,
+  SkillRegistration,
   SkillScope,
   SkillSummary,
 } from "@bb/server-contract";
@@ -36,7 +41,10 @@ import {
   scanProviderNativeRoots,
 } from "../providers/native-roots.js";
 
-type IndexedSkillSummary = SkillSummary & { realPath: string };
+export type IndexedSkillRegistration = SkillRegistration & {
+  realPath: string;
+  contentSha256: string | null;
+};
 
 const SKILL_FILE_NAME = "SKILL.md";
 const SERVER_SKILL_FILE_LIMIT = 200;
@@ -110,8 +118,8 @@ interface ProviderSkillDiscovery {
 }
 
 function compareSkillSummaries(
-  left: SkillSummary,
-  right: SkillSummary,
+  left: SkillRegistration,
+  right: SkillRegistration,
 ): number {
   const scopeDelta =
     SKILL_SCOPE_ORDER.indexOf(left.scope) -
@@ -134,8 +142,8 @@ function compareSkillSummaries(
 
 export function assembleSkillList(
   perProvider: readonly ProviderSkillDiscovery[],
-): SkillSummary[] {
-  const registrations: SkillSummary[] = [];
+): SkillRegistration[] {
+  const registrations: SkillRegistration[] = [];
   for (const { provider, skills } of perProvider) {
     for (const skill of skills) {
       const mapped = mapSkillScope(provider, skill.rootKind, skill.filePath);
@@ -159,7 +167,9 @@ export function assembleSkillList(
   );
 }
 
-async function listServerOwnedSkills(deps: AppDeps): Promise<SkillSummary[]> {
+async function listServerOwnedSkills(
+  deps: AppDeps,
+): Promise<SkillRegistration[]> {
   return (
     await resolveServerOwnedSkillCatalogEntries({
       builtinSkillsRootPath: null,
@@ -168,7 +178,7 @@ async function listServerOwnedSkills(deps: AppDeps): Promise<SkillSummary[]> {
       skillTreeRegistry: deps.skillTreeRegistry,
     })
   )
-    .map(({ runtimeSource }): SkillSummary | null => {
+    .map(({ runtimeSource }): SkillRegistration | null => {
       if (runtimeSource.kind !== "tree") return null;
       const rootPath = path.join(
         resolveDataDirSkillsRootPath(deps.config.dataDir),
@@ -186,13 +196,13 @@ async function listServerOwnedSkills(deps: AppDeps): Promise<SkillSummary[]> {
         manageable: true,
       };
     })
-    .filter((skill): skill is SkillSummary => skill !== null)
+    .filter((skill): skill is SkillRegistration => skill !== null)
     .sort(compareSkillSummaries);
 }
 
-async function listBbPluginSkills(deps: AppDeps): Promise<SkillSummary[]> {
+async function listBbPluginSkills(deps: AppDeps): Promise<SkillRegistration[]> {
   return (await resolveSkillCatalog(deps))
-    .map(({ provenance, runtimeSource }): SkillSummary | null => {
+    .map(({ provenance, runtimeSource }): SkillRegistration | null => {
       if (provenance.kind !== "plugin" || runtimeSource.kind !== "tree") {
         return null;
       }
@@ -213,7 +223,7 @@ async function listBbPluginSkills(deps: AppDeps): Promise<SkillSummary[]> {
         manageable: false,
       };
     })
-    .filter((skill): skill is SkillSummary => skill !== null)
+    .filter((skill): skill is SkillRegistration => skill !== null)
     .sort(compareSkillSummaries);
 }
 
@@ -221,8 +231,8 @@ async function projectSkillIndex(
   deps: AppDeps,
   args: { workspace: CommandWorkspace },
 ): Promise<{
-  registrations: IndexedSkillSummary[];
-  entries: IndexedSkillSummary[];
+  registrations: IndexedSkillRegistration[];
+  entries: SkillSummary[];
 }> {
   const skillProviders = deps.providerRegistry
     .list()
@@ -278,11 +288,16 @@ async function projectSkillIndex(
         realPath,
       });
   }
+  const disabledSources = new Set(getAppSettings(deps.db).disabledSkillSources);
   const registrations = [
     ...assembleSkillList(perProvider),
     ...sharedSkills.summaries,
     ...serverSkills,
   ]
+    .filter((skill) => {
+      const source = bbSkillSourceOf(skill);
+      return source === null || !disabledSources.has(source);
+    })
     .sort(
       (left, right) =>
         Number(left.provider !== null) - Number(right.provider !== null) ||
@@ -293,27 +308,120 @@ async function projectSkillIndex(
     .map((skill) => ({
       ...skill,
       realPath: identities.get(skill.id)?.realPath ?? skill.filePath,
+      contentSha256: identities.get(skill.id)?.contentSha256 ?? null,
     }));
+  return { registrations, entries: summarizeSkillRegistrations(registrations) };
+}
+
+export function bbSkillSourceOf(
+  skill: Pick<SkillRegistration, "scope" | "provider">,
+): BbSkillSourceId | null {
+  switch (skill.scope) {
+    case "bb-user":
+      return "bb-user";
+    case "bb-project":
+      return "bb-project";
+    case "shared-user":
+    case "shared-project":
+      return "shared";
+    case "plugin":
+      return skill.provider === null ? "bb-plugins" : null;
+    default:
+      return null;
+  }
+}
+
+function skillContentIdentity(skill: IndexedSkillRegistration): string {
+  return `${skill.name}\0${skill.contentSha256 ?? skill.realPath}`;
+}
+
+function toSkillRegistration({
+  realPath: _realPath,
+  contentSha256: _contentSha256,
+  ...registration
+}: IndexedSkillRegistration): SkillRegistration {
+  return registration;
+}
+
+function toSkillDuplicate(
+  skill: IndexedSkillRegistration,
+  relation: SkillDuplicateRelation,
+): SkillDuplicate {
   return {
-    registrations,
-    entries: firstPerIdentity(
-      registrations,
-      (skill) =>
-        `${skill.name}\0${identities.get(skill.id)?.contentSha256 ?? skill.realPath}`,
-    ),
+    id: skill.id,
+    scope: skill.scope,
+    provider: skill.provider,
+    pluginId: skill.pluginId,
+    filePath: skill.filePath,
+    relation,
   };
+}
+
+export function summarizeSkillRegistrations(
+  registrations: readonly IndexedSkillRegistration[],
+): SkillSummary[] {
+  const groups = new Map<string, IndexedSkillRegistration[]>();
+  const keysByName = new Map<string, string[]>();
+  for (const skill of registrations) {
+    const key = skillContentIdentity(skill);
+    const group = groups.get(key);
+    if (group !== undefined) {
+      group.push(skill);
+      continue;
+    }
+    groups.set(key, [skill]);
+    keysByName.set(skill.name, [...(keysByName.get(skill.name) ?? []), key]);
+  }
+  const summaries: SkillSummary[] = [];
+  for (const [key, group] of groups) {
+    const [entry, ...copies] = group;
+    if (entry === undefined) continue;
+    const sameName = (keysByName.get(entry.name) ?? [])
+      .filter((candidate) => candidate !== key)
+      .flatMap((candidate) => groups.get(candidate) ?? []);
+    summaries.push({
+      ...toSkillRegistration(entry),
+      providers: [
+        ...new Set(
+          group.flatMap((skill) =>
+            skill.provider === null ? [] : [skill.provider],
+          ),
+        ),
+      ].sort(),
+      duplicates: otherLocations(entry, [
+        ...copies.map((skill) =>
+          toSkillDuplicate(
+            skill,
+            skill.realPath === entry.realPath ? "same-file" : "same-content",
+          ),
+        ),
+        ...sameName.map((skill) => toSkillDuplicate(skill, "same-name")),
+      ]),
+    });
+  }
+  return summaries.sort(compareSkillSummaries);
+}
+
+function otherLocations(
+  entry: IndexedSkillRegistration,
+  duplicates: readonly SkillDuplicate[],
+): SkillDuplicate[] {
+  const seen = new Set([entry.filePath]);
+  return duplicates.filter((duplicate) => {
+    if (seen.has(duplicate.filePath)) return false;
+    seen.add(duplicate.filePath);
+    return true;
+  });
 }
 
 export async function listProjectSkills(
   deps: AppDeps,
   args: { workspace: CommandWorkspace },
 ): Promise<SkillSummary[]> {
-  return (await projectSkillIndex(deps, args)).entries
-    .map(({ realPath: _realPath, ...summary }) => summary)
-    .sort(compareSkillSummaries);
+  return (await projectSkillIndex(deps, args)).entries;
 }
 
-function isServerOwnedSkill(deps: AppDeps, skill: SkillSummary): boolean {
+function isServerOwnedSkill(deps: AppDeps, skill: SkillRegistration): boolean {
   const skillDirectoryPath = path.dirname(skill.filePath);
   if (
     skill.scope === "plugin" &&
@@ -366,7 +474,7 @@ function isPathWithinRoot(candidatePath: string, rootPath: string): boolean {
 }
 
 async function resolveServerSkillFile(
-  skill: SkillSummary,
+  skill: SkillRegistration,
   relativePath: string,
 ): Promise<string> {
   const segments = validateServerSkillRelativePath(relativePath);
@@ -391,7 +499,7 @@ async function resolveServerSkillFile(
 }
 
 async function listServerSkillFiles(
-  skill: SkillSummary,
+  skill: SkillRegistration,
 ): Promise<{ files: string[]; truncated: boolean }> {
   const rootPath = path.dirname(skill.filePath);
   const files: string[] = [];
@@ -435,7 +543,7 @@ async function resolveProjectSkill(
     skillId: string;
     workspace: CommandWorkspace;
   },
-): Promise<IndexedSkillSummary> {
+): Promise<IndexedSkillRegistration> {
   const index = await projectSkillIndex(deps, { workspace: args.workspace });
   const match = index.registrations.find((skill) => skill.id === args.skillId);
   if (!match) {

@@ -19,6 +19,7 @@ import {
   experimentKeys,
   managedBranchPrefixSchema,
   type AppTheme,
+  type BbSkillSourceId,
   type ExperimentKey,
   type Experiments,
   type FaviconColorPreference,
@@ -56,6 +57,7 @@ import { useAppThemePreview } from "@/hooks/useAppThemePreview";
 import { ProvidersSettingsSection } from "@/components/settings/ProvidersSettingsSection";
 import { CodeRendererSettings } from "@/components/settings/CodeRendererSettings";
 import { SidebarThreadListSetting } from "@/components/settings/SidebarThreadListSetting";
+import { SkillSourcesSettings } from "@/components/settings/SkillSourcesSettings";
 import { SidebarNavigationProviderSetting } from "@/components/settings/SidebarNavigationProviderSetting";
 import { SidebarFooterSettings } from "@/components/settings/SidebarFooterSettings";
 import { SplitDimmingSetting } from "@/components/settings/SplitDimmingSetting";
@@ -191,6 +193,8 @@ interface GeneralSettingsSectionProps {
   openLinksInAppBrowser: boolean;
   rewriteLocalhostLinks: boolean;
   steerActiveThreadOnEnter: boolean;
+  disabledSkillSources: readonly BbSkillSourceId[];
+  onDisabledSkillSourcesChange: (disabledSources: BbSkillSourceId[]) => void;
 }
 
 interface PrivacySettingsSectionProps {
@@ -878,6 +882,8 @@ export function GeneralSettingsSection({
   openLinksInAppBrowser,
   rewriteLocalhostLinks,
   steerActiveThreadOnEnter,
+  disabledSkillSources,
+  onDisabledSkillSourcesChange,
 }: GeneralSettingsSectionProps) {
   const localhostRewriteDescription = localhostLinkRewriteDescription(
     typeof window === "undefined" ? undefined : window.location.hostname,
@@ -1001,6 +1007,12 @@ export function GeneralSettingsSection({
           </SettingsWithControl>
         </div>
       </SettingsSection>
+      <SkillSourcesSettings
+        disabled={generalSettingsDisabled}
+        disabledSources={disabledSkillSources}
+        onDisabledSourcesChange={onDisabledSkillSourcesChange}
+      />
+
       <SettingsSection title="Links">
         <div className="space-y-5">
           {desktopBrowserAvailable ? (
@@ -1393,9 +1405,7 @@ export function SettingsView() {
   } else if (activeSection === "environment-variables") {
     content = <MachineEnvironmentSettings />;
   } else if (activeSection === "updates") {
-    content = (
-      <UpdatesSettingsSection />
-    );
+    content = <UpdatesSettingsSection />;
   } else if (activeSection === "mobile") {
     content = <MobileAppSection />;
   } else if (activeSection === "experiments") {
@@ -1464,6 +1474,12 @@ export function SettingsView() {
           openLinksInAppBrowser={openLinksInAppBrowser}
           rewriteLocalhostLinks={rewriteLocalhostLinks}
           steerActiveThreadOnEnter={generalSettings.steerActiveThreadOnEnter}
+          disabledSkillSources={generalSettings.disabledSkillSources}
+          onDisabledSkillSourcesChange={(disabledSources) =>
+            updateGeneralSettingsMutation.mutate({
+              disabledSkillSources: disabledSources,
+            })
+          }
           terminalCopyOnSelect={generalSettings.terminalCopyOnSelect}
           onTerminalCopyOnSelectChange={(enabled) =>
             updateGeneralSettingsMutation.mutate({

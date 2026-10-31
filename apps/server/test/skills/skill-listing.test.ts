@@ -5,6 +5,8 @@ import { describe, expect, it } from "vitest";
 import {
   assembleSkillList,
   mapSkillScope,
+  summarizeSkillRegistrations,
+  type IndexedSkillRegistration,
 } from "../../src/services/skills/skill-listing.js";
 
 describe("mapSkillScope", () => {
@@ -200,5 +202,150 @@ describe("assembleSkillList", () => {
       scope: "provider-user",
       manageable: false,
     });
+  });
+});
+
+describe("summarizeSkillRegistrations", () => {
+  function registration(
+    overrides: Partial<IndexedSkillRegistration> &
+      Pick<IndexedSkillRegistration, "filePath" | "name">,
+  ): IndexedSkillRegistration {
+    return {
+      id: `skill_${createHash("sha256")
+        .update(overrides.filePath + (overrides.provider ?? ""))
+        .digest("hex")}`,
+      description: null,
+      provider: null,
+      scope: "provider-user",
+      pluginId: null,
+      manageable: false,
+      realPath: overrides.filePath,
+      contentSha256: createHash("sha256")
+        .update(overrides.filePath)
+        .digest("hex"),
+      ...overrides,
+    };
+  }
+
+  it("lists a symlinked skill once with every agent that loads it and the other path once as a same-file duplicate", () => {
+    const real = "/home/.pi/agent/git/forge-skills/skills/debug/SKILL.md";
+    const piPackage = registration({
+      name: "debug",
+      provider: "pi",
+      filePath: real,
+    });
+    const piLinked = registration({
+      name: "debug",
+      provider: "pi",
+      filePath: "/home/.agents/skills/debug/SKILL.md",
+      realPath: real,
+      contentSha256: piPackage.contentSha256,
+    });
+    const cursorLinked = {
+      ...piLinked,
+      id: registration({
+        name: "debug",
+        provider: "acp-cursor",
+        filePath: piLinked.filePath,
+      }).id,
+      provider: "acp-cursor",
+    };
+
+    const result = summarizeSkillRegistrations([
+      piPackage,
+      piLinked,
+      cursorLinked,
+    ]);
+
+    expect(result).toHaveLength(1);
+    expect(result[0]).toMatchObject({
+      id: piPackage.id,
+      providers: ["acp-cursor", "pi"],
+    });
+    expect(
+      result[0]?.duplicates.map((d) => [d.id, d.filePath, d.relation]),
+    ).toEqual([[piLinked.id, piLinked.filePath, "same-file"]]);
+    expect(result[0]).not.toHaveProperty("realPath");
+    expect(result[0]).not.toHaveProperty("contentSha256");
+  });
+
+  it("marks a copied file as same-content and a different skill with the same name as same-name on both sides", () => {
+    const original = registration({
+      name: "pdf",
+      provider: "acp-cursor",
+      filePath: "/home/.cursor/skills/pdf/SKILL.md",
+    });
+    const copy = registration({
+      name: "pdf",
+      provider: "acp-hermes-agent",
+      filePath: "/home/.hermes/skills/pdf/SKILL.md",
+      contentSha256: original.contentSha256,
+    });
+    const other = registration({
+      name: "pdf",
+      scope: "plugin",
+      pluginId: "docs",
+      filePath: "/plugins/docs/skills/pdf/SKILL.md",
+    });
+
+    const result = summarizeSkillRegistrations([original, copy, other]);
+
+    expect(result).toHaveLength(2);
+    const byId = new Map(result.map((skill) => [skill.id, skill]));
+    expect(byId.get(original.id)?.providers).toEqual([
+      "acp-cursor",
+      "acp-hermes-agent",
+    ]);
+    expect(
+      byId.get(original.id)?.duplicates.map((d) => [d.id, d.relation]),
+    ).toEqual([
+      [copy.id, "same-content"],
+      [other.id, "same-name"],
+    ]);
+    expect(
+      byId.get(other.id)?.duplicates.map((d) => [d.id, d.relation]),
+    ).toEqual([
+      [original.id, "same-name"],
+      [copy.id, "same-name"],
+    ]);
+    expect(byId.get(other.id)?.providers).toEqual([]);
+  });
+
+  it("does not count one path loaded by several agents as a duplicate", () => {
+    const filePath = "/home/.agents/skills/architect/SKILL.md";
+    const forCodex = registration({
+      name: "architect",
+      provider: "codex",
+      filePath,
+    });
+    const forPi = registration({ name: "architect", provider: "pi", filePath });
+
+    const result = summarizeSkillRegistrations([forCodex, forPi]);
+
+    expect(result).toHaveLength(1);
+    expect(result[0]?.providers).toEqual(["codex", "pi"]);
+    expect(result[0]?.duplicates).toEqual([]);
+  });
+
+  it("leaves a unique skill without duplicates", () => {
+    const only = registration({
+      name: "solo",
+      provider: "codex",
+      filePath: "/home/.codex/skills/solo/SKILL.md",
+    });
+    expect(summarizeSkillRegistrations([only])).toEqual([
+      {
+        id: only.id,
+        name: "solo",
+        description: null,
+        provider: "codex",
+        scope: "provider-user",
+        pluginId: null,
+        filePath: only.filePath,
+        manageable: false,
+        providers: ["codex"],
+        duplicates: [],
+      },
+    ]);
   });
 });

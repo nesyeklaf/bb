@@ -6,6 +6,7 @@ import {
   stubServerApi,
   type CommandRegistrar,
 } from "../helpers/command-output-harness.js";
+import { defaultAppSettings } from "@bb/domain";
 import { registerSkillCommands } from "../../commands/skill.js";
 
 describe("bb skill commands", () => {
@@ -29,6 +30,8 @@ describe("bb skill commands", () => {
           scope: "codex-user",
           filePath: "/home/user/.agents/skills/review/SKILL.md",
           manageable: true,
+          providers: ["codex"],
+          duplicates: [],
         },
       ],
     }));
@@ -43,5 +46,58 @@ describe("bb skill commands", () => {
     expect(collectLogLines(vi.mocked(console.log)).join("\n")).toContain(
       "review",
     );
+  });
+
+  it("turns one bb skill source off and keeps the other settings", async () => {
+    const put = vi.fn(async ({ json }) => json);
+    stubServerApi({
+      "v1.system.config.$get": vi.fn(async () => ({
+        generalSettings: {
+          ...defaultAppSettings,
+          streamerMode: true,
+          disabledSkillSources: ["bb-user"],
+        },
+      })),
+      "v1.settings.general.$put": put,
+    });
+
+    await runCommand(["skill", "sources", "shared", "off", "--json"], register);
+
+    expect(put).toHaveBeenCalledWith({
+      json: {
+        ...defaultAppSettings,
+        streamerMode: true,
+        disabledSkillSources: ["bb-user", "shared"],
+      },
+    });
+    const printed = JSON.parse(
+      collectLogLines(vi.mocked(console.log)).join("\n"),
+    );
+    expect(
+      printed.sources.map((source: { id: string; enabled: boolean }) => [
+        source.id,
+        source.enabled,
+      ]),
+    ).toEqual([
+      ["bb-plugins", true],
+      ["bb-user", false],
+      ["bb-project", true],
+      ["shared", false],
+    ]);
+  });
+
+  it("rejects an unknown skill source without writing settings", async () => {
+    const put = vi.fn(async ({ json }) => json);
+    stubServerApi({
+      "v1.system.config.$get": vi.fn(async () => ({
+        generalSettings: defaultAppSettings,
+      })),
+      "v1.settings.general.$put": put,
+    });
+
+    await expect(
+      runCommand(["skill", "sources", "pi", "off"], register),
+    ).rejects.toThrow("process.exit:1");
+    expect(put).not.toHaveBeenCalled();
   });
 });

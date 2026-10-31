@@ -27,6 +27,7 @@ import {
   rollbackGeneralSettingsCacheTransaction,
   rollbackKeyboardSettingsCacheTransaction,
 } from "../cache-owners/system-config-cache-owner";
+import { invalidateAllProjectSkillsQueries } from "../cache-owners/skills-cache-effects";
 
 const optimisticSettingsMutationKey = ["system", "settings"] as const;
 const generalSettingsMutationKey = [
@@ -111,6 +112,9 @@ export function generalSettingsMutationOptions(queryClient: QueryClient) {
         patch.streamerMode !== previous?.streamerMode
       ) {
         void resetModelCatalogsAfterStreamerModeChange({ queryClient });
+      }
+      if (patch.disabledSkillSources !== undefined) {
+        invalidateAllProjectSkillsQueries({ queryClient });
       }
       const nextProviderOrder = patch.providerOrder;
       if (nextProviderOrder === undefined) return;

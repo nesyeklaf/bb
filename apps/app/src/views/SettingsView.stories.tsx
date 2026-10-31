@@ -130,6 +130,9 @@ function useSettingsStoryState() {
     useState(false);
   const [summarizeShellCommands, setSummarizeShellCommands] = useState(true);
   const [streamerMode, setStreamerMode] = useState(false);
+  const [disabledSkillSources, setDisabledSkillSources] = useState(
+    defaultAppSettings.disabledSkillSources,
+  );
   const [managedBranchPrefix, setManagedBranchPrefix] = useState(
     defaultAppSettings.managedBranchPrefix,
   );
@@ -148,6 +151,8 @@ function useSettingsStoryState() {
     openLinksInAppBrowser,
     rewriteLocalhostLinks,
     steerActiveThreadOnEnter,
+    disabledSkillSources,
+    setDisabledSkillSources,
     confirmThreadArchive,
     setConfirmThreadArchive,
     keepHistoryAfterContextClear,
@@ -222,6 +227,8 @@ function GeneralSettingsStory({
         openLinksInAppBrowser={state.openLinksInAppBrowser}
         rewriteLocalhostLinks={state.rewriteLocalhostLinks}
         steerActiveThreadOnEnter={state.steerActiveThreadOnEnter}
+        disabledSkillSources={state.disabledSkillSources}
+        onDisabledSkillSourcesChange={state.setDisabledSkillSources}
       />
       <CliCommandSettingsSectionContent
         onChange={() => {}}

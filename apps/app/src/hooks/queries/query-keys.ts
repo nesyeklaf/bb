@@ -1054,6 +1054,10 @@ export function hostPathExistenceQueryKeyPrefix(): HostPathExistenceQueryKeyPref
   return [HOST_PATH_EXISTENCE_QUERY_KEY];
 }
 
+export function allProjectSkillsQueryKey() {
+  return [PROJECT_SKILLS_QUERY_KEY] as const;
+}
+
 export function projectSkillsQueryKey(projectId: string) {
   return [PROJECT_SKILLS_QUERY_KEY, projectId] as const;
 }

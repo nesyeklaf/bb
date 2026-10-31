@@ -335,7 +335,7 @@ export const installedSkillIdSchema = z.string().regex(/^skill_[a-f0-9]{64}$/u);
 
 export const skillRevisionSchema = z.string().regex(/^[a-f0-9]{64}$/u);
 
-export const skillSummarySchema = z.object({
+export const skillRegistrationSchema = z.object({
   id: installedSkillIdSchema,
   name: z.string(),
   description: z.string().nullable(),
@@ -344,6 +344,32 @@ export const skillSummarySchema = z.object({
   pluginId: z.string().min(1).nullable(),
   filePath: z.string(),
   manageable: z.boolean(),
+});
+export type SkillRegistration = z.infer<typeof skillRegistrationSchema>;
+
+export const skillDuplicateRelationSchema = z.enum([
+  "same-file",
+  "same-content",
+  "same-name",
+]);
+export type SkillDuplicateRelation = z.infer<
+  typeof skillDuplicateRelationSchema
+>;
+
+export const skillDuplicateSchema = skillRegistrationSchema
+  .pick({
+    id: true,
+    scope: true,
+    provider: true,
+    pluginId: true,
+    filePath: true,
+  })
+  .extend({ relation: skillDuplicateRelationSchema });
+export type SkillDuplicate = z.infer<typeof skillDuplicateSchema>;
+
+export const skillSummarySchema = skillRegistrationSchema.extend({
+  providers: z.array(skillProviderSchema),
+  duplicates: z.array(skillDuplicateSchema),
 });
 export type SkillSummary = z.infer<typeof skillSummarySchema>;
 

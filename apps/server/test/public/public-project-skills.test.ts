@@ -6,7 +6,7 @@ import { createHash } from "node:crypto";
 import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { setExperiments } from "@bb/db";
+import { getAppSettings, setAppSettings, setExperiments } from "@bb/db";
 import { defaultExperiments } from "@bb/domain";
 import {
   skillContentResponseSchema,
@@ -384,6 +384,8 @@ describe("public project skills route", () => {
           filePath:
             "/tmp/shared-skill-list/.agents/skills/portable-review/SKILL.md",
           manageable: false,
+          providers: [],
+          duplicates: [],
         });
         expect(body.skills.map((skill) => skill.name)).not.toContain(
           "repo-bb-skill",
@@ -391,6 +393,21 @@ describe("public project skills route", () => {
         expect(warn).not.toHaveBeenCalledWith(
           expect.anything(),
           "Skipping invalid shared skill",
+        );
+
+        setAppSettings(harness.deps.db, {
+          ...getAppSettings(harness.deps.db),
+          disabledSkillSources: ["shared"],
+        });
+        const switchedOff = skillListResponseSchema.parse(
+          await readJson(
+            await harness.app.request(
+              `/api/v1/projects/${project.id}/skills?environmentId=${environment.id}`,
+            ),
+          ),
+        );
+        expect(switchedOff.skills.map((skill) => skill.name)).not.toContain(
+          "portable-review",
         );
       },
     );
@@ -469,6 +486,8 @@ describe("public project skills route", () => {
           pluginId: null,
           filePath: "/data/skills/bb-helper/SKILL.md",
           manageable: true,
+          providers: [],
+          duplicates: [],
         },
         {
           id: skillId("/cwd/.cursor/skills/impeccable/SKILL.md"),
@@ -479,6 +498,8 @@ describe("public project skills route", () => {
           pluginId: null,
           filePath: "/cwd/.cursor/skills/impeccable/SKILL.md",
           manageable: false,
+          providers: ["acp-cursor"],
+          duplicates: [],
         },
         {
           id: skillId("/cwd/.claude/skills/cp/SKILL.md"),
@@ -489,6 +510,8 @@ describe("public project skills route", () => {
           pluginId: null,
           filePath: "/cwd/.claude/skills/cp/SKILL.md",
           manageable: true,
+          providers: ["claude-code"],
+          duplicates: [],
         },
         {
           id: skillId("/home/.claude/skills/cu/SKILL.md"),
@@ -499,6 +522,8 @@ describe("public project skills route", () => {
           pluginId: null,
           filePath: "/home/.claude/skills/cu/SKILL.md",
           manageable: true,
+          providers: ["claude-code"],
+          duplicates: [],
         },
         {
           id: skillId("/home/.codex/skills/cx/SKILL.md"),
@@ -509,6 +534,8 @@ describe("public project skills route", () => {
           pluginId: null,
           filePath: "/home/.codex/skills/cx/SKILL.md",
           manageable: true,
+          providers: ["codex"],
+          duplicates: [],
         },
       ]);
       const listed = stub.requests

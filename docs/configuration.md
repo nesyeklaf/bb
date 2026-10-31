@@ -227,6 +227,7 @@ for the command surface.
 | `managedBranchPrefix`                                                      | `bb/`                               | Settings → General → New branch prefix. Prefix for branches bb creates for worktrees and new checkout branches (`bb/fix-login-flow-thr_ab12cd34ef`); empty for none. At most 64 characters and must start a valid git branch name (no space or leading `-`). Existing branches and worktrees keep their names.                                                                                                                                                                                                                                 |
 | `providerOrder`                                                            | `[]`                                | Settings → Providers (move a provider up or down). JSON list of provider ids that lead the picker, such as `'["claude-code","codex"]'`; unlisted ids follow in plugin install order and unknown ids are ignored.                                                                                                                                                                                                                                                                                                                               |
 | `defaultProviderId`                                                        | `null`                              | Settings → Providers. Provider for new threads when neither caller nor project chose one; `null` means the first available provider in picker order.                                                                                                                                                                                                                                                                                                                                                                                           |
+| `disabledSkillSources`                                                     | `[]`                                | Settings → General → Skill sources, or `bb skill sources <source> on` and `off`. JSON list of bb-owned skill sources bb neither injects into agents nor lists: `bb-plugins` (plugin skills), `bb-user` (the data directory's skills folder and `BB_INHERITED_SKILLS_ROOTS`), `bb-project` (`.bb/skills`), `shared` (`sharedSkillRoots`). Agents' native skill roots are not affected.                                                                                                                                                          |
 | `earlyAdopter`                                                             | `false`                             | Settings → Experiments → Become an early adopter. Turns on experiments marked Early adopter unless you set them yourself; see [Experiments](#experiments).                                                                                                                                                                                                                                                                                                                                                                                     |
 | `machineServerUrl`, `defaultMachineAccess`, `machineGitCredentialsEnabled` | See [Multi-machine](#multi-machine) | Machine access and credential forwarding.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
 
@@ -243,7 +244,7 @@ the terminal and pastes the primary selection independently of this setting.
 Unsupported browsers never substitute unrelated regular clipboard contents.
 
 Older clients that omit `keepHistoryAfterContextClear`,
-`summarizeShellCommands`, or `earlyAdopter` preserve the saved value. The
+`summarizeShellCommands`, `earlyAdopter`, or `disabledSkillSources` preserve the saved value. The
 former Show Git changes and Commit button switch is now
 [plugin settings](#git-and-github-pr-status-plugins), and the general-settings
 API rejects an update that still sends `showGitChanges`. For older SDK callers, the
@@ -600,6 +601,20 @@ from the home directory and the workspace. bb indexes them read-only and
 injects selected skills into every provider; bb user and project skills win on
 a name collision. Apply edits with `npx bb-app config refresh`.
 
+`bb skill sources` shows the four bb-owned sources (`bb-plugins`, `bb-user`,
+`bb-project`, `shared`) and whether each is on; `bb skill sources shared off`
+stops bb from injecting and listing that source, and Settings → General → Skill
+sources has the same switches. They do not change what an agent loads from its
+own native roots.
+
+Each listed skill carries `providers`, the agents that load it, and
+`duplicates`, the other registrations of the same skill: `same-file` (the
+same real file, for example through a symlink), `same-content` (identical
+`SKILL.md` bytes), or `same-name`. `bb skill list --duplicates` lists only
+skills with duplicates, and the Skills page marks them and filters by agent.
+`bb skill install-cli-skills` copies bb's CLI skills into `~/.agents/skills`,
+so those copies show up as duplicates of the built-in ones.
+
 bb also indexes each provider's native skill roots for that provider's `/`
 menu, the Skills page, and `bb skill list`. The shipped provider plugins
 declare:
@@ -608,7 +623,7 @@ declare:
 | ------------ | -------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------ |
 | Codex        | `~/.agents/skills`, `$CODEX_HOME/skills`                                                                 | `.agents/skills` from the repository root to the current directory, plus `.codex/skills`                     |
 | Claude Code  | `$CLAUDE_CONFIG_DIR/skills` or `~/.claude/skills`, plus enabled plugin skills                            | `.claude/skills` from the repository root to the current directory, plus enabled plugin skills               |
-| Pi           | `~/.pi/agent/skills`, `~/.agents/skills`                                                                 | `.pi/skills` in the workspace; `.agents/skills` from the repository root to the current directory            |
+| Pi           | `~/.pi/agent/skills`, `~/.agents/skills`, plus skills of installed Pi packages after Pi's filters        | `.pi/skills` in the workspace; `.agents/skills` from the repository root to the current directory            |
 | Cursor       | `~/.cursor/skills`, `~/.agents/skills`, `~/.claude/skills`, `~/.codex/skills`                            | The same four roots in the workspace                                                                         |
 | OpenCode     | `~/.config/opencode/skills`, `~/.claude/skills`, `~/.agents/skills`                                      | `.opencode/skills`, `.claude/skills`, and `.agents/skills` from the repository root to the current directory |
 | omp          | The active `~/.omp/.../agent` roots and supported Pi, Agents, Claude, Codex, and OpenCode roots          | `.omp/skills` and the supported compatibility roots from the repository root to the current directory        |
