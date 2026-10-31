@@ -698,6 +698,9 @@ importers:
       '@bb/skill-index':
         specifier: workspace:*
         version: link:../../packages/skill-index
+      '@bb/telemetry':
+        specifier: workspace:*
+        version: link:../../packages/telemetry
       '@bb/text-utils':
         specifier: workspace:*
         version: link:../../packages/text-utils
@@ -759,6 +762,9 @@ importers:
       '@bb/tsconfig':
         specifier: workspace:*
         version: link:../../packages/tsconfig
+      '@opentelemetry/api':
+        specifier: 1.9.1
+        version: 1.9.1
       '@types/mime-types':
         specifier: ^3.0.1
         version: 3.0.1

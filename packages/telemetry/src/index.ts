@@ -1,3 +1,4 @@
+import { setTimeout as delay } from "node:timers/promises";
 import { metrics } from "@opentelemetry/api";
 import { OTLPMetricExporter } from "@opentelemetry/exporter-metrics-otlp-proto";
 import { OTLPTraceExporter } from "@opentelemetry/exporter-trace-otlp-proto";
@@ -16,6 +17,8 @@ import {
   otlpSignalUrl,
 } from "@bb/config/otlp";
 
+export { markSpanFailed, withIncomingSpan, withOutgoingSpan } from "./spans.js";
+
 export interface Telemetry {
   shutdown(): Promise<void>;
 }
@@ -27,6 +30,7 @@ interface StartTelemetryOptions {
 }
 
 const DEFAULT_METRIC_EXPORT_INTERVAL_MS = 15_000;
+const SHUTDOWN_TIMEOUT_MS = 3_000;
 
 export function startTelemetry(options: StartTelemetryOptions): Telemetry {
   const config = loadOtlpConfig({ env: options.env ?? process.env });
@@ -62,9 +66,12 @@ export function startTelemetry(options: StartTelemetryOptions): Telemetry {
   metrics.setGlobalMeterProvider(meterProvider);
   return {
     shutdown: async () => {
-      await Promise.allSettled([
-        tracerProvider.shutdown(),
-        meterProvider.shutdown(),
+      await Promise.race([
+        Promise.allSettled([
+          tracerProvider.shutdown(),
+          meterProvider.shutdown(),
+        ]),
+        delay(SHUTDOWN_TIMEOUT_MS, undefined, { ref: false }),
       ]);
     },
   };

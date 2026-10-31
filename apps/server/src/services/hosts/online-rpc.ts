@@ -1,3 +1,4 @@
+import { markSpanFailed, withOutgoingSpan } from "@bb/telemetry";
 import { hostCommandMayWake } from "./wake-policy.js";
 import { isHostCleanupAllowed } from "./cleanup-context.js";
 import { assertMachineLifecycleAdmission } from "../machines/lifecycle.js";
@@ -263,7 +264,8 @@ async function callHostOnlineRpcWithRetry(
   },
 ): Promise<HostDaemonRpcResultForCommand> {
   const retryArgs = (): CallHostOnlineRpcArgs<HostDaemonRpcCommand> =>
-    options.retryCommand !== undefined && args.command.type === "plugin.host.call"
+    options.retryCommand !== undefined &&
+    args.command.type === "plugin.host.call"
       ? { ...args, command: options.retryCommand(args.command) }
       : args;
   const timeoutRetryDeadline =
@@ -387,16 +389,30 @@ function requestHostOnlineRpcResponse(
       );
   }
   return traceTurnRpc(args.command.type, () =>
-    deps.hub.requestHostOnlineRpc({
-      hostId: args.hostId,
-      message: {
-        type: "host-rpc.request",
-        requestId: randomUUID(),
-        command: args.command,
+    withOutgoingSpan(
+      {
+        attributes: {
+          "bb.host.id": args.hostId,
+          "bb.host_rpc.command": args.command.type,
+        },
+        name: `host-rpc ${args.command.type}`,
       },
-      ...(args.signal ? { signal: args.signal } : {}),
-      timeoutMs: args.timeoutMs,
-    }),
+      async (traceparent, span) => {
+        const response = await deps.hub.requestHostOnlineRpc({
+          hostId: args.hostId,
+          message: {
+            type: "host-rpc.request",
+            requestId: randomUUID(),
+            command: args.command,
+            ...(traceparent === undefined ? {} : { traceparent }),
+          },
+          ...(args.signal ? { signal: args.signal } : {}),
+          timeoutMs: args.timeoutMs,
+        });
+        if (!response.ok) markSpanFailed(span, response.errorCode);
+        return response;
+      },
+    ),
   );
 }
 

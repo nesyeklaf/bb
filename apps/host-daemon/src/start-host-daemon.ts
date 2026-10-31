@@ -8,6 +8,7 @@ import {
   setParcelWatcherBackend,
 } from "@bb/host-watcher";
 import { createLogger } from "@bb/logger";
+import { startTelemetry } from "@bb/telemetry";
 import { createHostDaemonApp } from "./app.js";
 import {
   readHostAuthState,
@@ -125,6 +126,7 @@ export async function startHostDaemon(
         ? resolveBbExecutablePathInDirectory(options.bbExecutableDirectory)
         : await resolveLocalBbExecutablePath();
     const bbExecutableDirectory = dirname(bbExecutablePath);
+    const telemetry = startTelemetry({ component: "host-daemon" });
     const logger = createLogger({
       component: "host-daemon",
       base: { serverUrl },
@@ -189,7 +191,9 @@ export async function startHostDaemon(
       resolveRuntimeShellEnv,
       hostWatcher,
       closeMachineAuthProxy: machineAuthProxy?.close,
-      exitProcess: (code) => process.exit(code),
+      exitProcess: (code) => {
+        void telemetry.shutdown().finally(() => process.exit(code));
+      },
     });
     const startedApp = app;
     handleDaemonLockLost = () => {
