@@ -59,7 +59,7 @@ describe("fitPathMiddle", () => {
     expect(fitPathMiddle("/tmp/qa/run/external-root", 20, measure)).toBe(
       "/tmp/…/external-root",
     );
-    expect(fitPathMiddle("C:\\Users\\me\\Code\\sandy", 14, measure)).toBe(
+    expect(fitPathMiddle("C:\\Users\\me\\Code\\sandy", 15, measure)).toBe(
       "C:\\…\\Code\\sandy",
     );
   });
