@@ -212,8 +212,6 @@ it("keeps customizing through picker choices and dismissals, then finishes on a 
     ]),
   );
   expect(finish).not.toHaveBeenCalled();
-  // The editor hands focus back to the edited slot on the next frame. A
-  // non-modal menu dismisses when focus leaves it, so let that settle first.
   await waitFor(() =>
     expect(
       document.activeElement?.hasAttribute("data-sidebar-customize-launch"),
