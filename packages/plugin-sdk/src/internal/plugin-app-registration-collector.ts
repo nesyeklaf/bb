@@ -1267,9 +1267,13 @@ export function collectPluginAppRegistrations(
         const id = requireSlotId(kind, registration?.id);
         requireUniqueId(kind, seenIds.messageMetadata, id);
         const placement = registration.placement ?? "above";
-        if (placement !== "above" && placement !== "actionRow") {
+        if (
+          placement !== "above" &&
+          placement !== "actionRow" &&
+          placement !== "below"
+        ) {
           throw new Error(
-            `${kind}: "placement" must be "above" or "actionRow"`,
+            `${kind}: "placement" must be "above", "actionRow" or "below"`,
           );
         }
         collected.messageMetadata.push({

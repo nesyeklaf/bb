@@ -3464,9 +3464,13 @@ export interface ExperimentalMessageMetadataProps {
  * its side. `"actionRow"` sits in the message's action row and shows and hides
  * with the actions, before them on user messages and after the overflow menu
  * on assistant messages. It extends into the space beside the message rather
- * than narrowing the actions.
+ * than narrowing the actions. `"below"` sits under the message in its full
+ * column width, for cards that belong to the message, such as notes.
  */
-export type ExperimentalMessageMetadataPlacement = "above" | "actionRow";
+export type ExperimentalMessageMetadataPlacement =
+  | "above"
+  | "actionRow"
+  | "below";
 
 /** A React contribution beside a conversation message. */
 export interface ExperimentalMessageMetadataRegistration {

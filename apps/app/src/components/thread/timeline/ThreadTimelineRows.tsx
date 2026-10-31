@@ -1029,6 +1029,7 @@ const ConversationRowContent = memo(function ConversationRowContent({
           turnRequest={row.turnRequest}
           workspaceRootPath={workspaceRootPath}
         />
+        <MessageMetadata placement="below" {...metadata} />
       </>
     );
   }
@@ -1074,6 +1075,7 @@ const ConversationRowContent = memo(function ConversationRowContent({
         turnId={row.turnId}
         workspaceRootPath={workspaceRootPath}
       />
+      <MessageMetadata placement="below" {...metadata} />
     </>
   );
 });
