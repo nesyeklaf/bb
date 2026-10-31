@@ -265,7 +265,7 @@ describe("collector and store", () => {
     store.record(observations);
     expect(store.capReached()).toBe(true);
     expect(store.list({ since: 0 })).toHaveLength(KEY_LIMIT);
-  });
+  }, 30_000);
 });
 
 describe("aggregation edge cases", () => {

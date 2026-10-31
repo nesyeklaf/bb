@@ -107,8 +107,6 @@ describe("CompactSecondaryPanelShelf", () => {
           <CompactSecondaryPanelShelf
             open={false}
             onClose={vi.fn()}
-            // The shelf no longer accepts an open handler; pass one anyway so
-            // the test would catch a swipe-to-open path that still calls it.
             {...({ onOpen } as object)}
             srLabel="Right panel"
           >

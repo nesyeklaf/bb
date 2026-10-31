@@ -35,10 +35,20 @@ scripts/fork/deploy.sh AI ~/bb-fork-dist/<sha>/bb-app-<version>.tgz
 `deploy.sh` copies the tarball and `remote.sh` to the host, compares checksums, and starts `remote.sh deploy` as a transient systemd user unit. The unit keeps running when the ssh session drops, which it does when the restarted server is the one carrying the session. `remote.sh deploy`:
 
 1. finds the single `bb-host-daemon-*.service` user unit (or `BB_UNIT`) and its `BB_DATA_DIR`,
-2. stops the server,
-3. backs up `bb.db`, `config.json` and the npm prefix to `<data-dir>/backup-pre-fork-<timestamp>` and records that path in `~/bb-fork-last-backup`,
-4. installs the tarball into the npm prefix, restoring the old package if npm fails,
-5. sets `BB_APP_URL` to the tailnet URL and starts the server.
+2. refuses while any thread other than the one deploying (`BB_THREAD_ID`, passed on by `deploy.sh`) runs a turn, because the restart breaks that turn; `--force` overrides,
+3. runs the upgrade test below; when it fails, the running version stays,
+4. stops the server,
+5. backs up `bb.db`, `config.json` and the npm prefix to `<data-dir>/backup-pre-fork-<timestamp>` and records that path in `~/bb-fork-last-backup`,
+6. installs the tarball into the npm prefix, restoring the old package if npm fails,
+7. sets `BB_APP_URL` to the tailnet URL and starts the server.
+
+The upgrade test also runs on its own, with the live server untouched:
+
+```sh
+ssh AI 'bash ~/bb-fork-remote.sh upgrade-test /tmp/bb-app-fork.tgz'
+```
+
+It installs the tarball into a temporary npm prefix, copies `bb.db` (an online SQLite backup), the config and the plugins without their host data, starts that server on spare ports, and passes when `/health` and `/api/threads` answer 200 and every plugin is `running` or `disabled`. This is how a migration over real data gets tested before the deploy, for example soft-deleted plugin rows that no fixture holds. The copy runs plugin services for about 20 seconds, but no host daemon, so no turn starts. `--skip-upgrade-test` skips it on deploy.
 
 Check the result any time with `ssh AI 'bash ~/bb-fork-remote.sh status'`. It prints the unit state, installed version, `BB_APP_URL`, the local and tailnet HTTP status, and the tail of `~/bb-fork-deploy.log`.
 

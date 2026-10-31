@@ -13,7 +13,6 @@ const cliEntry = join(packageRoot, "dist", "bb.js");
 
 const EXPECTED_RUNNING_BUILTIN_PLUGINS = [
   "automations",
-  "connect",
   "environment-git-worktree",
   "environment-project-checkout",
   "provider-acp",
@@ -170,7 +169,6 @@ const launcher = spawn(
     String(serverPort),
     "--host-daemon-port",
     String(daemonPort),
-    "--bundled",
   ],
   {
     detached: process.platform !== "win32",

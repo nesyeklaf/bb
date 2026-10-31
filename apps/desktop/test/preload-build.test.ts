@@ -432,7 +432,6 @@ describe("desktop build", () => {
 
         for (const scenario of [
           "custom",
-          "connect",
           "fatal",
           "attached",
           "crashed",

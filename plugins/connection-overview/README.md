@@ -31,3 +31,13 @@ Run on a Linux host against a started bb (dev or installed), not in CI. Never wr
    - `bb connections list --since 24h --json` and `bb connections incoming --since 24h --json` are the evidence files.
    - Spot check: while a provider CLI runs, `ss -tnp` lists its peers; each must appear as a row (allowed, inferred or third-party). Yellow provider rows mean the answer is inconclusive, not clean.
 4. Summary, without company hostnames: what was measured (sources, window, rows by state), what was inferred (inferred rows) and what was not measured (the list in `status`, plus any gap).
+
+## Real /proc fixture
+
+`src/fixtures/proc-host-daemon.json` is a sanitized snapshot of a real host daemon's process tree: zombie children, `node-MainThread` plugin hosts and provider bridge workers holding sockets to a provider. `src/sampler.fixture.test.ts` replays it through the sampler and the classifier, so process naming is tested on the shapes a host produces, not only on invented ones. Refresh it on a Linux host while a provider bridge worker holds an outgoing connection:
+
+```sh
+node scripts/capture-proc-fixture.mjs <host-daemon-pid> src/fixtures/proc-host-daemon.json
+```
+
+The script keeps pids, process names, states and socket tables. It drops every argument except Node flags and script file names, maps LAN, tailnet and public addresses to documentation ranges, and zeroes kernel pointers. Read the diff before committing it.

@@ -77,7 +77,6 @@ export function selectionFromTicks({
   };
 }
 
-/** The band the pointer is on or nearest to, so moving along the rail picks a band without aiming at its line. Ties go to the narrower band. */
 export function pickBandAtTick(
   ranges: readonly TickRange[],
   tickIndex: number,
