@@ -17,6 +17,9 @@ import {
 } from "@bb/host-daemon-contract";
 import type { HostWatcher } from "@bb/host-watcher";
 import { createDeferredPromise, makeTempDir } from "@bb/test-helpers";
+import { context, metrics, propagation, trace } from "@opentelemetry/api";
+import { startTelemetry } from "@bb/telemetry";
+import { startOtlpReceiver } from "@bb/telemetry/testing";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   DISPATCH_TEST_BRIDGE_LAUNCH,
@@ -418,6 +421,47 @@ async function createAppFixture(
 }
 
 describe("createHostDaemonApp", () => {
+  it("continues the server's trace when it handles a host RPC", async () => {
+    const receiver = await startOtlpReceiver();
+    const telemetry = startTelemetry({
+      component: "host-daemon",
+      env: { BB_OTLP_ENDPOINT: receiver.endpoint },
+    });
+    const { app, dataDir } = await createAppFixture();
+    const traceId = "0af7651916cd43dd8448eb211c80319c";
+    try {
+      const response = await app.router.handleOnlineRpcRequest({
+        type: "host-rpc.request",
+        requestId: "traced-read",
+        command: {
+          type: "host.read_file",
+          path: path.join(dataDir, "missing.txt"),
+          followRootSymlink: false,
+        },
+        traceparent: `00-${traceId}-b7ad6b7169203331-01`,
+      });
+      expect(response.ok).toBe(false);
+      await telemetry.shutdown();
+
+      const traces = receiver.requests.find(
+        (request) => request.path === "/v1/traces",
+      );
+      expect(traces?.body.includes(Buffer.from(traceId, "hex"))).toBe(true);
+      expect(traces?.body.includes("host-rpc host.read_file")).toBe(true);
+      expect(traces?.body.includes("bb-host-daemon")).toBe(true);
+      expect(
+        response.ok ? undefined : traces?.body.includes(response.errorCode),
+      ).toBe(true);
+    } finally {
+      await app.daemon.shutdown("test", 0);
+      trace.disable();
+      context.disable();
+      propagation.disable();
+      metrics.disable();
+      await receiver.close();
+    }
+  });
+
   it("installs machine variables into the daemon and child processes before work, then removes overrides live", async () => {
     vi.stubEnv("MACHINE_DAEMON_TEST", "original");
     let socket: ReconnectingWebSocketLike | undefined;

@@ -333,6 +333,7 @@ const hostDaemonOnlineRpcRequestMessageSchema = z
     type: z.literal("host-rpc.request"),
     requestId: hostDaemonOnlineRpcRequestIdSchema,
     command: hostDaemonRpcCommandSchema,
+    traceparent: z.string().min(1).optional(),
   })
   .strict();
 

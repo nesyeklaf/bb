@@ -165,6 +165,7 @@ const STARTUP_ONLY_MANAGED_ENV_KEYS = new Set<string>([
   "BB_HOST_DAEMON_PORT",
   "BB_INHERITED_SKILLS_ROOTS",
   "BB_LOG_LEVEL",
+  "BB_OTLP_ENDPOINT",
   "BB_PERF_DIAGNOSTICS",
   "BB_MANAGED_DEV_BUILTIN_PLUGIN_HOT_RELOAD",
   "BB_SERVER_BIND_HOST",
@@ -1516,9 +1517,9 @@ Usage:
 Startup-only server and launcher keys:
   BB_APP_SURFACE, BB_APP_URL, BB_DATA_DIR, BB_DEV_APP_PORT,
   BB_EXTERNAL_URL, BB_HOST_DAEMON_PORT, BB_INHERITED_SKILLS_ROOTS,
-  BB_LOG_LEVEL, BB_MANAGED_DEV_BUILTIN_PLUGIN_HOT_RELOAD, BB_PERF_DIAGNOSTICS,
-  BB_SERVER_BIND_HOST, BB_SERVER_PORT, and BB_FF_* feature
-  flags.
+  BB_LOG_LEVEL, BB_MANAGED_DEV_BUILTIN_PLUGIN_HOT_RELOAD, BB_OTLP_ENDPOINT,
+  BB_PERF_DIAGNOSTICS, BB_SERVER_BIND_HOST, BB_SERVER_PORT, and BB_FF_*
+  feature flags.
   Changes require a full bb-app restart with bb-app stop && bb-app start,
   or a desktop app restart. BB_APP_URL can instead be changed live with
   bb-app config.

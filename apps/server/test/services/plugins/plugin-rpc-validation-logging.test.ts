@@ -51,9 +51,11 @@ async function rpcValidationWarning(
       },
     );
     expect(response.status).toBe(400);
-    return warn.mock.calls
-      .map(([message]) => String(message))
-      .find((message) => message.includes("rpc inspect failed:"));
+    const call = warn.mock.calls.find((args) =>
+      String(args.at(-1)).includes("rpc inspect failed:"),
+    );
+    expect(call?.[0]).toEqual({ pluginId: "rpc-diagnostics" });
+    return call === undefined ? undefined : String(call.at(-1));
   } finally {
     warn.mockRestore();
     await harness.pluginService.stop();

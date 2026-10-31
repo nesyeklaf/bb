@@ -7,6 +7,7 @@ import type { ServerConfig } from "@bb/config/server";
 import { toOptionalString } from "@bb/config/strings";
 import { BB_LOOPBACK_HOST } from "@bb/config/runtime";
 import { createLogger } from "@bb/logger";
+import { startTelemetry } from "@bb/telemetry";
 import { getAppSettings, getDisabledProviderIds, setAppSettings } from "@bb/db";
 import { initDb } from "./db.js";
 import { createApp } from "./server.js";
@@ -134,6 +135,7 @@ export function startServerPlugins(
 }
 
 export async function runServer(serverConfig: ServerConfig): Promise<void> {
+  const telemetry = startTelemetry({ component: "server" });
   const logger = createLogger({
     component: "server",
     dataDir: serverConfig.BB_DATA_DIR,
@@ -459,6 +461,7 @@ export async function runServer(serverConfig: ServerConfig): Promise<void> {
       const closeServers = Promise.all(servers.map(closeHttpListener));
       await closeWebSockets();
       await closeServers;
+      await telemetry.shutdown();
     })();
     return shutdownPromise;
   };
@@ -476,6 +479,7 @@ export async function runServer(serverConfig: ServerConfig): Promise<void> {
     if (pluginService.handleUncaughtException(error)) return;
     const message =
       error instanceof Error ? (error.stack ?? error.message) : String(error);
+    logger.fatal({ err: error }, "Uncaught exception");
     process.stderr.write(`${message}\n`);
     process.exit(1);
   });

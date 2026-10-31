@@ -632,6 +632,20 @@ export function registerSystemRoutes(
     context.json(await updateAiServiceSelection(deps, payload)),
   );
 
+  post(routes.reportClientError, (context, payload) => {
+    deps.logger.error(
+      {
+        clientComponentStack: payload.componentStack,
+        clientErrorSource: payload.source,
+        clientPath: payload.path,
+        clientStack: payload.stack,
+        userAgent: context.req.header("user-agent") ?? null,
+      },
+      `Client error: ${payload.message}`,
+    );
+    return context.json({ ok: true as const });
+  });
+
   post(routes.testAiService, async (context, payload) =>
     context.json(
       await testAiService(deps, {

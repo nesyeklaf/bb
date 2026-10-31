@@ -11,6 +11,7 @@ import type {
   HostDaemonCommandEnvironmentLane,
 } from "@bb/host-daemon-contract";
 import { performance } from "node:perf_hooks";
+import { markSpanFailed, withIncomingSpan } from "@bb/telemetry";
 import {
   hostDaemonEnvironmentLaneForCommand,
   hostDaemonOnlineRpcResponseMessageSchema,
@@ -104,7 +105,24 @@ export class CommandRouter {
     this.logger = options.logger;
   }
 
-  async handleOnlineRpcRequest(
+  handleOnlineRpcRequest(
+    message: HostDaemonOnlineRpcRequestMessage,
+  ): Promise<HostDaemonOnlineRpcResponseMessage> {
+    return withIncomingSpan(
+      {
+        attributes: { "bb.host_rpc.command": message.command.type },
+        name: `host-rpc ${message.command.type}`,
+        traceparent: message.traceparent,
+      },
+      async (span) => {
+        const response = await this.respondToOnlineRpcRequest(message);
+        if (!response.ok) markSpanFailed(span, response.errorCode);
+        return response;
+      },
+    );
+  }
+
+  private async respondToOnlineRpcRequest(
     message: HostDaemonOnlineRpcRequestMessage,
   ): Promise<HostDaemonOnlineRpcResponseMessage> {
     const handlerStartedAtMs = performance.now();

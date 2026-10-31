@@ -162,10 +162,7 @@ import {
 } from "./plugin-hook-registry.js";
 import type { PluginEnvironmentProviderBridge } from "./plugin-environment-provider-registry.js";
 import { createPluginRegistration } from "./plugin-registration.js";
-import {
-  createPluginRuntime,
-  forgetMutableRoot,
-} from "./plugin-runtime.js";
+import { createPluginRuntime, forgetMutableRoot } from "./plugin-runtime.js";
 import {
   nextCronRunAt,
   raceTimeout,
@@ -589,6 +586,7 @@ export function createPluginService(deps: PluginServiceDeps): PluginService {
     })();
     if (!(await settledWithin(run, installHandlerTimeoutMs))) {
       logger.warn(
+        { pluginId: id },
         `[plugin:${id}] install handlers were still running after ${installHandlerTimeoutMs / 1000}s; the install finished without waiting for them`,
       );
     }
@@ -2698,6 +2696,7 @@ export function createPluginService(deps: PluginServiceDeps): PluginService {
           newNextRunAt = nextCronRunAt(schedule.cron, now);
         } catch (error) {
           logger.warn(
+            { pluginId: row.pluginId },
             `[plugin:${row.pluginId}] schedule ${row.name} has an invalid cron: ${
               error instanceof Error ? error.message : String(error)
             }`,

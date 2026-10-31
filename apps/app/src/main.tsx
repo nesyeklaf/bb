@@ -14,10 +14,20 @@ import { appQueryClient } from "./lib/app-query-client";
 import { applyAppFrameGeometry, getBbDesktopInfo } from "./lib/bb-desktop";
 import { applyCachedAppThemeCss } from "./lib/themes";
 import { installStaleChunkRecovery } from "./lib/stale-chunk-recovery";
+import {
+  createClientErrorReporter,
+  installClientErrorListeners,
+} from "./lib/client-error-reporting";
+import { sdk } from "./lib/sdk";
 import { installThreadSwitchTrace } from "./lib/thread-switch-trace";
 import { moveStylesheetPropertiesToRegistry } from "./lib/stylesheet-property-registry";
 import "./app.css";
 
+const clientErrorReporter = createClientErrorReporter({
+  send: (report) => sdk.system.experimental_reportClientError(report),
+  readPath: () => window.location.pathname,
+});
+installClientErrorListeners(window, clientErrorReporter);
 installStaleChunkRecovery();
 installForeignDomMutationGuard();
 installThreadSwitchTrace(window);
@@ -35,11 +45,24 @@ if (typeof CSS.registerProperty === "function") {
 }
 
 createRoot(document.getElementById("root")!, {
+  onCaughtError: (error, errorInfo) => {
+    console.error(error);
+    clientErrorReporter.report(
+      "react-caught",
+      error,
+      errorInfo.componentStack ?? null,
+    );
+  },
   onUncaughtError: (error, errorInfo) => {
     console.error(
       "[bb] uncaught render error — the app root was torn down",
       error,
       errorInfo.componentStack,
+    );
+    clientErrorReporter.report(
+      "react-uncaught",
+      error,
+      errorInfo.componentStack ?? null,
     );
   },
 }).render(

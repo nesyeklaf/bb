@@ -649,7 +649,7 @@ export function createPluginApi(options: {
     level: "debug" | "info" | "warn" | "error",
     message: string,
   ): void {
-    logger[level](`${prefix} ${message}`);
+    logger[level]({ pluginId }, `${prefix} ${message}`);
     appendPluginLogLine(dataDir, pluginId, level, message);
   }
   const log: PluginLogger = {

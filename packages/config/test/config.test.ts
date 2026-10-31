@@ -617,6 +617,31 @@ describe("consumer-specific config", () => {
     expect(loggerConfig.BB_LOG_LEVEL).toBe("debug");
   });
 
+  it("leaves OTLP export off unless an http endpoint is configured", () => {
+    const env = { NODE_ENV: "production" };
+    expect(
+      loadLoggerConfig({ dataDir: "/tmp/logger-data", env }).BB_OTLP_ENDPOINT,
+    ).toBeNull();
+    expect(
+      loadLoggerConfig({
+        dataDir: "/tmp/logger-data",
+        env: { ...env, BB_OTLP_ENDPOINT: "" },
+      }).BB_OTLP_ENDPOINT,
+    ).toBeNull();
+    expect(
+      loadLoggerConfig({
+        dataDir: "/tmp/logger-data",
+        env: { ...env, BB_OTLP_ENDPOINT: "http://127.0.0.1:4318/" },
+      }).BB_OTLP_ENDPOINT,
+    ).toBe("http://127.0.0.1:4318");
+    expect(() =>
+      loadLoggerConfig({
+        dataDir: "/tmp/logger-data",
+        env: { ...env, BB_OTLP_ENDPOINT: "grpc://127.0.0.1:4317" },
+      }),
+    ).toThrow("BB_OTLP_ENDPOINT must be an http or https URL");
+  });
+
   it("defaults CLI connection env to the local app instance", () => {
     const cliConfig = loadCliConfig({
       env: {

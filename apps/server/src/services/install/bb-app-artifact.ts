@@ -27,6 +27,7 @@ const HOST_DEPENDENCIES = [
   "fs-native-extensions",
   "node-pty",
   "pino",
+  "pino-opentelemetry-transport",
   "pino-pretty",
   "pino-roll",
 ] as const;

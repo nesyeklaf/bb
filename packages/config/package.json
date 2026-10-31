@@ -28,6 +28,11 @@
       "types": "./src/log-level.ts",
       "default": "./src/log-level.ts"
     },
+    "./otlp": {
+      "source": "./src/otlp.ts",
+      "types": "./src/otlp.ts",
+      "default": "./src/otlp.ts"
+    },
     "./logger": {
       "source": "./src/logger.ts",
       "types": "./src/logger.ts",

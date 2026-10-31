@@ -120,6 +120,25 @@ export const BB_LOG_LEVEL_ENV = defineEnvVar<string>({
   parse: parseLogLevelValue,
 });
 
+function parseOtlpEndpointValue(args: EnvVarParseArgs): string | null {
+  const endpoint = validateOptionalUrl(args.name, args.value);
+  if (endpoint === "") {
+    return null;
+  }
+  const protocol = new URL(endpoint).protocol;
+  if (protocol !== "http:" && protocol !== "https:") {
+    throw new Error(`${args.name} must be an http or https URL`);
+  }
+  return endpoint.replace(/\/+$/u, "");
+}
+
+export const BB_OTLP_ENDPOINT_ENV = defineEnvVar<string | null>({
+  description:
+    "Base URL of an OTLP/HTTP receiver, such as http://127.0.0.1:4318. When set, the server and host daemon export logs, traces, and metrics there. Unset or empty: nothing is exported.",
+  name: "BB_OTLP_ENDPOINT",
+  parse: parseOtlpEndpointValue,
+});
+
 export const BB_SERVER_PORT_ENV = defineEnvVar<number>({
   description: "HTTP port for the server",
   name: "BB_SERVER_PORT",
