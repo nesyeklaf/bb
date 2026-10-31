@@ -284,7 +284,7 @@ describe("BrowsePluginsTab", () => {
 
     fireEvent.click(await screen.findByRole("link", { name: "SANDY Official" }));
     expect(screen.getByTestId("location").textContent).toBe(
-      "/plugins?category=memory-and-context&sort=recently-added&author=13%3Asandy-official%3Agithub%3Aget-bb",
+      "/plugins?category=memory-and-context&sort=recently-added&author=14%3Asandy-official%3Agithub%3Aget-bb",
     );
     expect(onOpenPlugin).not.toHaveBeenCalled();
   });

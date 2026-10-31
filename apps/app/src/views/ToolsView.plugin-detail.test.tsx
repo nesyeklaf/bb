@@ -1668,7 +1668,7 @@ describe("SANDY Official plugin detail routing", () => {
     );
     expect(await screen.findByRole("heading", { name: /^SANDY/u })).toBeTruthy();
     expect(screen.getByTestId("location").textContent).toBe(
-      "/plugins?category=code-and-reviews&sort=recently-added&author=13%3Asandy-official%3Agithub%3Aget-bb",
+      "/plugins?category=code-and-reviews&sort=recently-added&author=14%3Asandy-official%3Agithub%3Aget-bb",
     );
 
     fireEvent.click(screen.getByRole("button", { name: "Browser back" }));
@@ -1749,7 +1749,7 @@ describe("SANDY Official plugin detail routing", () => {
     fireEvent.click(authorLinks.at(-1)!);
     await waitFor(() => {
       expect(screen.getByTestId("location").textContent).toBe(
-        "/plugins?author=13%3Asandy-official%3Agithub%3Aget-bb",
+        "/plugins?author=14%3Asandy-official%3Agithub%3Aget-bb",
       );
     });
     expect(await screen.findByRole("heading", { name: /^SANDY/u })).toBeTruthy();
