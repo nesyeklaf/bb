@@ -26,8 +26,17 @@ The web app reports errors caught by React error boundaries (including plugin sl
 docker compose -f ops/observability/compose.yaml up -d
 ```
 
-- Every port binds to `127.0.0.1` only: Grafana on `3000`, OTLP gRPC on `4317`, OTLP HTTP on `4318`. Override them with `BB_LGTM_GRAFANA_PORT`, `BB_LGTM_OTLP_GRPC_PORT` and `BB_LGTM_OTLP_HTTP_PORT`. From another machine, tunnel: `ssh -L 3000:127.0.0.1:3000 <host>`.
-- Grafana allows anonymous admin access, which is why it must stay on loopback. Its usage reporting and update checks are turned off; at first start it still downloads its Drilldown apps from grafana.com.
+- Every port binds to `127.0.0.1` only: Grafana on `3000`, OTLP gRPC on `4317`, OTLP HTTP on `4318`. Override them with `BB_LGTM_GRAFANA_PORT`, `BB_LGTM_OTLP_GRPC_PORT` and `BB_LGTM_OTLP_HTTP_PORT`.
+- Grafana has no login form, no basic auth and no anonymous access. It signs users in from the `Tailscale-User-Login` header that Tailscale Serve sets, creating each tailnet user as an org admin on first visit. Without that header it answers 401. Its usage reporting and update checks are turned off; at first start it still downloads its Drilldown apps from grafana.com.
+- Publish it through Tailscale Serve, tailnet only:
+
+  ```sh
+  tailscale serve --bg --https=3000 http://127.0.0.1:3000
+  tailscale serve --bg --https=4318 http://127.0.0.1:4318
+  ```
+
+  Grafana is then `https://<host>.<tailnet>.ts.net:3000`, and other machines in the tailnet send OTLP to `https://<host>.<tailnet>.ts.net:4318`. Set `BB_LGTM_GRAFANA_ROOT_URL` to the Grafana URL in `ops/observability/.env` so its links and redirects use it. `tailscale serve --https=3000 off` withdraws it.
+
 - Data persists in the `bb-observability_lgtm-data` volume. `docker compose -f ops/observability/compose.yaml down -v` removes it.
 - Point bb at it with `BB_OTLP_ENDPOINT=http://127.0.0.1:4318` in the environment of the server and host daemon, then restart them. In Grafana:
   - Errors from every component: Explore → Loki, `{service_name=~"bb-.+"} | detected_level="error"`.
