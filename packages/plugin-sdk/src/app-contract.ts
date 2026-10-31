@@ -3515,6 +3515,11 @@ export interface PluginMessageActionRegistration {
   title: string;
   icon?: BbIconName;
   /**
+   * Where the action shows. Omitted means both the per-message action bar and
+   * the text-selection menu; ['selection'] keeps it out of the action bar.
+   */
+  surfaces?: readonly ("actionBar" | "selection")[];
+  /**
    * Runs when the user activates the action. Errors (sync or async) are
    * contained and logged; they never break the timeline.
    */
